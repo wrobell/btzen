@@ -29,7 +29,6 @@ def read_data(obj, converter):
 
 def connect(mac):
     device = dbus.get_device(mac)
-    device._obj.Connect()
     return device
 
 

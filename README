@@ -1,0 +1,11 @@
+Run `bluetoothd` with `-E` option.
+
+As root::
+
+    $ hciconfig hci0 up
+    $ hcitool lescan
+    $ hcitool lecc <MAC>
+
+As an user::
+
+    $ PYTHONPATH=. bin/braitebt <MAC>
