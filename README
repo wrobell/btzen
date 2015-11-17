@@ -9,3 +9,10 @@ As root::
 As an user::
 
     $ PYTHONPATH=. bin/braitebt <MAC>
+
+Requirements
+
+- bluez 5.36
+- Python 3
+- Python D-Bus bindings
+
