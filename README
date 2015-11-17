@@ -1,3 +1,9 @@
+Library to read data from Bluetooth Smart sensors.
+
+Supported devices
+
+- SensorTag (CC2541DK, CC2650STK)
+
 Run `bluetoothd` with `-E` option.
 
 As root::
