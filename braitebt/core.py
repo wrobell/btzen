@@ -55,4 +55,11 @@ def read_pressure(device):
     yield from read_data(p_data._obj, conv.bmp280_pressure)
 
 
+def read_light(device):
+    p_conf = dbus.find_sensor(device, dev_uuid(0xaa72))
+    p_data = dbus.find_sensor(device, dev_uuid(0xaa71))
+    p_conf._obj.WriteValue([1])
+    yield from read_data(p_data._obj, conv.opt3001_light)
+
+
 # vim: sw=4:et:ai

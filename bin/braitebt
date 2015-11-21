@@ -33,13 +33,16 @@ dev = braitebt.connect(args.device)
 r_pressure = braitebt.read_pressure(dev)
 r_temp = braitebt.read_temperature(dev)
 r_hum = braitebt.read_humidity(dev)
+r_light = braitebt.read_light(dev)
 
 print('... connected to {} and sensors initialized'.format(args.device))
 
-for temp, pressure, hum in zip(r_temp, r_pressure, r_hum):
+readings = zip(r_temp, r_pressure, r_hum, r_light)
+for temp, pressure, hum, light in readings:
     print('temperature: {:.1f}'.format(temp))
     print('pressure: {:.1f}'.format(pressure))
     print('humidity: {:.1f}'.format(hum))
+    print('light: {:.1f}'.format(light))
     print()
 
     time.sleep(1)

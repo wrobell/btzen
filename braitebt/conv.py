@@ -37,4 +37,10 @@ tmp006_temp = lambda data: to_int(data[2:]) / 128.0
 bmp280_pressure = lambda data: to_int(data[3:])
 hdc1000_humidity = lambda data: to_int(data[2:]) / HDC1000_HUMIDITY
 
+def opt3001_light(data):
+    v = to_int(data)
+    m = (v & 0x0FFF) / 100
+    e = (v & 0xF000) >> 12
+    return m * (2 << e)
+
 # vim: sw=4:et:ai
