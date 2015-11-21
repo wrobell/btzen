@@ -21,14 +21,20 @@
 Data conversion functions for various sensors.
 """
 
+import struct
+
 SHT21_TEMP = 175.72 / 65536
-SHT21_HUMIDITY = 125.0 / 65536
+SHT21_HUMIDITY = 125 / 65536
+HDC1000_HUMIDITY = 65536 / 100
 
-to_int16 = lambda data: (data[1] << 8) + data[0]
+BYTE_SHIFT = 1, 8, 16
 
-sht21_humidity = lambda data: -6.0 + SHT21_HUMIDITY * (to_int16(data[2:]) & 0xfffc)
-sht21_temp = lambda data: -46.85 + SHT21_TEMP * to_int16(data)
+to_int = lambda data: sum(v << b for v, b in zip(data, BYTE_SHIFT))
 
-tmp006_temp = lambda data: to_int16(data[2:]) / 128.0
+sht21_humidity = lambda data: -6.0 + SHT21_HUMIDITY * (to_int(data[2:]) & 0xfffc)
+sht21_temp = lambda data: -46.85 + SHT21_TEMP * to_int(data[:2])
+tmp006_temp = lambda data: to_int(data[2:]) / 128.0
+bmp280_pressure = lambda data: to_int(data[3:])
+hdc1000_humidity = lambda data: to_int(data[2:]) / HDC1000_HUMIDITY
 
 # vim: sw=4:et:ai

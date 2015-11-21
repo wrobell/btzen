@@ -18,8 +18,9 @@
 #
 
 from . import dbus
-from .conv import tmp006_temp, sht21_humidity
+from .import conv
 
+dev_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
 
 def read_data(obj, converter):
     while True:
@@ -33,18 +34,25 @@ def connect(mac):
 
 
 def read_temperature(device):
-    temp_conf = dbus.find_sensor(device, 'IR Temp. Conf.')
-    temp_data = dbus.find_sensor(device, 'IR Temp. Data')
+    temp_conf = dbus.find_sensor(device, dev_uuid(0xaa02))
+    temp_data = dbus.find_sensor(device, dev_uuid(0xaa01))
     temp_conf._obj.WriteValue([1])
 
-    yield from read_data(temp_data._obj, tmp006_temp)
+    yield from read_data(temp_data._obj, conv.tmp006_temp)
 
 
 def read_humidity(device):
-    hum_conf = dbus.find_sensor(device, 'Humid. Conf.')
-    hum_data = dbus.find_sensor(device, 'Humid. Data')
+    hum_conf = dbus.find_sensor(device, dev_uuid(0xaa22))
+    hum_data = dbus.find_sensor(device, dev_uuid(0xaa21))
     hum_conf._obj.WriteValue([1])
-    yield from read_data(hum_data._obj, sht21_humidity)
+    yield from read_data(hum_data._obj, conv.hdc1000_humidity)
+
+
+def read_pressure(device):
+    p_conf = dbus.find_sensor(device, dev_uuid(0xaa42))
+    p_data = dbus.find_sensor(device, dev_uuid(0xaa41))
+    p_conf._obj.WriteValue([1])
+    yield from read_data(p_data._obj, conv.bmp280_pressure)
 
 
 # vim: sw=4:et:ai

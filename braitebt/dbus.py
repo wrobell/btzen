@@ -69,20 +69,9 @@ def get_descriptors(characteristics):
     return load_objects(characteristics.Descriptors, 'org.bluez.GattDescriptor1')
 
 
-def get_all_sensors(device):
-    value = lambda d: bytearray(d._obj.ReadValue()).decode()
-    items = (
-        (c, value(d))
-        for s in get_services(device)
-        for c in get_characteristics(s)
-        for d in get_descriptors(c)
-    )
-    return ((c, d) for c, d in items if d.isprintable())
-
-
-def find_sensor(device, name):
-    items = get_all_sensors(device)
-    return next(c for c, d in items if d == name)
+def find_sensor(device, uuid):
+    items = (c for s in get_services(device) for c in get_characteristics(s))
+    return next((c for c in items if c.UUID == uuid), None)
 
 
 # vim: sw=4:et:ai

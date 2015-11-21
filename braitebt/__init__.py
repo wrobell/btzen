@@ -17,8 +17,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .core import connect, read_temperature, read_humidity
+from .core import connect, read_temperature, read_humidity, read_pressure
 
-__all__ = ['connect', 'read_temperature', 'read_humidity']
+__all__ = ['connect', 'read_temperature', 'read_humidity', 'read_pressure']
 
 # vim: sw=4:et:ai
