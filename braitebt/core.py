@@ -17,10 +17,31 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+The identificators for specific sensors can be found at
+
+CC2541DK
+    http://processors.wiki.ti.com/index.php/SensorTag_User_Guide
+CC2650STK
+    http://processors.wiki.ti.com/index.php/CC2650_SensorTag_User's_Guide
+"""
+
+import logging
+
 from . import dbus
 from .import conv
 
+logger = logging.getLogger(__name__)
+
+# (sensor name, sensor id): data converter
+DATA_CONVERTER = {
+    ('SensorTag', 0xaa21): conv.sht21_humidity,
+    ('SensorTag 2', 0xaa21): conv.hdc1000_humidity,
+}
+
 dev_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
+data_converter = lambda device, dev_id: \
+    DATA_CONVERTER[(str(device.Name), dev_id)]
 
 def read_data(obj, converter):
     while True:
@@ -42,10 +63,11 @@ def read_temperature(device):
 
 
 def read_humidity(device):
+    converter = data_converter(device, 0xaa21)
     hum_conf = dbus.find_sensor(device, dev_uuid(0xaa22))
     hum_data = dbus.find_sensor(device, dev_uuid(0xaa21))
     hum_conf._obj.WriteValue([1])
-    yield from read_data(hum_data._obj, conv.hdc1000_humidity)
+    yield from read_data(hum_data._obj, converter)
 
 
 def read_pressure(device):
@@ -57,9 +79,16 @@ def read_pressure(device):
 
 def read_light(device):
     p_conf = dbus.find_sensor(device, dev_uuid(0xaa72))
-    p_data = dbus.find_sensor(device, dev_uuid(0xaa71))
-    p_conf._obj.WriteValue([1])
-    yield from read_data(p_data._obj, conv.opt3001_light)
+    if p_conf:
+        p_data = dbus.find_sensor(device, dev_uuid(0xaa71))
+        p_conf._obj.WriteValue([1])
+        return read_data(p_data._obj, conv.opt3001_light)
+    else:
+        if __debug__:
+            logger.debug(
+                'light sensor configuration not found (id={})'.format(0xaa72)
+            )
+        return None
 
 
 # vim: sw=4:et:ai
