@@ -6,7 +6,7 @@ Supported devices and sensor readings
   - temperature
   - pressure
   - humidity
-  - light
+  - light (CC2541DK only)
 
 Run `bluetoothd` with `-E` option.
 
