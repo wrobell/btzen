@@ -26,22 +26,36 @@ CC2650STK
     http://processors.wiki.ti.com/index.php/CC2650_SensorTag_User's_Guide
 """
 
+import functools
 import logging
+import struct
 
 from . import dbus
 from .import conv
 
 logger = logging.getLogger(__name__)
 
+
+def converter_epcos_t5400_pressure(dev, p_conf):
+    p_calib = dbus.find_sensor(dev, dev_uuid(0xaa43))
+    p_conf._obj.WriteValue([2])
+    calib = p_calib._obj.ReadValue()
+    calib = struct.unpack('<4H4h', bytearray(calib))
+    return functools.partial(conv.epcos_t5400_pressure, calib)
+
+
 # (sensor name, sensor id): data converter
 DATA_CONVERTER = {
-    ('SensorTag', 0xaa21): conv.sht21_humidity,
-    ('SensorTag 2', 0xaa21): conv.hdc1000_humidity,
+    ('SensorTag', 0xaa21): lambda *args: conv.sht21_humidity,
+    ('SensorTag 2', 0xaa21): lambda *args: conv.hdc1000_humidity,
+    ('SensorTag', 0xaa41): converter_epcos_t5400_pressure,
+    ('SensorTag 2', 0xaa41): lambda *args: conv.bmp280_pressure,
 }
 
 dev_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
 data_converter = lambda device, dev_id: \
     DATA_CONVERTER[(str(device.Name), dev_id)]
+
 
 def read_data(obj, converter):
     while True:
@@ -63,18 +77,25 @@ def read_temperature(device):
 
 
 def read_humidity(device):
-    converter = data_converter(device, 0xaa21)
     hum_conf = dbus.find_sensor(device, dev_uuid(0xaa22))
-    hum_data = dbus.find_sensor(device, dev_uuid(0xaa21))
-    hum_conf._obj.WriteValue([1])
-    yield from read_data(hum_data._obj, converter)
+    if hum_conf:
+        converter = data_converter(device, 0xaa21)(device, hum_conf)
+        hum_data = dbus.find_sensor(device, dev_uuid(0xaa21))
+        hum_conf._obj.WriteValue([1])
+        return read_data(hum_data._obj, converter)
+    else:
+        return None
 
 
 def read_pressure(device):
     p_conf = dbus.find_sensor(device, dev_uuid(0xaa42))
-    p_data = dbus.find_sensor(device, dev_uuid(0xaa41))
-    p_conf._obj.WriteValue([1])
-    yield from read_data(p_data._obj, conv.bmp280_pressure)
+    if p_conf:
+        converter = data_converter(device, 0xaa41)(device, p_conf)
+        p_data = dbus.find_sensor(device, dev_uuid(0xaa41))
+        p_conf._obj.WriteValue([1])
+        return read_data(p_data._obj, converter)
+    else:
+        return None
 
 
 def read_light(device):
@@ -86,7 +107,7 @@ def read_light(device):
     else:
         if __debug__:
             logger.debug(
-                'light sensor configuration not found (id={})'.format(0xaa72)
+                'light sensor configuration not found (id={:x})'.format(0xaa72)
             )
         return None
 

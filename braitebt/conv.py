@@ -43,4 +43,15 @@ def opt3001_light(data):
     e = (v & 0xF000) >> 12
     return m * (2 << e)
 
+
+def epcos_t5400_pressure(calib, data):
+    temp, pressure = struct.unpack('<hH', bytearray(data))
+
+    c = calib
+    t2 = temp << 2
+    sens = c[2] + ((c[3] * temp) >> 17) + ((c[4] * t2) >> 34)
+    off = (c[5] << 14) + ((c[6] * temp) >> 3) + ((c[7] * t2) >> 19)
+    return (sens * pressure + off) >> 14
+
+
 # vim: sw=4:et:ai
