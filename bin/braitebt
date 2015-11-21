@@ -32,6 +32,7 @@ args = parser.parse_args()
 
 print('connecting to {}...'.format(args.device))
 dev = braitebt.connect(args.device)
+print('connected to {}'.format(dev.Name))
 
 readers = {
     'pressure': braitebt.read_pressure(dev),
@@ -39,8 +40,7 @@ readers = {
     'humidity': braitebt.read_humidity(dev),
     'light': braitebt.read_light(dev),
 }
-
-print('... connected to {} and sensors initialized'.format(dev.Name))
+print('sensors initialized')
 
 data = sorted([(n, r) for n, r in readers.items() if r])
 while True:

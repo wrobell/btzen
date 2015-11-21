@@ -47,9 +47,9 @@ def converter_epcos_t5400_pressure(dev, p_conf):
 # (sensor name, sensor id): data converter
 DATA_CONVERTER = {
     ('SensorTag', 0xaa21): lambda *args: conv.sht21_humidity,
-    ('SensorTag 2', 0xaa21): lambda *args: conv.hdc1000_humidity,
+    ('SensorTag 2.0', 0xaa21): lambda *args: conv.hdc1000_humidity,
     ('SensorTag', 0xaa41): converter_epcos_t5400_pressure,
-    ('SensorTag 2', 0xaa41): lambda *args: conv.bmp280_pressure,
+    ('SensorTag 2.0', 0xaa41): lambda *args: conv.bmp280_pressure,
 }
 
 dev_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
