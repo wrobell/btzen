@@ -34,18 +34,31 @@ print('connecting to {}...'.format(args.device))
 dev = btzen.connect(args.device)
 print('connected to {}'.format(dev.Name))
 
-readers = {
-    'pressure': btzen.read_pressure(dev),
-    'temperature': btzen.read_temperature(dev),
-    'humidity': btzen.read_humidity(dev),
-    'light': btzen.read_light(dev),
-}
+readers = {}
+try:
+    readers['pressure'] = btzen.Pressure(dev)
+except ValueError as ex:
+    print(ex)
+
+try:
+    readers['temperature'] = btzen.Temperature(dev)
+except ValueError as ex:
+    print(ex)
+try:
+    readers['humidity'] = btzen.Humidity(dev)
+except ValueError as ex:
+    print(ex)
+try:
+    readers['light'] = btzen.Light(dev)
+except ValueError as ex:
+    print(ex)
+
 print('sensors initialized')
 
 data = sorted([(n, r) for n, r in readers.items() if r])
 while True:
     for n, r in data:
-        print('{}: {:.1f}'.format(n, next(r)))
+        print('{}: {:.1f}'.format(n, r.read()))
     print()
     time.sleep(1)
 

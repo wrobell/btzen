@@ -46,9 +46,11 @@ def converter_epcos_t5400_pressure(dev, p_conf):
 
 # (sensor name, sensor id): data converter
 DATA_CONVERTER = {
+    ('TI BLE Sensor Tag', 0xaa01):lambda *args: conv.tmp006_temp,
     ('TI BLE Sensor Tag', 0xaa21): lambda *args: conv.sht21_humidity,
-    ('SensorTag 2.0', 0xaa21): lambda *args: conv.hdc1000_humidity,
     ('TI BLE Sensor Tag', 0xaa41): converter_epcos_t5400_pressure,
+    ('SensorTag 2.0', 0xaa01):lambda *args: conv.tmp006_temp,
+    ('SensorTag 2.0', 0xaa21): lambda *args: conv.hdc1000_humidity,
     ('SensorTag 2.0', 0xaa41): lambda *args: conv.bmp280_pressure,
 }
 
@@ -57,59 +59,62 @@ data_converter = lambda device, dev_id: \
     DATA_CONVERTER[(str(device.Name), dev_id)]
 
 
-def read_data(obj, converter):
-    while True:
-        data = obj.ReadValue()
-        yield converter(data)
-
-
 def connect(mac):
+    """
+    Connect to device with MAC address `mac`.
+
+    :param mac: Bluetooth device MAC address.
+    """
     device = dbus.get_device(mac)
     return device
 
 
-def read_temperature(device):
-    temp_conf = dbus.find_sensor(device, dev_uuid(0xaa02))
-    temp_data = dbus.find_sensor(device, dev_uuid(0xaa01))
-    temp_conf._obj.WriteValue([1])
+class Reader:
+    def __init__(self, device, conf_id, data_id):
+        super().__init__()
 
-    yield from read_data(temp_data._obj, conv.tmp006_temp)
+        conf_uuid = dev_uuid(conf_id)
+        self.conf = dbus.find_sensor(device, conf_uuid)
 
-
-def read_humidity(device):
-    hum_conf = dbus.find_sensor(device, dev_uuid(0xaa22))
-    if hum_conf:
-        converter = data_converter(device, 0xaa21)(device, hum_conf)
-        hum_data = dbus.find_sensor(device, dev_uuid(0xaa21))
-        hum_conf._obj.WriteValue([1])
-        return read_data(hum_data._obj, converter)
-    else:
-        return None
-
-
-def read_pressure(device):
-    p_conf = dbus.find_sensor(device, dev_uuid(0xaa42))
-    if p_conf:
-        converter = data_converter(device, 0xaa41)(device, p_conf)
-        p_data = dbus.find_sensor(device, dev_uuid(0xaa41))
-        p_conf._obj.WriteValue([1])
-        return read_data(p_data._obj, converter)
-    else:
-        return None
-
-
-def read_light(device):
-    p_conf = dbus.find_sensor(device, dev_uuid(0xaa72))
-    if p_conf:
-        p_data = dbus.find_sensor(device, dev_uuid(0xaa71))
-        p_conf._obj.WriteValue([1])
-        return read_data(p_data._obj, conv.opt3001_light)
-    else:
+        if not self.conf:
+            raise ValueError('Cannot find configuration for uuid {}'.format(
+                conf_uuid
+            ))
         if __debug__:
             logger.debug(
-                'light sensor configuration not found (id={:x})'.format(0xaa72)
+                'sensor configuration found for uuiid={}'.format(conf_uuid)
             )
-        return None
+
+        self.converter = data_converter(device, data_id)(device, self.conf)
+        self.data = dbus.find_sensor(device, dev_uuid(data_id))
+        self.conf._obj.WriteValue([1])
+
+
+    def read(self):
+        value = self.data._obj.ReadValue()
+        return self.converter(value)
+
+
+
+class Temperature(Reader):
+    def __init__(self, device):
+        super().__init__(device, 0xaa02, 0xaa01)
+
+
+class Humidity(Reader):
+    def __init__(self, device):
+        super().__init__(device, 0xaa22, 0xaa21)
+
+
+
+class Pressure(Reader):
+    def __init__(self, device):
+        super().__init__(device, 0xaa42, 0xaa41)
+
+
+class Light(Reader):
+    def __init__(self, device):
+        super().__init__(device, 0xaa72, 0xaa71)
 
 
 # vim: sw=4:et:ai
