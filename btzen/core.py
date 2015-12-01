@@ -52,6 +52,7 @@ DATA_CONVERTER = {
     ('SensorTag 2.0', 0xaa01):lambda *args: conv.tmp006_temp,
     ('SensorTag 2.0', 0xaa21): lambda *args: conv.hdc1000_humidity,
     ('SensorTag 2.0', 0xaa41): lambda *args: conv.bmp280_pressure,
+    ('SensorTag 2.0', 0xaa71): lambda *args: conv.opt3001_light,
 }
 
 dev_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
