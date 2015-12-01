@@ -8,6 +8,8 @@ Supported devices and sensor readings
   - humidity
   - light (CC2541DK only)
 
+Please update your sensor device to its latest firmware.
+
 Run `bluetoothd` with `-E` option.
 
 As root::
