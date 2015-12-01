@@ -46,9 +46,9 @@ def converter_epcos_t5400_pressure(dev, p_conf):
 
 # (sensor name, sensor id): data converter
 DATA_CONVERTER = {
-    ('SensorTag', 0xaa21): lambda *args: conv.sht21_humidity,
+    ('TI BLE Sensor Tag', 0xaa21): lambda *args: conv.sht21_humidity,
     ('SensorTag 2.0', 0xaa21): lambda *args: conv.hdc1000_humidity,
-    ('SensorTag', 0xaa41): converter_epcos_t5400_pressure,
+    ('TI BLE Sensor Tag', 0xaa41): converter_epcos_t5400_pressure,
     ('SensorTag 2.0', 0xaa41): lambda *args: conv.bmp280_pressure,
 }
 
