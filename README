@@ -18,7 +18,7 @@ As root::
 
 As an user::
 
-    $ PYTHONPATH=. bin/braitebt <MAC>
+    $ PYTHONPATH=. bin/btzen <MAC>
 
 Requirements
 
