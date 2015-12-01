@@ -1,5 +1,5 @@
-#
-# BTZen - Bluetooh Smart sensor reading library. 
+#!/usr/bin/env python3
+
 #
 # Copyright (C) 2015 by Artur Wroblewski <wrobell@pld-linux.org>
 #
@@ -17,12 +17,29 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .core import connect, read_temperature, read_humidity, read_pressure, \
-    read_light
 
-__all__ = [
-    'connect', 'read_temperature', 'read_humidity', 'read_pressure',
-    'read_light',
-]
+"""
+Build setup for btsensor library.
+"""
+
+from setuptools import setup, find_packages
+
+setup(
+    name='btzen',
+    version='0.0.1',
+    author='Artur Wroblewski',
+    author_email='wrobell@pld-linux.org',
+    description='BTZen - Bluetooh Smart sensor reading library',
+    classifiers=[
+        'License :: OSI Approved :: GNU General Public License (GPL)',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
+        'Development Status :: 3 - Alpha',
+        'Topic :: Software Development :: Libraries',
+    ],
+    packages=['btzen'],
+    include_package_data=True,
+)
 
 # vim: sw=4:et:ai
+

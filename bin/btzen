@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# BraiteBT - Bluetooh Smart sensor reading library. 
+# BTZen - Bluetooh Smart sensor reading library.
 #
 # Copyright (C) 2015 by Artur Wroblewski <wrobell@pld-linux.org>
 #
@@ -24,21 +24,21 @@ import time
 
 logging.basicConfig(level=logging.DEBUG)
 
-import braitebt
+import btzen
 
 parser = argparse.ArgumentParser()
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
 print('connecting to {}...'.format(args.device))
-dev = braitebt.connect(args.device)
+dev = btzen.connect(args.device)
 print('connected to {}'.format(dev.Name))
 
 readers = {
-    'pressure': braitebt.read_pressure(dev),
-    'temperature': braitebt.read_temperature(dev),
-    'humidity': braitebt.read_humidity(dev),
-    'light': braitebt.read_light(dev),
+    'pressure': btzen.read_pressure(dev),
+    'temperature': btzen.read_temperature(dev),
+    'humidity': btzen.read_humidity(dev),
+    'light': btzen.read_light(dev),
 }
 print('sensors initialized')
 

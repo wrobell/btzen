@@ -1,5 +1,5 @@
 #
-# BraiteBT - Bluetooh Smart sensor reading library. 
+# BTZen - Bluetooh Smart sensor reading library.
 #
 # Copyright (C) 2015 by Artur Wroblewski <wrobell@pld-linux.org>
 #
