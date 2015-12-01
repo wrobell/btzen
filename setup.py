@@ -29,7 +29,9 @@ setup(
     version='0.0.1',
     author='Artur Wroblewski',
     author_email='wrobell@pld-linux.org',
+    url='https://github.com/wrobell/btzen',
     description='BTZen - Bluetooh Smart sensor reading library',
+    setup_requires = ['setuptools_git >= 1.0',],
     classifiers=[
         'License :: OSI Approved :: GNU General Public License (GPL)',
         'Programming Language :: Python',
@@ -37,7 +39,8 @@ setup(
         'Development Status :: 3 - Alpha',
         'Topic :: Software Development :: Libraries',
     ],
-    packages=['btzen'],
+    packages=find_packages('.'),
+    scripts=('bin/btzen',),
     include_package_data=True,
 )
 
