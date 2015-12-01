@@ -3,6 +3,7 @@ Library to read data from Bluetooth Smart sensors.
 Supported devices and sensor readings
 
 - SensorTag (CC2541DK, CC2650STK)
+
   - temperature
   - pressure
   - humidity
