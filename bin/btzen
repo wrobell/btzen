@@ -31,7 +31,7 @@ import btzen
 
 logging.basicConfig(level=logging.DEBUG)
 
-dbus_loop = dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+dbus_loop = DBusGMainLoop(set_as_default=True)
 dbus_main_loop = GObject.MainLoop()
 bus = dbus.SystemBus(mainloop=dbus_loop)
 
