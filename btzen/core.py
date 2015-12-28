@@ -26,6 +26,7 @@ CC2650STK
     http://processors.wiki.ti.com/index.php/CC2650_SensorTag_User's_Guide
 """
 
+import asyncio
 import functools
 import logging
 import struct
@@ -60,22 +61,23 @@ data_converter = lambda device, dev_id: \
     DATA_CONVERTER[(str(device.Name), dev_id)]
 
 
-def connect(mac):
+def connect(bus, mac):
     """
     Connect to device with MAC address `mac`.
 
     :param mac: Bluetooth device MAC address.
     """
-    device = dbus.get_device(mac)
+    device = dbus.get_device(bus, mac)
     return device
 
 
 class Reader:
-    def __init__(self, device, conf_id, data_id):
+    def __init__(self, bus, device, conf_id, data_id, loop=None):
         super().__init__()
 
+        self._loop = asyncio.get_event_loop() if loop is None else loop
         conf_uuid = dev_uuid(conf_id)
-        self.conf = dbus.find_sensor(device, conf_uuid)
+        self.conf = dbus.find_sensor(bus, device, conf_uuid)
 
         if not self.conf:
             raise ValueError('Cannot find configuration for uuid {}'.format(
@@ -86,36 +88,59 @@ class Reader:
                 'sensor configuration found for uuiid={}'.format(conf_uuid)
             )
 
+        self._values = asyncio.Queue()
+
         self.converter = data_converter(device, data_id)(device, self.conf)
-        self.data = dbus.find_sensor(device, dev_uuid(data_id))
+        self.data = dbus.find_sensor(bus, device, dev_uuid(data_id))
         self.conf._obj.WriteValue([1])
 
 
     def read(self):
+        """
+        Read data from sensor.
+        """
         value = self.data._obj.ReadValue()
         return self.converter(value)
 
 
+    async def read_async(self):
+        """
+        Read data from sensor in asynchronous manner.
+
+        This method is a coroutine.
+        """
+        def cb(value):
+            value = self.converter(value)
+            self._loop.call_soon_threadsafe(self._values.put_nowait, value)
+
+        def error_cb(*args):
+            raise TypeError(*args) # FIXME
+
+        self.data._obj.ReadValue(reply_handler=cb, error_handler=error_cb)
+        value = await self._values.get()
+        return value
+
+
 
 class Temperature(Reader):
-    def __init__(self, device):
-        super().__init__(device, 0xaa02, 0xaa01)
+    def __init__(self, bus, device):
+        super().__init__(bus, device, 0xaa02, 0xaa01)
 
 
 class Humidity(Reader):
-    def __init__(self, device):
-        super().__init__(device, 0xaa22, 0xaa21)
+    def __init__(self, bus, device):
+        super().__init__(bus, device, 0xaa22, 0xaa21)
 
 
 
 class Pressure(Reader):
-    def __init__(self, device):
-        super().__init__(device, 0xaa42, 0xaa41)
+    def __init__(self, bus, device):
+        super().__init__(bus, device, 0xaa42, 0xaa41)
 
 
 class Light(Reader):
-    def __init__(self, device):
-        super().__init__(device, 0xaa72, 0xaa71)
+    def __init__(self, bus, device):
+        super().__init__(bus, device, 0xaa72, 0xaa71)
 
 
 # vim: sw=4:et:ai

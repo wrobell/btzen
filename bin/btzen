@@ -19,47 +19,72 @@
 #
 
 import argparse
+import asyncio
 import logging
-import time
+import threading
+
+import dbus
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GObject
+
+import btzen
 
 logging.basicConfig(level=logging.DEBUG)
 
-import btzen
+dbus_loop = dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+dbus_main_loop = GObject.MainLoop()
+bus = dbus.SystemBus(mainloop=dbus_loop)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
 print('connecting to {}...'.format(args.device))
-dev = btzen.connect(args.device)
+dev = btzen.connect(bus, args.device)
 print('connected to {}'.format(dev.Name))
 
 readers = {}
 try:
-    readers['pressure'] = btzen.Pressure(dev)
+    readers['pressure'] = btzen.Pressure(bus, dev)
 except ValueError as ex:
     print(ex)
 
 try:
-    readers['temperature'] = btzen.Temperature(dev)
+    readers['temperature'] = btzen.Temperature(bus, dev)
 except ValueError as ex:
     print(ex)
 try:
-    readers['humidity'] = btzen.Humidity(dev)
+    readers['humidity'] = btzen.Humidity(bus, dev)
 except ValueError as ex:
     print(ex)
 try:
-    readers['light'] = btzen.Light(dev)
+    readers['light'] = btzen.Light(bus, dev)
 except ValueError as ex:
     print(ex)
 
 print('sensors initialized')
 
-data = sorted([(n, r) for n, r in readers.items() if r])
-while True:
-    for n, r in data:
-        print('{}: {:.1f}'.format(n, r.read()))
-    print()
-    time.sleep(1)
+async def read_data(name, f):
+    t1 = loop.time()
+    v = await f()
+    t2 = loop.time()
+    print('{}: {:.1f} ({:.4f}s)'.format(name, v, t2 - t1))
+
+
+async def read_sensors(sensors):
+    while True:
+        tasks = [read_data(n, r.read_async) for n, r in sensors]
+        await asyncio.gather(*tasks)
+        print()
+        await asyncio.sleep(-loop.time() % 2)
+
+
+# start DBUS loop for async calls
+thread = threading.Thread(target=dbus_main_loop.run)
+thread.start()
+loop = asyncio.get_event_loop()
+
+sensors = sorted([(n, r) for n, r in readers.items() if r])
+loop.run_until_complete(read_sensors(sensors))
 
 # vim: sw=4:et:ai
