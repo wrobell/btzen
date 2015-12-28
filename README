@@ -19,6 +19,13 @@ As root::
     $ hcitool lescan
     $ hcitool lecc <MAC>
 
+To extend SensorTag battery life::
+
+    $ hcitool lecup  --handle=<HANDLE> --min 6 --max 100 --timeout 100 --latency=1
+
+Please note, that above command will make single sensor read to last about
+250ms.
+
 As an user::
 
     $ PYTHONPATH=. bin/btzen <MAC>
