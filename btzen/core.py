@@ -54,6 +54,7 @@ DATA_CONVERTER = {
     ('SensorTag 2.0', 0xaa21): lambda *args: conv.hdc1000_humidity,
     ('SensorTag 2.0', 0xaa41): lambda *args: conv.bmp280_pressure,
     ('SensorTag 2.0', 0xaa71): lambda *args: conv.opt3001_light,
+    ('SensorTag 2.0', 0xaa81): lambda *args: conv.mpu9250_motion,
 }
 
 dev_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
@@ -72,7 +73,7 @@ def connect(bus, mac):
 
 
 class Reader:
-    def __init__(self, bus, device, conf_id, data_id, loop=None):
+    def __init__(self, bus, device, conf_id, data_id, config, loop=None):
         super().__init__()
 
         self._loop = asyncio.get_event_loop() if loop is None else loop
@@ -80,9 +81,10 @@ class Reader:
         self.conf = dbus.find_sensor(bus, device, conf_uuid)
 
         if not self.conf:
-            raise ValueError('Cannot find configuration for uuid {}'.format(
-                conf_uuid
-            ))
+            raise ValueError(
+                'Cannot find configuration for uuid {}'
+                .format(conf_uuid)
+            )
         if __debug__:
             logger.debug(
                 'sensor configuration found for uuiid={}'.format(conf_uuid)
@@ -92,7 +94,7 @@ class Reader:
 
         self.converter = data_converter(device, data_id)(device, self.conf)
         self.data = dbus.find_sensor(bus, device, dev_uuid(data_id))
-        self.conf._obj.WriteValue([1])
+        self.conf._obj.WriteValue(config)
 
 
     def read(self):
@@ -114,7 +116,7 @@ class Reader:
             self._loop.call_soon_threadsafe(self._values.put_nowait, value)
 
         def error_cb(*args):
-            raise TypeError(*args) # FIXME
+            raise TypeError(self.__class__.__name__, *args) # FIXME
 
         self.data._obj.ReadValue(reply_handler=cb, error_handler=error_cb)
         value = await self._values.get()
@@ -123,24 +125,42 @@ class Reader:
 
 
 class Temperature(Reader):
-    def __init__(self, bus, device):
-        super().__init__(bus, device, 0xaa02, 0xaa01)
+    def __init__(self, bus, device, loop=None):
+        super().__init__(bus, device, 0xaa02, 0xaa01, [1], loop=loop)
 
 
 class Humidity(Reader):
-    def __init__(self, bus, device):
-        super().__init__(bus, device, 0xaa22, 0xaa21)
+    def __init__(self, bus, device, loop=None):
+        super().__init__(bus, device, 0xaa22, 0xaa21, [1], loop=loop)
 
 
 
 class Pressure(Reader):
-    def __init__(self, bus, device):
-        super().__init__(bus, device, 0xaa42, 0xaa41)
+    def __init__(self, bus, device, loop=None):
+        super().__init__(bus, device, 0xaa42, 0xaa41, [1], loop=loop)
 
 
 class Light(Reader):
-    def __init__(self, bus, device):
-        super().__init__(bus, device, 0xaa72, 0xaa71)
+    def __init__(self, bus, device, loop=None):
+        super().__init__(bus, device, 0xaa72, 0xaa71, [1], loop=loop)
+
+
+class Motion(Reader):
+    GYRO_X = 0x04
+    GYRO_Y = 0x02
+    GYRO_Z = 0x01
+    ACCEL_X = 0x20
+    ACCEL_Y = 0x10
+    ACCEL_Z = 0x08
+    MAGNET = 0x40
+
+    def __init__(self, bus, device, loop=None):
+        # FIXME: configuration needs to be independent from sensor
+        config = self.GYRO_X | self.GYRO_Y | self.GYRO_Z \
+            | self.ACCEL_X | self.ACCEL_Y | self.ACCEL_Z
+            #| self.MAGNET
+        config = struct.pack('<H', config)
+        super().__init__(bus, device, 0xaa82, 0xaa81, config, loop=loop)
 
 
 # vim: sw=4:et:ai

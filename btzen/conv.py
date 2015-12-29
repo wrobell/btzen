@@ -26,6 +26,8 @@ import struct
 SHT21_TEMP = 175.72 / 65536
 SHT21_HUMIDITY = 125 / 65536
 HDC1000_HUMIDITY = 65536 / 100
+MPU9250_GYRO = 65536 / 500
+MPU9250_ACCEL_2G = 32768 / 2
 
 BYTE_SHIFT = 1, 8, 16
 
@@ -53,5 +55,12 @@ def epcos_t5400_pressure(calib, data):
     off = (c[5] << 14) + ((c[6] * temp) >> 3) + ((c[7] * t2) >> 19)
     return (sens * pressure + off) >> 14
 
+
+def mpu9250_motion(data):
+    data = struct.unpack('<9h', bytes(data))
+    gyro = tuple(v / MPU9250_GYRO for v in data[:3])
+    accel = tuple(v / MPU9250_ACCEL_2G for v in data[3:6])
+    magnet = data[6:]
+    return gyro + accel + magnet
 
 # vim: sw=4:et:ai

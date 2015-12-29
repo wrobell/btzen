@@ -10,14 +10,13 @@ Features
      - pressure
      - humidity
      - light (CC2541DK only)
+     - gyroscope, accelerometer (CC2541DK only)
 
 2. Sensor data access using `asyncio` coroutines.
 
 Please update your sensor device to its latest firmware.
 
-Run `bluetoothd` with `-E` option.
-
-As root::
+To use the library, run `bluetoothd` with `-E` option. Then as root::
 
     $ hciconfig hci0 up
     $ hcitool lescan
@@ -30,9 +29,9 @@ To extend SensorTag battery life::
 Please note, that above command will make single sensor read to last about
 250ms. Therefore reading 4 sensors will take about 1s.
 
-As an user::
+The library provides `btzen` script to display sensor data::
 
-    $ PYTHONPATH=. bin/btzen <MAC>
+    $ btzen <MAC>
 
 Requirements
 

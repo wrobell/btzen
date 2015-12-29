@@ -17,8 +17,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .core import connect, Temperature, Humidity, Pressure, Light
+from .core import connect, Temperature, Humidity, Pressure, Light, \
+    Motion
 
-__all__ = ['connect', 'Temperature', 'Humidity', 'Pressure', 'Light']
+__all__ = [
+    'connect', 'Temperature', 'Humidity', 'Pressure', 'Light',
+    'Motion',
+]
 
 # vim: sw=4:et:ai
