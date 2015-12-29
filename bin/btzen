@@ -29,43 +29,14 @@ from gi.repository import GObject
 
 import btzen
 
-logging.basicConfig(level=logging.DEBUG)
+def sensor_reader(cls, name):
+    obj = None
+    try:
+        obj = cls(bus, dev)
+    except ValueError as ex:
+        print(ex)
+    return obj
 
-dbus_loop = DBusGMainLoop(set_as_default=True)
-dbus_main_loop = GObject.MainLoop()
-bus = dbus.SystemBus(mainloop=dbus_loop)
-
-parser = argparse.ArgumentParser()
-parser.add_argument('device', help='MAC address of device')
-args = parser.parse_args()
-
-print('connecting to {}...'.format(args.device))
-dev = btzen.connect(bus, args.device)
-print('connected to {}'.format(dev.Name))
-
-readers = {}
-try:
-    readers['pressure'] = btzen.Pressure(bus, dev)
-except ValueError as ex:
-    print(ex)
-try:
-    readers['temperature'] = btzen.Temperature(bus, dev)
-except ValueError as ex:
-    print(ex)
-try:
-    readers['humidity'] = btzen.Humidity(bus, dev)
-except ValueError as ex:
-    print(ex)
-try:
-    readers['light'] = btzen.Light(bus, dev)
-except ValueError as ex:
-    print(ex)
-try:
-    readers['motion'] = btzen.Motion(bus, dev)
-except ValueError as ex:
-    print(ex)
-
-print('sensors initialized')
 
 async def read_data(name, f):
     t1 = loop.time()
@@ -87,6 +58,29 @@ async def read_sensors(sensors):
         print()
         await asyncio.sleep(-loop.time() % 1)
 
+
+logging.basicConfig(level=logging.DEBUG)
+
+dbus_loop = DBusGMainLoop(set_as_default=True)
+dbus_main_loop = GObject.MainLoop()
+bus = dbus.SystemBus(mainloop=dbus_loop)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('device', help='MAC address of device')
+args = parser.parse_args()
+
+print('connecting to {}...'.format(args.device))
+dev = btzen.connect(bus, args.device)
+print('connected to {}'.format(dev.Name))
+
+names = ['pressure', 'temperature', 'humidity', 'light', 'motion']
+classes = [
+    btzen.Pressure, btzen.Temperature, btzen.Humidity, btzen.Light,
+    btzen.Motion
+]
+readers = ((n, sensor_reader(c, n)) for c, n in zip(classes, names))
+readers = {n: r for n, r in readers if r is not None}
+print('sensors initialized')
 
 # start DBUS loop for async calls
 thread = threading.Thread(target=dbus_main_loop.run)
