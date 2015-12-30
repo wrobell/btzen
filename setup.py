@@ -33,7 +33,7 @@ setup(
     description='BTZen - Bluetooh Smart sensor reading library',
     setup_requires = ['setuptools_git >= 1.0',],
     classifiers=[
-        'License :: OSI Approved :: GNU General Public License (GPL)',
+        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Development Status :: 3 - Alpha',
