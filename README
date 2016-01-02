@@ -10,7 +10,7 @@ Features
      - pressure
      - humidity
      - light (CC2541DK only)
-     - gyroscope, accelerometer (CC2541DK only)
+     - accelerometer (CC2541DK only)
 
 2. Sensor data access using `asyncio` coroutines.
 
