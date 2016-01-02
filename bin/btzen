@@ -22,6 +22,8 @@ import argparse
 import asyncio
 import logging
 import threading
+import signal
+import sys
 
 import dbus
 from dbus.mainloop.glib import DBusGMainLoop
@@ -73,21 +75,26 @@ print('connecting to {}...'.format(args.device))
 dev = btzen.connect(bus, args.device)
 print('connected to {}'.format(dev.Name))
 
-names = ['pressure', 'temperature', 'humidity', 'light', 'motion']
+names = ['pressure', 'temperature', 'humidity', 'light', 'accelerometer']
 classes = [
     btzen.Pressure, btzen.Temperature, btzen.Humidity, btzen.Light,
-    btzen.Motion
+    btzen.Accelerometer,
 ]
 readers = ((n, sensor_reader(c, n)) for c, n in zip(classes, names))
 readers = {n: r for n, r in readers if r is not None}
 print('sensors initialized')
 
 # start DBUS loop for async calls
-thread = threading.Thread(target=dbus_main_loop.run)
+thread = threading.Thread(target=dbus_main_loop.run, daemon=True)
 thread.start()
 loop = asyncio.get_event_loop()
+loop.add_signal_handler(signal.SIGTERM, sys.exit)
 
 sensors = sorted([(n, r) for n, r in readers.items() if r])
-loop.run_until_complete(read_sensors(sensors))
+try:
+    loop.run_until_complete(read_sensors(sensors))
+finally:
+    for r in readers.values():
+        r.close()
 
 # vim: sw=4:et:ai

@@ -18,7 +18,7 @@
 #
 
 from .core import connect, Temperature, Humidity, Pressure, Light, \
-    Motion
+    Accelerometer
 
 __all__ = [
     'connect', 'Temperature', 'Humidity', 'Pressure', 'Light',
