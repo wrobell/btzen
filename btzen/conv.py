@@ -58,9 +58,9 @@ def epcos_t5400_pressure(calib, data):
 
 def mpu9250_motion(data):
     data = struct.unpack('<9h', bytes(data))
-    gyro = tuple(v / MPU9250_GYRO for v in data[:3])
+    #gyro = tuple(v / MPU9250_GYRO for v in data[:3])
     accel = tuple(v / MPU9250_ACCEL_2G for v in data[3:6])
-    magnet = data[6:]
-    return gyro + accel + magnet
+    #magnet = data[6:]
+    return accel
 
 # vim: sw=4:et:ai
