@@ -22,13 +22,6 @@ To use the library, run `bluetoothd` with `-E` option. Then as root::
     $ hcitool lescan
     $ hcitool lecc <MAC>
 
-To extend SensorTag battery life::
-
-    $ hcitool lecup  --handle=<HANDLE> --min 6 --max 100 --timeout 1000 --latency 0
-
-Please note, that above command will make single sensor read to last about
-250ms. Therefore reading 4 sensors will take about 1s.
-
 The library provides `btzen` script to display sensor data::
 
     $ btzen <MAC>
