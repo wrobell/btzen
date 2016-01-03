@@ -95,8 +95,8 @@ class Reader:
         factory = data_converter(device, params.uuid_dev)
         self._converter = factory(device, self._dev_conf)
 
-        self._dev_conf._obj.WriteValue(params.config_on)
         self.set_interval(1)
+        self._dev_conf._obj.WriteValue(params.config_on)
 
 
     def _find(self, bus, device, uuid):
