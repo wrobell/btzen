@@ -88,9 +88,7 @@ class Reader:
         self._params = params
         self._device = self._find(bus, device, params.uuid_dev)
         self._dev_conf = self._find(bus, device, params.uuid_conf)
-        self._dev_period = None
-        if params.uuid_period:
-            self._dev_period = self._find(bus, device, params.uuid_period)
+        self._dev_period = self._find(bus, device, params.uuid_period)
 
         self._values = asyncio.Queue()
 
@@ -98,8 +96,7 @@ class Reader:
         self._converter = factory(device, self._dev_conf)
 
         self._dev_conf._obj.WriteValue(params.config_on)
-        if self._dev_period is not None:
-            self.set_interval(1)
+        self.set_interval(1)
 
 
     def _find(self, bus, device, uuid):
@@ -180,7 +177,7 @@ class Pressure(Reader):
         dev = Parameters(
             dev_uuid(0xaa41),
             dev_uuid(0xaa42),
-            None, #dev_uuid(0xaa43),
+            dev_uuid(0xaa44),
             [1],
             [0],
         )
