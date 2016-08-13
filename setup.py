@@ -26,7 +26,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='btzen',
-    version='0.0.8',
+    version='0.0.9',
     author='Artur Wroblewski',
     author_email='wrobell@pld-linux.org',
     url='https://github.com/wrobell/btzen',
