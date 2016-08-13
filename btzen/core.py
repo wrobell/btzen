@@ -46,7 +46,7 @@ Parameters = namedtuple('Parameters', [
 def converter_epcos_t5400_pressure(dev, p_conf):
     p_calib = dbus.find_sensor(dev, dev_uuid(0xaa43))
     p_conf._obj.WriteValue([2])
-    calib = p_calib._obj.ReadValue()
+    calib = p_calib._obj.ReadValue({})
     calib = struct.unpack('<4H4h', bytearray(calib))
     return functools.partial(conv.epcos_t5400_pressure, calib)
 
@@ -77,6 +77,7 @@ def connect(bus, mac):
     :param mac: Bluetooth device MAC address.
     """
     device = dbus.get_device(bus, mac)
+    device._obj.Connect()
     return device
 
 
@@ -96,7 +97,7 @@ class Reader:
         self._converter = factory(device, self._dev_conf)
 
         self.set_interval(1)
-        self._dev_conf._obj.WriteValue(params.config_on)
+        self._dev_conf._obj.WriteValue(params.config_on, {})
 
 
     def _find(self, bus, device, uuid):
@@ -112,14 +113,14 @@ class Reader:
 
 
     def set_interval(self, interval):
-        self._dev_period._obj.WriteValue([interval * 100])
+        self._dev_period._obj.WriteValue([interval * 100], {})
 
 
     def read(self):
         """
         Read data from sensor.
         """
-        value = self.device._obj.ReadValue()
+        value = self._device._obj.ReadValue({})
         return self._converter(value)
 
 
@@ -136,7 +137,7 @@ class Reader:
         def error_cb(*args):
             raise TypeError(self.__class__.__name__, *args) # FIXME
 
-        self._device._obj.ReadValue(reply_handler=cb, error_handler=error_cb)
+        self._device._obj.ReadValue({}, reply_handler=cb, error_handler=error_cb)
         value = await self._values.get()
         return value
 

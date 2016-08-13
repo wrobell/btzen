@@ -23,6 +23,7 @@ D-Bus support classes and functions.
 
 import dbus
 
+IFACE = 'org.bluez.GattCharacteristic1'
 
 class Proxy:
     """
@@ -33,43 +34,27 @@ class Proxy:
         self._iface = iface
         self._properties = dbus.Interface(obj, 'org.freedesktop.DBus.Properties')
 
-
     def __getattr__(self, name):
         return self._properties.Get(self._iface, name)
-        
-
-def get_device(bus, mac):
-    bus_name = 'org.bluez'
-    path = '/org/bluez/hci0/dev_{}'.format(mac.replace(':', '_'))
-    proxy = bus.get_object(bus_name, path)
-    device = dbus.Interface(proxy, dbus_interface='org.bluez.Device1')
-    return Proxy(device, 'org.bluez.Device1')
-
 
 def load_object(bus, path, iface):
     proxy = bus.get_object('org.bluez', path)
     return Proxy(dbus.Interface(proxy, iface), iface)
 
-
-def load_objects(bus, paths, iface):
-    return (load_object(bus, p, iface) for p in paths)
-
-
-def get_services(bus, device):
-    return load_objects(bus, device.GattServices, 'org.bluez.GattService1')
-
-
-def get_characteristics(bus, service):
-    return load_objects(bus, service.Characteristics, 'org.bluez.GattCharacteristic1')
-
-
-def get_descriptors(bus, characteristics):
-    return load_objects(bus, characteristics.Descriptors, 'org.bluez.GattDescriptor1')
-
+def get_device(bus, mac):
+    path = '/org/bluez/hci0/dev_{}'.format(mac.replace(':', '_'))
+    device = load_object(bus, path, 'org.bluez.Device1')
+    return device
 
 def find_sensor(bus, device, uuid):
-    items = (c for s in get_services(bus, device) for c in get_characteristics(bus, s))
-    return next((c for c in items if c.UUID == uuid), None)
+    om = load_object(bus, '/', 'org.freedesktop.DBus.ObjectManager')
+    managed = om._obj.GetManagedObjects()
+    objects = (
+        load_object(bus, path, IFACE) for path, data in managed.items()
+        if IFACE in data and data[IFACE]['UUID'] == uuid
+    )
+    obj = next(objects, None)
+    return obj
 
 
 # vim: sw=4:et:ai

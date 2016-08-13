@@ -46,7 +46,7 @@ async def read_data(name, f):
     if isinstance(value, (float, int)):
         value = '{:.1f}'.format(value)
     elif isinstance(value, tuple):
-        value = ', '.join('{:.1f}'.format(v) for v in value)
+        value = ', '.join('{:.2f}'.format(v) for v in value)
     else:
         assert False, 'float, int or tuple expected'
     t2 = loop.time()
