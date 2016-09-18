@@ -181,7 +181,7 @@ int bt_device_read_async(sd_bus *bus, t_bt_device *dev) {
     return r;
 }
 
-int bt_device_chr_uuid(sd_bus *bus, const char *path, char **uuid) {
+int bt_device_chr_uuid(sd_bus *bus, const char *path, const char **uuid) {
     int r;
     sd_bus_message *m = NULL;
     sd_bus_error error = SD_BUS_ERROR_NULL;
@@ -264,10 +264,12 @@ int bt_device_chr_list(sd_bus *bus, t_bt_device_chr **root) {
                 len = strlen(path) + 1;
                 current->path = malloc(len);
                 strncpy(current->path, path, len);
+                current->path[len - 1] = '\0';
 
                 len = strlen(uuid) + 1;
                 current->uuid = malloc(len);
                 strncpy(current->uuid, uuid, len);
+                current->uuid[len - 1] = '\0';
 
                 current->next = NULL;
                 if (prev != NULL)
