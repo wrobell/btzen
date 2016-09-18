@@ -17,12 +17,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .core import connect, Temperature, Humidity, Pressure, Light, \
-    Accelerometer
+from .bus import Bus
+from .core import Temperature, Humidity, Pressure, Light, Accelerometer
 
 __all__ = [
-    'connect', 'Temperature', 'Humidity', 'Pressure', 'Light',
-    'Motion',
+    'Bus', 'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
 ]
 
 # vim: sw=4:et:ai

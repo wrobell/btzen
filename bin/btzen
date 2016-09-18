@@ -21,23 +21,8 @@
 import argparse
 import asyncio
 import logging
-import threading
-import signal
-import sys
-
-import dbus
-from dbus.mainloop.glib import DBusGMainLoop
-from gi.repository import GObject
 
 import btzen
-
-def sensor_reader(cls, name):
-    obj = None
-    try:
-        obj = cls(bus, dev)
-    except ValueError as ex:
-        print(ex)
-    return obj
 
 
 async def read_data(name, f):
@@ -63,33 +48,24 @@ async def read_sensors(sensors):
 
 logging.basicConfig(level=logging.DEBUG)
 
-dbus_loop = DBusGMainLoop(set_as_default=True)
-dbus_main_loop = GObject.MainLoop()
-bus = dbus.SystemBus(mainloop=dbus_loop)
-
 parser = argparse.ArgumentParser()
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
 print('connecting to {}...'.format(args.device))
-dev = btzen.connect(bus, args.device)
-print('connected to {}'.format(dev.Name))
+bus = btzen.Bus()
+bus.connect(args.device)
 
 names = ['pressure', 'temperature', 'humidity', 'light', 'accelerometer']
 classes = [
     btzen.Pressure, btzen.Temperature, btzen.Humidity, btzen.Light,
-    btzen.Accelerometer,
+#    btzen.Accelerometer,
 ]
-readers = ((n, sensor_reader(c, n)) for c, n in zip(classes, names))
+readers = ((n, bus.sensor(args.device, c)) for c, n in zip(classes, names))
 readers = {n: r for n, r in readers if r is not None}
 print('sensors initialized')
 
-# start DBUS loop for async calls
-thread = threading.Thread(target=dbus_main_loop.run, daemon=True)
-thread.start()
 loop = asyncio.get_event_loop()
-loop.add_signal_handler(signal.SIGTERM, sys.exit)
-
 sensors = sorted([(n, r) for n, r in readers.items() if r])
 try:
     loop.run_until_complete(read_sensors(sensors))

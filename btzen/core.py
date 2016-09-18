@@ -32,7 +32,7 @@ import logging
 import struct
 from collections import namedtuple
 
-from . import dbus
+from _btzen import ffi, lib
 from .import conv
 
 logger = logging.getLogger(__name__)
@@ -64,10 +64,15 @@ DATA_CONVERTER = {
     ('SensorTag 2.0', dev_uuid(0xaa41)): lambda *args: conv.bmp280_pressure,
     ('SensorTag 2.0', dev_uuid(0xaa71)): lambda *args: conv.opt3001_light,
     ('SensorTag 2.0', dev_uuid(0xaa81)): lambda *args: conv.mpu9250_motion,
+    ('CC2650 SensorTag', dev_uuid(0xaa01)):lambda *args: conv.tmp006_temp,
+    ('CC2650 SensorTag', dev_uuid(0xaa21)): lambda *args: conv.hdc1000_humidity,
+    ('CC2650 SensorTag', dev_uuid(0xaa41)): lambda *args: conv.bmp280_pressure,
+    ('CC2650 SensorTag', dev_uuid(0xaa71)): lambda *args: conv.opt3001_light,
+    ('CC2650 SensorTag', dev_uuid(0xaa81)): lambda *args: conv.mpu9250_motion,
 }
 
-data_converter = lambda device, dev_id: \
-    DATA_CONVERTER[(str(device.Name), dev_id)]
+data_converter = lambda name, uuid: \
+    DATA_CONVERTER[(name, uuid)]
 
 
 def connect(bus, mac):
@@ -147,54 +152,70 @@ class Reader:
         logger.info('{} device closed'.format(self.__class__.__name__))
 
 
+class Reader:
+    def __init__(self, path_data, path_conf, bus, loop):
+        self._loop = loop
+
+        self._bus = bus
+        self._data = ffi.new('uint8_t[]', self.DATA_LEN)
+        self._chr_data = ffi.new('char[]', path_data.encode())
+        self._chr_conf = ffi.new('char[]', path_conf.encode())
+
+        v = {
+            'chr_data': self._chr_data,
+            'chr_conf': self._chr_conf,
+            'data': self._data,
+            'len': self.DATA_LEN,
+        }
+        self._device = ffi.new('t_bt_device*', v)
+
+        r = lib.bt_device_write(self._bus, self._device)
+
+        factory = data_converter('CC2650 SensorTag', self.UUID_DATA)
+        self._converter = factory('CC2650 SensorTag', None)
+
+    async def read_async(self):
+        future = self._future = self._loop.create_future()
+        lib.bt_device_read_async(self._bus, self._device)
+        await future
+        return future.result()
+
+    def set_result(self):
+        value = self._converter(bytearray(self._data))
+        self._future.set_result(value)
+        self._future = None
+
+    def close(self):
+        #self._dev_conf._obj.WriteValue(self._params.config_off)
+        logger.info('{} device closed'.format(self.__class__.__name__))
+
 
 class Temperature(Reader):
-    def __init__(self, bus, device, loop=None):
-        dev = Parameters(
-            dev_uuid(0xaa01),
-            dev_uuid(0xaa02),
-            dev_uuid(0xaa03),
-            [1],
-            [0],
-        )
-        super().__init__(bus, device, dev, loop=loop)
-
-
-class Humidity(Reader):
-    def __init__(self, bus, device, loop=None):
-        dev = Parameters(
-            dev_uuid(0xaa21),
-            dev_uuid(0xaa22),
-            dev_uuid(0xaa23),
-            [1],
-            [0],
-        )
-        super().__init__(bus, device, dev, loop=loop)
-
+    DATA_LEN = 4
+    UUID_DATA = dev_uuid(0xaa01)
+    UUID_CONF = dev_uuid(0xaa02)
+    UUID_PERIOD = dev_uuid(0xaa03)
 
 
 class Pressure(Reader):
-    def __init__(self, bus, device, loop=None):
-        dev = Parameters(
-            dev_uuid(0xaa41),
-            dev_uuid(0xaa42),
-            dev_uuid(0xaa44),
-            [1],
-            [0],
-        )
-        super().__init__(bus, device, dev, loop=loop)
+    DATA_LEN = 6
+    UUID_DATA = dev_uuid(0xaa41)
+    UUID_CONF = dev_uuid(0xaa42)
+    UUID_PERIOD = dev_uuid(0xaa44)
+
+
+class Humidity(Reader):
+    DATA_LEN = 4
+    UUID_DATA = dev_uuid(0xaa21)
+    UUID_CONF = dev_uuid(0xaa22)
+    UUID_PERIOD = dev_uuid(0xaa23)
 
 
 class Light(Reader):
-    def __init__(self, bus, device, loop=None):
-        dev = Parameters(
-            dev_uuid(0xaa71),
-            dev_uuid(0xaa72),
-            dev_uuid(0xaa73),
-            [1],
-            [0],
-        )
-        super().__init__(bus, device, dev, loop=loop)
+    DATA_LEN = 2
+    UUID_DATA = dev_uuid(0xaa71)
+    UUID_CONF = dev_uuid(0xaa72)
+    UUID_PERIOD = dev_uuid(0xaa73)
 
 
 class Accelerometer(Reader):
