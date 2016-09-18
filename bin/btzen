@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+#
+# BTZen - Bluetooh Smart sensor reading library.
+#
+# Copyright (C) 2015 by Artur Wroblewski <wrobell@pld-linux.org>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+import argparse
+import asyncio
+import logging
+import threading
+import signal
+import sys
+
+import dbus
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GObject
+
+import btzen
+
+def sensor_reader(cls, name):
+    obj = None
+    try:
+        obj = cls(bus, dev)
+    except ValueError as ex:
+        print(ex)
+    return obj
+
+
+async def read_data(name, f):
+    t1 = loop.time()
+    value = await f()
+    if isinstance(value, (float, int)):
+        value = '{:.1f}'.format(value)
+    elif isinstance(value, tuple):
+        value = ', '.join('{:.2f}'.format(v) for v in value)
+    else:
+        assert False, 'float, int or tuple expected'
+    t2 = loop.time()
+    print('{}: {} ({:.4f}s)'.format(name, value, t2 - t1))
+
+
+async def read_sensors(sensors):
+    while True:
+        tasks = [read_data(n, r.read_async) for n, r in sensors]
+        await asyncio.gather(*tasks)
+        print()
+        await asyncio.sleep(-loop.time() % 1)
+
+
+logging.basicConfig(level=logging.DEBUG)
+
+dbus_loop = DBusGMainLoop(set_as_default=True)
+dbus_main_loop = GObject.MainLoop()
+bus = dbus.SystemBus(mainloop=dbus_loop)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('device', help='MAC address of device')
+args = parser.parse_args()
+
+print('connecting to {}...'.format(args.device))
+dev = btzen.connect(bus, args.device)
+print('connected to {}'.format(dev.Name))
+
+names = ['pressure', 'temperature', 'humidity', 'light', 'accelerometer']
+classes = [
+    btzen.Pressure, btzen.Temperature, btzen.Humidity, btzen.Light,
+    btzen.Accelerometer,
+]
+readers = ((n, sensor_reader(c, n)) for c, n in zip(classes, names))
+readers = {n: r for n, r in readers if r is not None}
+print('sensors initialized')
+
+# start DBUS loop for async calls
+thread = threading.Thread(target=dbus_main_loop.run, daemon=True)
+thread.start()
+loop = asyncio.get_event_loop()
+loop.add_signal_handler(signal.SIGTERM, sys.exit)
+
+sensors = sorted([(n, r) for n, r in readers.items() if r])
+try:
+    loop.run_until_complete(read_sensors(sensors))
+finally:
+    for r in readers.values():
+        r.close()
+
+# vim: sw=4:et:ai
