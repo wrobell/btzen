@@ -215,6 +215,7 @@ finish:
 
 int bt_device_chr_list(sd_bus *bus, t_bt_device_chr **root) {
     int r;
+    int len;
     sd_bus_message *m = NULL;
     sd_bus_error error = SD_BUS_ERROR_NULL;
     t_bt_device_chr *current = NULL;
@@ -259,10 +260,15 @@ int bt_device_chr_list(sd_bus *bus, t_bt_device_chr **root) {
                 /* create linked list of t_bt_device_chr records */
                 prev = current;
                 current = malloc(sizeof(t_bt_device_chr));
-                current->path = malloc(strlen(path));
-                current->uuid = malloc(strlen(uuid));
-                strcpy(current->path, path);
-                strcpy(current->uuid, uuid);
+
+                len = strlen(path) + 1;
+                current->path = malloc(len);
+                strncpy(current->path, path, len);
+
+                len = strlen(uuid) + 1;
+                current->uuid = malloc(len);
+                strncpy(current->uuid, uuid, len);
+
                 current->next = NULL;
                 if (prev != NULL)
                     prev->next = current;
@@ -272,8 +278,10 @@ int bt_device_chr_list(sd_bus *bus, t_bt_device_chr **root) {
             }
             sd_bus_message_exit_container(m);
         }
-        sd_bus_message_exit_container(m);
+        sd_bus_message_exit_container(m); /* array */
+        sd_bus_message_exit_container(m); /* dict entry */
     }
+    sd_bus_message_exit_container(m); /* array */
 
 finish:
     sd_bus_message_unref(m);
