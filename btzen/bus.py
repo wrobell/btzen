@@ -18,8 +18,13 @@
 #
 
 import asyncio
+from collections import namedtuple
 
 from _btzen import ffi, lib
+
+Parameters = namedtuple('Parameters', [
+    'path_data', 'path_conf', 'path_period', 'config_on', 'config_off',
+])
 
 def _mac(mac):
     return mac.replace(':', '_').upper()
@@ -47,8 +52,8 @@ class Bus:
         root = dev_chr = ffi.new('t_bt_device_chr **')
         r = lib.bt_device_chr_list(self._bus, dev_chr)
         while dev_chr != ffi.NULL:
-            uuid = ffi.string(dev_chr[0].uuid).decode()
-            path = ffi.string(dev_chr[0].path).decode()
+            uuid = ffi.string(dev_chr[0].uuid)
+            path = ffi.string(dev_chr[0].path)
             dev_chr = dev_chr[0].next
             items.append((path, uuid))
         lib.bt_device_chr_list_free(root[0]);
@@ -56,7 +61,8 @@ class Bus:
         self._chr_uuid = items
 
     def _find_path(self, mac, uuid):
-        mac = _mac(mac)
+        mac = _mac(mac).encode()
+        uuid = uuid.encode()
         items = (p for p, u in self._chr_uuid if mac in p and uuid == u)
         return next(items, None)
 
@@ -64,9 +70,14 @@ class Bus:
         assert isinstance(cls.UUID_DATA, str)
         assert isinstance(cls.UUID_CONF, str)
 
-        path_data = self._find_path(mac, cls.UUID_DATA)
-        path_conf = self._find_path(mac, cls.UUID_CONF)
-        reader = cls(path_data, path_conf, self._bus, self._loop)
+        params = Parameters(
+            self._find_path(mac, cls.UUID_DATA),
+            self._find_path(mac, cls.UUID_CONF),
+            self._find_path(mac, cls.UUID_PERIOD),
+            [1],
+            [0],
+        )
+        reader = cls(params, self._bus, self._loop)
         self._sensors[reader._device] = reader
         return reader
     

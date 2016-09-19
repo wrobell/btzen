@@ -30,17 +30,11 @@ import asyncio
 import functools
 import logging
 import struct
-from collections import namedtuple
 
 from _btzen import ffi, lib
 from .import conv
 
 logger = logging.getLogger(__name__)
-
-
-Parameters = namedtuple('Parameters', [
-    'uuid_dev', 'uuid_conf', 'uuid_period', 'config_on', 'config_off',
-])
 
 
 def converter_epcos_t5400_pressure(dev, p_conf):
@@ -153,17 +147,16 @@ class Reader:
 
 
 class Reader:
-    def __init__(self, path_data, path_conf, bus, loop):
+    def __init__(self, params, bus, loop):
         self._loop = loop
 
+        self._params = params
         self._bus = bus
         self._data = ffi.new('uint8_t[]', self.DATA_LEN)
-        self._chr_data = ffi.new('char[]', path_data.encode())
-        self._chr_conf = ffi.new('char[]', path_conf.encode())
 
         v = {
-            'chr_data': self._chr_data,
-            'chr_conf': self._chr_conf,
+            'chr_data': ffi.new('char[]', params.path_data),
+            'chr_conf': ffi.new('char[]', params.path_conf),
             'data': self._data,
             'len': self.DATA_LEN,
         }
@@ -173,6 +166,9 @@ class Reader:
 
         factory = data_converter('CC2650 SensorTag', self.UUID_DATA)
         self._converter = factory('CC2650 SensorTag', None)
+
+    def set_interval(self, interval):
+        self._dev_period._obj.WriteValue([interval * 100], {})
 
     def read(self):
         lib.bt_device_read(self._bus, self._device, self._data)
