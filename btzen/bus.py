@@ -18,9 +18,13 @@
 #
 
 import asyncio
+import logging
+import time
 from collections import namedtuple
 
 from _btzen import ffi, lib
+
+logger = logging.getLogger(__name__)
 
 Parameters = namedtuple('Parameters', [
     'path_data', 'path_conf', 'path_period', 'config_on', 'config_off',
@@ -47,6 +51,17 @@ class Bus:
             path = '/org/bluez/hci0/dev_{}'.format(_mac(mac))
             path = ffi.new('char[]', path.encode())
             r = lib.bt_device_connect(self._bus, path)
+            for i in range(10):
+                resolved = lib.bt_device_services_resolved(self._bus, path)
+                if resolved == 1:
+                    break
+                logger.debug(
+                    'bluetooth device {} services not resolved, wait 1s...'
+                    .format(mac)
+                )
+                time.sleep(1)
+            if i == 9:
+                raise ValueError('not resolved')
 
         items = []
         root = dev_chr = ffi.new('t_bt_device_chr **')

@@ -41,15 +41,50 @@ int bt_device_connect(sd_bus *bus, const char *path) {
     );
     if (r < 0) {
         fprintf(stderr, "Failed to issue method call: %s\n", error.message);
-        sd_bus_error_free(&error);
+        goto finish;
     }
-    sd_bus_message_unref(m);
 
+finish:
+    sd_bus_message_unref(m);
+    sd_bus_error_free(&error);
     return r;
 }
 
 int bt_device_is_connected(sd_bus *bus, const char *mac) {
     return 0;
+}
+
+int bt_device_services_resolved(sd_bus *bus, const char *path) {
+    uint8_t resolved;
+    int r;
+    sd_bus_message *m = NULL;
+    sd_bus_error error = SD_BUS_ERROR_NULL;
+
+    r = sd_bus_get_property(
+        bus,
+        "org.bluez",
+        path,
+        "org.bluez.Device1",
+        "ServicesResolved",
+        &error,
+        &m,
+        "b"
+    );
+    if (r < 0) {
+        fprintf(stderr, "Failed to read ServicesResolved property: %s\n", error.message);
+        goto finish;
+    }
+    r = sd_bus_message_read(m, "b", &resolved);
+    if (r < 0) {
+        fprintf(stderr, "Failed to get ServicesResolved property data\n");
+        goto finish;
+    }
+    r = resolved;
+
+finish:
+    //sd_bus_message_unref(m); FIXME
+    sd_bus_error_free(&error);
+    return r;
 }
 
 int bt_device_write(sd_bus *bus, const char *path, const uint8_t *data, ssize_t len) {
@@ -186,7 +221,7 @@ int bt_device_chr_uuid(sd_bus *bus, const char *path, const char **uuid) {
 
     r = sd_bus_message_read(m, "s", uuid);
     if (r < 0) {
-        fprintf(stderr, "Failed to get UUID property data: %s\n", error.message);
+        fprintf(stderr, "Failed to get UUID property data\n");
         goto finish;
     }
 
