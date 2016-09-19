@@ -215,7 +215,6 @@ finish:
 
 int bt_device_chr_list(sd_bus *bus, t_bt_device_chr **root) {
     int r;
-    int len;
     sd_bus_message *m = NULL;
     sd_bus_error error = SD_BUS_ERROR_NULL;
     t_bt_device_chr *current = NULL;
@@ -261,15 +260,8 @@ int bt_device_chr_list(sd_bus *bus, t_bt_device_chr **root) {
                 prev = current;
                 current = malloc(sizeof(t_bt_device_chr));
 
-                len = strlen(path) + 1;
-                current->path = malloc(len);
-                strncpy(current->path, path, len);
-                current->path[len - 1] = '\0';
-
-                len = strlen(uuid) + 1;
-                current->uuid = malloc(len);
-                strncpy(current->uuid, uuid, len);
-                current->uuid[len - 1] = '\0';
+                current->path = strdup(path);
+                current->uuid = strdup(uuid);
 
                 current->next = NULL;
                 if (prev != NULL)
