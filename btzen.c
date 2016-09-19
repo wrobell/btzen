@@ -199,10 +199,11 @@ int bt_device_read_async(sd_bus *bus, t_bt_device *dev) {
     return r;
 }
 
-int bt_device_chr_uuid(sd_bus *bus, const char *path, const char **uuid) {
+int bt_device_chr_uuid(sd_bus *bus, const char *path, char **uuid) {
     int r;
     sd_bus_message *m = NULL;
     sd_bus_error error = SD_BUS_ERROR_NULL;
+    char *data;
 
     r = sd_bus_get_property(
         bus,
@@ -219,7 +220,9 @@ int bt_device_chr_uuid(sd_bus *bus, const char *path, const char **uuid) {
         goto finish;
     }
 
-    r = sd_bus_message_read(m, "s", uuid);
+    r = sd_bus_message_read(m, "s", &data);
+    *uuid = strdup(data);
+
     if (r < 0) {
         fprintf(stderr, "Failed to get UUID property data\n");
         goto finish;
@@ -238,7 +241,6 @@ int bt_device_chr_list(sd_bus *bus, t_bt_device_chr **root) {
     t_bt_device_chr *current = NULL;
     t_bt_device_chr *prev = NULL;
     const char *path;
-    const char *uuid;
 
     *root = NULL;
 
@@ -274,14 +276,12 @@ int bt_device_chr_list(sd_bus *bus, t_bt_device_chr **root) {
             sd_bus_message_skip(m, "a{sv}");
 
             if (!strcmp(iface, "org.bluez.GattCharacteristic1")) {
-                bt_device_chr_uuid(bus, path, &uuid);
-
                 /* create linked list of t_bt_device_chr records */
                 prev = current;
                 current = malloc(sizeof(t_bt_device_chr));
 
+                bt_device_chr_uuid(bus, path, &current->uuid);
                 current->path = strdup(path);
-                current->uuid = strdup(uuid);
 
                 current->next = NULL;
                 if (prev != NULL)
