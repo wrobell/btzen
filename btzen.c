@@ -52,7 +52,7 @@ int bt_device_is_connected(sd_bus *bus, const char *mac) {
     return 0;
 }
 
-int bt_device_write(sd_bus *bus, t_bt_device *dev) {
+int bt_device_write(sd_bus *bus, const char *path, const uint8_t *data, ssize_t len) {
     int r;
     sd_bus_message *m = NULL;
     sd_bus_message *reply = NULL;
@@ -62,7 +62,7 @@ int bt_device_write(sd_bus *bus, t_bt_device *dev) {
         bus,
         &m,
         "org.bluez",
-        dev->chr_conf,
+        path,
         "org.bluez.GattCharacteristic1",
         "WriteValue"
     );
@@ -71,7 +71,7 @@ int bt_device_write(sd_bus *bus, t_bt_device *dev) {
         goto finish;
     }
 
-    sd_bus_message_append_array(m, 'y', (unsigned char[]){1}, 1);
+    sd_bus_message_append_array(m, 'y', data, len);
     sd_bus_message_open_container(m, 'a', "{sv}");
     sd_bus_message_close_container(m);
 

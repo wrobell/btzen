@@ -45,7 +45,7 @@ void *sd_bus_get_current_userdata(sd_bus*);
 
 int bt_device_connect(sd_bus*, const char*);
 t_bt_device *bt_device_last(void);
-int bt_device_write(sd_bus*, t_bt_device*);
+int bt_device_write(sd_bus*, const char*, const uint8_t*, ssize_t);
 int bt_device_read(sd_bus*, t_bt_device*, uint8_t[]);
 int bt_device_read_async(sd_bus*, t_bt_device *dev);
 int bt_device_chr_list(sd_bus*, t_bt_device_chr**);

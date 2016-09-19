@@ -157,18 +157,22 @@ class Reader:
         v = {
             'chr_data': ffi.new('char[]', params.path_data),
             'chr_conf': ffi.new('char[]', params.path_conf),
+            'chr_period': ffi.new('char[]', params.path_period),
             'data': self._data,
             'len': self.DATA_LEN,
         }
         self._device = ffi.new('t_bt_device*', v)
 
-        r = lib.bt_device_write(self._bus, self._device)
+        r = lib.bt_device_write(self._bus, self._device.chr_conf, [1], 1)
+        self.set_interval(1)
 
         factory = data_converter('CC2650 SensorTag', self.UUID_DATA)
         self._converter = factory('CC2650 SensorTag', None)
 
     def set_interval(self, interval):
-        self._dev_period._obj.WriteValue([interval * 100], {})
+        value = int(interval * 100)
+        assert value < 256
+        r = lib.bt_device_write(self._bus, self._device.chr_period, [value], 1)
 
     def read(self):
         lib.bt_device_read(self._bus, self._device, self._data)
