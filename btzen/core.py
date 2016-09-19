@@ -174,6 +174,10 @@ class Reader:
         factory = data_converter('CC2650 SensorTag', self.UUID_DATA)
         self._converter = factory('CC2650 SensorTag', None)
 
+    def read(self):
+        lib.bt_device_read(self._bus, self._device, self._data)
+        return self._converter(bytearray(self._data))
+
     async def read_async(self):
         future = self._future = self._loop.create_future()
         lib.bt_device_read_async(self._bus, self._device)

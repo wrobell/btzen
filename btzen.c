@@ -87,7 +87,7 @@ finish:
     return r;
 }
 
-int bt_device_read(sd_bus *bus, uint8_t data[]) {
+int bt_device_read(sd_bus *bus, t_bt_device *dev, uint8_t data[]) {
     int r;
     size_t len;
     const void *buff;
@@ -98,7 +98,7 @@ int bt_device_read(sd_bus *bus, uint8_t data[]) {
     r = sd_bus_call_method(
         bus,
         "org.bluez",
-        "/org/bluez/hci0/dev_B0_B4_48_BD_04_06/service001f/char0020",
+        dev->chr_data,
         "org.bluez.GattCharacteristic1",
         "ReadValue",
         &error,
