@@ -159,7 +159,7 @@ int bt_device_read_async(sd_bus *bus, t_bt_device *dev) {
         NULL
     );
     if (r < 0)
-        fprintf(stderr, "Failed to create async ReadValue call\n");
+        fprintf(stderr, "Failed to create async ReadValue call for: %s\n", dev->chr_data);
 
     return r;
 }

@@ -154,22 +154,23 @@ class Reader:
         self._bus = bus
         self._data = ffi.new('uint8_t[]', self.DATA_LEN)
 
-        v = {
+        # keep reference to device data with the dictionary below
+        self._device_data = {
             'chr_data': ffi.new('char[]', params.path_data),
             'chr_conf': ffi.new('char[]', params.path_conf),
             'chr_period': ffi.new('char[]', params.path_period),
             'data': self._data,
             'len': self.DATA_LEN,
         }
-        self._device = ffi.new('t_bt_device*', v)
+        self._device = ffi.new('t_bt_device*', self._device_data)
 
+        self.set_interval(1)
         r = lib.bt_device_write(
             self._bus,
             self._device.chr_conf,
             params.config_on,
             len(params.config_on)
         )
-        self.set_interval(1)
 
         factory = data_converter('CC2650 SensorTag', self.UUID_DATA)
         self._converter = factory('CC2650 SensorTag', None)
@@ -185,7 +186,7 @@ class Reader:
 
     async def read_async(self):
         future = self._future = self._loop.create_future()
-        lib.bt_device_read_async(self._bus, self._device)
+        r = lib.bt_device_read_async(self._bus, self._device)
         await future
         return future.result()
 
