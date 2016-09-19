@@ -163,7 +163,12 @@ class Reader:
         }
         self._device = ffi.new('t_bt_device*', v)
 
-        r = lib.bt_device_write(self._bus, self._device.chr_conf, [1], 1)
+        r = lib.bt_device_write(
+            self._bus,
+            self._device.chr_conf,
+            params.config_on,
+            len(params.config_on)
+        )
         self.set_interval(1)
 
         factory = data_converter('CC2650 SensorTag', self.UUID_DATA)
@@ -190,8 +195,13 @@ class Reader:
         self._future = None
 
     def close(self):
-        #self._dev_conf._obj.WriteValue(self._params.config_off)
-        logger.info('{} device closed'.format(self.__class__.__name__))
+        r = lib.bt_device_write(
+            self._bus,
+            self._device.chr_conf,
+            self._params.config_off,
+            len(self._params.config_off)
+        )
+        logger.info('{} sensor closed'.format(self.__class__.__name__))
 
 
 class Temperature(Reader):
@@ -199,6 +209,8 @@ class Temperature(Reader):
     UUID_DATA = dev_uuid(0xaa01)
     UUID_CONF = dev_uuid(0xaa02)
     UUID_PERIOD = dev_uuid(0xaa03)
+    CONFIG_ON = [1]
+    CONFIG_OFF = [0]
 
 
 class Pressure(Reader):
@@ -206,6 +218,8 @@ class Pressure(Reader):
     UUID_DATA = dev_uuid(0xaa41)
     UUID_CONF = dev_uuid(0xaa42)
     UUID_PERIOD = dev_uuid(0xaa44)
+    CONFIG_ON = [1]
+    CONFIG_OFF = [0]
 
 
 class Humidity(Reader):
@@ -213,6 +227,8 @@ class Humidity(Reader):
     UUID_DATA = dev_uuid(0xaa21)
     UUID_CONF = dev_uuid(0xaa22)
     UUID_PERIOD = dev_uuid(0xaa23)
+    CONFIG_ON = [1]
+    CONFIG_OFF = [0]
 
 
 class Light(Reader):
@@ -220,6 +236,8 @@ class Light(Reader):
     UUID_DATA = dev_uuid(0xaa71)
     UUID_CONF = dev_uuid(0xaa72)
     UUID_PERIOD = dev_uuid(0xaa73)
+    CONFIG_ON = [1]
+    CONFIG_OFF = [0]
 
 
 class Accelerometer(Reader):

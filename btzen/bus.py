@@ -74,8 +74,8 @@ class Bus:
             self._find_path(mac, cls.UUID_DATA),
             self._find_path(mac, cls.UUID_CONF),
             self._find_path(mac, cls.UUID_PERIOD),
-            [1],
-            [0],
+            cls.CONFIG_ON,
+            cls.CONFIG_OFF,
         )
         reader = cls(params, self._bus, self._loop)
         self._sensors[reader._device] = reader

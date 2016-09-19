@@ -51,4 +51,6 @@ for i in range(10):
     time.sleep(0.1)
 print('elapsed {:.4f}'.format(time.monotonic() - start))
 
+sensor.close()
+
 # vim: sw=4:et:ai
