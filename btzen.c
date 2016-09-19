@@ -45,23 +45,6 @@ int bt_device_connect(sd_bus *bus, const char *path) {
     }
     sd_bus_message_unref(m);
 
-/*
-    r = sd_bus_call_method(
-        bus,
-        "org.bluez",
-        "/org/bluez/hci0",
-        "org.bluez.Adapter1",
-        "StartDiscovery",
-        &error,
-        &m,
-        NULL
-    );
-    if (r < 0) {
-        fprintf(stderr, "Failed to issue method call: %s\n", error.message);
-        sd_bus_error_free(&error);
-    }
-    sd_bus_message_unref(m);
-*/
     return r;
 }
 
