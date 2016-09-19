@@ -51,7 +51,7 @@ class Bus:
         items = []
         root = dev_chr = ffi.new('t_bt_device_chr **')
         r = lib.bt_device_chr_list(self._bus, dev_chr)
-        while dev_chr != ffi.NULL:
+        while dev_chr != ffi.NULL and dev_chr[0] != ffi.NULL:
             uuid = ffi.string(dev_chr[0].uuid)
             path = ffi.string(dev_chr[0].path)
             dev_chr = dev_chr[0].next

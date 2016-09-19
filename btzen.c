@@ -205,6 +205,8 @@ int bt_device_chr_list(sd_bus *bus, t_bt_device_chr **root) {
     const char *path;
     const char *uuid;
 
+    *root = NULL;
+
     r = sd_bus_call_method(
         bus,
         "org.bluez",
