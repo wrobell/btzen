@@ -129,7 +129,6 @@ int bt_device_read(sd_bus *bus, t_bt_device *dev, uint8_t data[]) {
     sd_bus_message *m = NULL;
     sd_bus_error error = SD_BUS_ERROR_NULL;
 
-
     r = sd_bus_call_method(
         bus,
         "org.bluez",
