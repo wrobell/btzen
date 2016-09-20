@@ -30,11 +30,14 @@ import asyncio
 import functools
 import logging
 import struct
+import threading
 
 from _btzen import ffi, lib
 from .import conv
 
 logger = logging.getLogger(__name__)
+
+READ_LOCK = threading.Lock()
 
 
 def converter_epcos_t5400_pressure(dev, p_conf):
@@ -181,7 +184,8 @@ class Reader:
         r = lib.bt_device_write(self._bus, self._device.chr_period, [value], 1)
 
     def read(self):
-        lib.bt_device_read(self._bus, self._device, self._data)
+        with READ_LOCK:
+            lib.bt_device_read(self._bus, self._device, self._data)
         return self._converter(bytearray(self._data))
 
     async def read_async(self):
