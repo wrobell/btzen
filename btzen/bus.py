@@ -75,15 +75,10 @@ class Bus:
 
         self._chr_uuid = items
 
-    def _find_path(self, mac, uuid):
-        mac = _mac(mac).encode()
-        uuid = uuid.encode()
-        items = (p for p, u in self._chr_uuid if mac in p and uuid == u)
-        return next(items, None)
-
     def sensor(self, mac, cls):
         assert isinstance(cls.UUID_DATA, str)
         assert isinstance(cls.UUID_CONF, str)
+        assert isinstance(cls.UUID_PERIOD, str)
 
         params = Parameters(
             self._find_path(mac, cls.UUID_DATA),
@@ -105,5 +100,11 @@ class Bus:
                 assert device in self._sensors
                 sensor = self._sensors[device]
                 sensor.set_result()
+
+    def _find_path(self, mac, uuid):
+        mac = _mac(mac).encode()
+        uuid = uuid.encode()
+        items = (p for p, u in self._chr_uuid if mac in p and uuid == u)
+        return next(items, None)
 
 # vim: sw=4:et:ai
