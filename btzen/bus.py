@@ -27,7 +27,8 @@ from _btzen import ffi, lib
 logger = logging.getLogger(__name__)
 
 Parameters = namedtuple('Parameters', [
-    'path_data', 'path_conf', 'path_period', 'config_on', 'config_off',
+    'path_data', 'path_conf', 'path_period', 'config_on',
+    'config_on_notify', 'config_off',
 ])
 
 def _mac(mac):
@@ -75,7 +76,7 @@ class Bus:
 
         self._chr_uuid = items
 
-    def sensor(self, mac, cls):
+    def sensor(self, mac, cls, notifying=False):
         assert isinstance(cls.UUID_DATA, str)
         assert isinstance(cls.UUID_CONF, str)
         assert isinstance(cls.UUID_PERIOD, str)
@@ -85,12 +86,13 @@ class Bus:
             self._find_path(mac, cls.UUID_CONF),
             self._find_path(mac, cls.UUID_PERIOD),
             cls.CONFIG_ON,
+            cls.CONFIG_ON_NOTIFY,
             cls.CONFIG_OFF,
         )
-        reader = cls(params, self._bus, self._loop)
+        reader = cls(params, self._bus, self._loop, notifying)
         self._sensors[reader._device] = reader
         return reader
-    
+
     def _process_event(self):
         processed = 1
         while processed > 0:

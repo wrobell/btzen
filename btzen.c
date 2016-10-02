@@ -159,12 +159,111 @@ finish:
     return r;
 }
 
+static int bt_device_notification_data(sd_bus_message *m, void *data, sd_bus_error *err) {
+    int r;
+    char *name;
+    size_t len;
+    const void *buff;
+    t_bt_device *dev = data;
+
+    r = sd_bus_message_skip(m, "s"); /* org.bluez.GattCharacteristic1 */
+    sd_bus_message_enter_container(m, SD_BUS_TYPE_ARRAY, "{sv}");
+    while ((r = sd_bus_message_enter_container(m, SD_BUS_TYPE_DICT_ENTRY, "sv")) > 0) {
+        sd_bus_message_read(m, "s", &name);
+
+        if (!strcmp(name, "Value")) {
+            r = sd_bus_message_enter_container(m, SD_BUS_TYPE_VARIANT, "ay");
+            r = sd_bus_message_read_array(m, 'y', &buff, &len);
+            sd_bus_message_exit_container(m); /* variant */
+            memcpy(dev->data, buff, dev->len);
+            last_device = dev;
+
+            sd_bus_message_exit_container(m); /* dict entry */
+            break;
+        }
+
+        sd_bus_message_exit_container(m); /* dict entry */
+    }
+    sd_bus_message_exit_container(m); /* array entry */
+    return 0;
+}
+
+int bt_device_start_notify(sd_bus *bus, t_bt_device *dev) {
+    int r;
+    char *rule;
+    sd_bus_message *m = NULL;
+    sd_bus_error error = SD_BUS_ERROR_NULL;
+
+    r = sd_bus_call_method(
+        bus,
+        "org.bluez",
+        dev->chr_data,
+        "org.bluez.GattCharacteristic1",
+        "StartNotify",
+        &error,
+        &m,
+        NULL,
+        NULL
+    );
+    if (r < 0) {
+        fprintf(stderr, "Failed to issue StartNotify call: %s\n", error.message);
+        goto finish;
+    }
+
+    r = asprintf(
+        &rule,
+        "type='signal',"
+        "sender='org.bluez',"
+        "interface='org.freedesktop.DBus.Properties',"
+        "member='PropertiesChanged',"
+        "path='%s',"
+        "arg0='org.bluez.GattCharacteristic1'",
+        dev->chr_data
+    );
+    if (r < 0)
+        return -ENOMEM;
+
+    r = sd_bus_add_match(bus, NULL, rule, bt_device_notification_data, dev);
+    free(rule);
+    if (r < 0)
+        fprintf(stderr, "Failed to add match rule: %s\n", strerror(-r));
+
+finish:
+    sd_bus_error_free(&error);
+    sd_bus_message_unref(m);
+    return r;
+}
+
+int bt_device_stop_notify(sd_bus *bus, t_bt_device *dev) {
+    int r;
+    sd_bus_message *m = NULL;
+    sd_bus_error error = SD_BUS_ERROR_NULL;
+
+    r = sd_bus_call_method(
+        bus,
+        "org.bluez",
+        dev->chr_data,
+        "org.bluez.GattCharacteristic1",
+        "StopNotify",
+        &error,
+        &m,
+        NULL,
+        NULL
+    );
+    if (r < 0)
+        fprintf(stderr, "Failed to issue StopNotify call: %s\n", error.message);
+
+    sd_bus_error_free(&error);
+    sd_bus_message_unref(m);
+    return r;
+}
+
 static int bt_device_data(sd_bus_message *m, void *user_data, sd_bus_error *error) {
     int r;
     size_t len;
     const void *buff;
     t_bt_device *dev = user_data;
-    
+
     r = sd_bus_message_read_array(m, 'y', &buff, &len);
     if (r < 0) {
         fprintf(stderr, "Failed to parse response message: %s\n", strerror(-r));

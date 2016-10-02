@@ -25,25 +25,27 @@ import logging
 import btzen
 
 
-async def read_data(name, f):
-    t1 = loop.time()
-    value = await f()
-    if isinstance(value, (float, int)):
-        value = '{:.1f}'.format(value)
-    elif isinstance(value, tuple):
-        value = ', '.join('{:.2f}'.format(v) for v in value)
-    else:
-        assert False, 'float, int or tuple expected'
-    t2 = loop.time()
-    print('{}: {} ({:.4f}s)'.format(name, value, t2 - t1))
-
-
-async def read_sensors(sensors):
+async def read_sensor(name, reader):
     while True:
-        tasks = [read_data(n, r.read_async) for n, r in sensors]
-        await asyncio.gather(*tasks)
-        print()
+        t1 = loop.time()
+        value = await reader.read_async()
+        value = '{:.1f}'.format(value)
+        t2 = loop.time()
+        print('{}: {} ({:.4f}s)'.format(name, value, t2 - t1))
         await asyncio.sleep(-loop.time() % 1)
+
+async def read_accelerometer(bus, device):
+    reader = bus.sensor(device, btzen.Accelerometer, notifying=True)
+    reader.set_interval(0.2)
+    try:
+        while True:
+            t1 = loop.time()
+            values = await reader.read_async()
+            values = ', '.join('{:.4f}'.format(v) for v in values)
+            t2 = loop.time()
+            print('accelerometer: {} ({:.4f}s)'.format(values, t2 - t1))
+    finally:
+        reader.close()
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -56,10 +58,9 @@ print('connecting to {}...'.format(args.device))
 bus = btzen.Bus()
 bus.connect(args.device)
 
-names = ['pressure', 'temperature', 'humidity', 'light', 'accelerometer']
+names = ['pressure', 'temperature', 'humidity', 'light']
 classes = [
     btzen.Pressure, btzen.Temperature, btzen.Humidity, btzen.Light,
-    btzen.Accelerometer,
 ]
 readers = ((n, bus.sensor(args.device, c)) for c, n in zip(classes, names))
 readers = {n: r for n, r in readers if r is not None}
@@ -67,8 +68,10 @@ print('sensors initialized')
 
 loop = asyncio.get_event_loop()
 sensors = sorted([(n, r) for n, r in readers.items() if r])
+tasks = [read_sensor(n, r) for n, r in sensors]
+tasks.append(read_accelerometer(bus, args.device))
 try:
-    loop.run_until_complete(read_sensors(sensors))
+    loop.run_until_complete(asyncio.gather(*tasks))
 finally:
     for r in readers.values():
         r.close()

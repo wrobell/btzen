@@ -150,9 +150,10 @@ class Reader:
 
 
 class Reader:
-    def __init__(self, params, bus, loop):
+    def __init__(self, params, bus, loop, notifying):
         self._loop = loop
 
+        self._notifying = notifying
         self._params = params
         self._bus = bus
         self._data = ffi.new('uint8_t[]', self.DATA_LEN)
@@ -168,14 +169,21 @@ class Reader:
         self._device = ffi.new('t_bt_device*', self._device_data)
 
         self.set_interval(1)
+
+        if self._notifying:
+            config_on = self._params.config_on_notify
+            r = lib.bt_device_start_notify(self._bus, self._device)
+        else:
+            config_on = self._params.config_on
+
         r = lib.bt_device_write(
             self._bus,
             self._device.chr_conf,
-            params.config_on,
-            len(params.config_on)
+            config_on,
+            len(config_on)
         )
 
-        factory = data_converter('CC2650 SensorTag', self.UUID_DATA)
+        factory = data_converter('CC2650 SensorTag', self.UUID_DATA) # FIXME: hardcoded name
         self._converter = factory('CC2650 SensorTag', None)
 
     def set_interval(self, interval):
@@ -190,7 +198,8 @@ class Reader:
 
     async def read_async(self):
         future = self._future = self._loop.create_future()
-        r = lib.bt_device_read_async(self._bus, self._device)
+        if not self._notifying:
+            r = lib.bt_device_read_async(self._bus, self._device)
         await future
         return future.result()
 
@@ -200,6 +209,9 @@ class Reader:
         self._future = None
 
     def close(self):
+        if self._notifying:
+            r = lib.bt_device_stop_notify(self._bus, self._device)
+
         r = lib.bt_device_write(
             self._bus,
             self._device.chr_conf,
@@ -215,6 +227,7 @@ class Temperature(Reader):
     UUID_CONF = dev_uuid(0xaa02)
     UUID_PERIOD = dev_uuid(0xaa03)
     CONFIG_ON = [1]
+    CONFIG_ON_NOTIFY = [1]
     CONFIG_OFF = [0]
 
 
@@ -224,6 +237,7 @@ class Pressure(Reader):
     UUID_CONF = dev_uuid(0xaa42)
     UUID_PERIOD = dev_uuid(0xaa44)
     CONFIG_ON = [1]
+    CONFIG_ON_NOTIFY = [1]
     CONFIG_OFF = [0]
 
 
@@ -233,6 +247,7 @@ class Humidity(Reader):
     UUID_CONF = dev_uuid(0xaa22)
     UUID_PERIOD = dev_uuid(0xaa23)
     CONFIG_ON = [1]
+    CONFIG_ON_NOTIFY = [1]
     CONFIG_OFF = [0]
 
 
@@ -242,6 +257,7 @@ class Light(Reader):
     UUID_CONF = dev_uuid(0xaa72)
     UUID_PERIOD = dev_uuid(0xaa73)
     CONFIG_ON = [1]
+    CONFIG_ON_NOTIFY = [1]
     CONFIG_OFF = [0]
 
 
@@ -256,6 +272,7 @@ class Accelerometer(Reader):
     ACCEL_X = 0x20
     WAKE_ON_MOTION = 0x80
     CONFIG_ON = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z)
+    CONFIG_ON_NOTIFY = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z | WAKE_ON_MOTION)
     CONFIG_OFF = [0, 0]
 
 # vim: sw=4:et:ai
