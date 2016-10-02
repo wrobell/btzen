@@ -59,7 +59,7 @@ bus.connect(args.device)
 names = ['pressure', 'temperature', 'humidity', 'light', 'accelerometer']
 classes = [
     btzen.Pressure, btzen.Temperature, btzen.Humidity, btzen.Light,
-#    btzen.Accelerometer,
+    btzen.Accelerometer,
 ]
 readers = ((n, bus.sensor(args.device, c)) for c, n in zip(classes, names))
 readers = {n: r for n, r in readers if r is not None}

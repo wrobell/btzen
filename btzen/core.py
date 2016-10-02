@@ -246,20 +246,16 @@ class Light(Reader):
 
 
 class Accelerometer(Reader):
-    ACCEL_X = 0x20
-    ACCEL_Y = 0x10
+    DATA_LEN = 18
+    UUID_DATA = dev_uuid(0xaa81)
+    UUID_CONF = dev_uuid(0xaa82)
+    UUID_PERIOD = dev_uuid(0xaa83)
+
     ACCEL_Z = 0x08
-
-    def __init__(self, bus, device, loop=None):
-        config = self.ACCEL_X | self.ACCEL_Y | self.ACCEL_Z
-        dev = Parameters(
-            dev_uuid(0xaa81),
-            dev_uuid(0xaa82),
-            dev_uuid(0xaa83),
-            struct.pack('<H', config),
-            b'\x00\x00',
-        )
-        super().__init__(bus, device, dev, loop=loop)
-
+    ACCEL_Y = 0x10
+    ACCEL_X = 0x20
+    WAKE_ON_MOTION = 0x80
+    CONFIG_ON = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z)
+    CONFIG_OFF = [0, 0]
 
 # vim: sw=4:et:ai
