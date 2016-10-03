@@ -33,6 +33,7 @@ BYTE_SHIFT = 1, 8, 16
 
 to_int = lambda data: sum(v << b for v, b in zip(data, BYTE_SHIFT))
 
+first_arg = lambda value, *args: value
 sht21_humidity = lambda data: -6.0 + SHT21_HUMIDITY * (to_int(data[2:]) & 0xfffc)
 sht21_temp = lambda data: -46.85 + SHT21_TEMP * to_int(data[:2])
 tmp006_temp = lambda data: to_int(data[2:]) / 128.0
@@ -45,7 +46,6 @@ def opt3001_light(data):
     e = (v & 0xF000) >> 12
     return m * (2 << e)
 
-
 def epcos_t5400_pressure(calib, data):
     temp, pressure = struct.unpack('<hH', bytearray(data))
 
@@ -54,7 +54,6 @@ def epcos_t5400_pressure(calib, data):
     sens = c[2] + ((c[3] * temp) >> 17) + ((c[4] * t2) >> 34)
     off = (c[5] << 14) + ((c[6] * temp) >> 3) + ((c[7] * t2) >> 19)
     return (sens * pressure + off) >> 14
-
 
 def mpu9250_motion(data):
     data = struct.unpack('<9h', bytes(data))

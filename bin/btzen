@@ -47,6 +47,18 @@ async def read_accelerometer(bus, device):
     finally:
         reader.close()
 
+async def read_button(bus, device):
+    reader = bus.sensor(device, btzen.Button, notifying=True)
+    reader.set_interval(1)
+    try:
+        while True:
+            t1 = loop.time()
+            value = await reader.read_async()
+            t2 = loop.time()
+            print('button: {} ({:.4f}s)'.format(value, t2 - t1))
+    finally:
+        reader.close()
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -70,6 +82,7 @@ loop = asyncio.get_event_loop()
 sensors = sorted([(n, r) for n, r in readers.items() if r])
 tasks = [read_sensor(n, r) for n, r in sensors]
 tasks.append(read_accelerometer(bus, args.device))
+tasks.append(read_button(bus, args.device))
 try:
     loop.run_until_complete(asyncio.gather(*tasks))
 finally:

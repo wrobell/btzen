@@ -18,10 +18,12 @@
 #
 
 from .bus import Bus
-from .core import Temperature, Humidity, Pressure, Light, Accelerometer
+from .core import Temperature, Humidity, Pressure, Light, Accelerometer, \
+    Button
 
 __all__ = [
     'Bus', 'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
+    'Button',
 ]
 
 # vim: sw=4:et:ai

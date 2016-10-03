@@ -78,8 +78,8 @@ class Bus:
 
     def sensor(self, mac, cls, notifying=False):
         assert isinstance(cls.UUID_DATA, str)
-        assert isinstance(cls.UUID_CONF, str)
-        assert isinstance(cls.UUID_PERIOD, str)
+        assert isinstance(cls.UUID_CONF, str) or cls.UUID_CONF is None
+        assert isinstance(cls.UUID_PERIOD, str) or cls.UUID_PERIOD is None
 
         params = Parameters(
             self._find_path(mac, cls.UUID_DATA),
@@ -104,6 +104,8 @@ class Bus:
                 sensor.set_result()
 
     def _find_path(self, mac, uuid):
+        if uuid is None:
+            return b''
         mac = _mac(mac).encode()
         uuid = uuid.encode()
         items = (p for p, u in self._chr_uuid if mac in p and uuid == u)

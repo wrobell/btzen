@@ -61,11 +61,13 @@ DATA_CONVERTER = {
     ('SensorTag 2.0', dev_uuid(0xaa41)): lambda *args: conv.bmp280_pressure,
     ('SensorTag 2.0', dev_uuid(0xaa71)): lambda *args: conv.opt3001_light,
     ('SensorTag 2.0', dev_uuid(0xaa81)): lambda *args: conv.mpu9250_motion,
+    ('SensorTag 2.0', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: conv.first_arg,
     ('CC2650 SensorTag', dev_uuid(0xaa01)):lambda *args: conv.tmp006_temp,
     ('CC2650 SensorTag', dev_uuid(0xaa21)): lambda *args: conv.hdc1000_humidity,
     ('CC2650 SensorTag', dev_uuid(0xaa41)): lambda *args: conv.bmp280_pressure,
     ('CC2650 SensorTag', dev_uuid(0xaa71)): lambda *args: conv.opt3001_light,
     ('CC2650 SensorTag', dev_uuid(0xaa81)): lambda *args: conv.mpu9250_motion,
+    ('CC2650 SensorTag', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: conv.first_arg,
 }
 
 data_converter = lambda name, uuid: \
@@ -99,12 +101,13 @@ class Reader:
         else:
             config_on = self._params.config_on
 
-        r = lib.bt_device_write(
-            self._bus,
-            self._device.chr_conf,
-            config_on,
-            len(config_on)
-        )
+        if config_on:
+            r = lib.bt_device_write(
+                self._bus,
+                self._device.chr_conf,
+                config_on,
+                len(config_on)
+            )
 
         factory = data_converter('CC2650 SensorTag', self.UUID_DATA) # FIXME: hardcoded name
         self._converter = factory('CC2650 SensorTag', None)
@@ -197,5 +200,16 @@ class Accelerometer(Reader):
     CONFIG_ON = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z)
     CONFIG_ON_NOTIFY = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z | WAKE_ON_MOTION)
     CONFIG_OFF = [0, 0]
+
+
+class Button(Reader):
+    DATA_LEN = 1
+    UUID_DATA = '0000ffe1-0000-1000-8000-00805f9b34fb'
+    UUID_CONF = None
+    UUID_PERIOD = None
+
+    CONFIG_ON = None
+    CONFIG_ON_NOTIFY = None
+    CONFIG_OFF = None
 
 # vim: sw=4:et:ai
