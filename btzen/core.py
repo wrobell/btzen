@@ -101,6 +101,8 @@ class Reader:
         else:
             config_on = self._params.config_on
 
+        # enabled switched off sensor; some sensors are always on,
+        # i.e. button
         if config_on:
             r = lib.bt_device_write(
                 self._bus,
@@ -141,12 +143,15 @@ class Reader:
         if self._notifying:
             r = lib.bt_device_stop_notify(self._bus, self._device)
 
-        r = lib.bt_device_write(
-            self._bus,
-            self._device.chr_conf,
-            self._params.config_off,
-            len(self._params.config_off)
-        )
+        # disable switched on sensor; some sensors stay always on,
+        # i.e. button
+        if self._params.config_off:
+            r = lib.bt_device_write(
+                self._bus,
+                self._device.chr_conf,
+                self._params.config_off,
+                len(self._params.config_off)
+            )
         logger.info('{} sensor closed'.format(self.__class__.__name__))
 
     def _set_result(self):
