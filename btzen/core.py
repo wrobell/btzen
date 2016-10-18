@@ -77,6 +77,7 @@ data_converter = lambda name, uuid: \
 class Reader:
     def __init__(self, params, bus, loop, notifying):
         self._loop = loop
+        self._future = None
 
         self._notifying = notifying
         self._params = params
@@ -140,6 +141,14 @@ class Reader:
         return future.result()
 
     def close(self):
+        """
+        Disable sensor and stop reading sensor data.
+
+        Pending, asynchronous coroutines are cancelled.
+        """
+        if self._future is not None:
+            self._future.cancel()
+
         if self._notifying:
             r = lib.bt_device_stop_notify(self._bus, self._device)
 
