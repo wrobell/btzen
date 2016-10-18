@@ -78,7 +78,7 @@ data_converter = lambda name, uuid: \
 class Reader:
     def __init__(self, params, bus, loop, notifying):
         self._loop = loop
-        self._future = None
+        self._queue = asyncio.Queue()
 
         self._notifying = notifying
         self._params = params
@@ -137,11 +137,10 @@ class Reader:
 
         This method is a coroutine.
         """
-        future = self._future = self._loop.create_future()
         if not self._notifying:
             r = lib.bt_device_read_async(self._bus, self._device)
-        await future
-        return future.result()
+        value = await self._queue.get()
+        return value
 
     def close(self):
         """
@@ -149,9 +148,6 @@ class Reader:
 
         Pending, asynchronous coroutines are cancelled.
         """
-        if self._future is not None:
-            self._future.cancel()
-
         if self._notifying:
             r = lib.bt_device_stop_notify(self._bus, self._device)
 
@@ -164,6 +160,11 @@ class Reader:
                 self._params.config_off,
                 len(self._params.config_off)
             )
+
+        # empty data queue to avoid not done futures
+        while self._queue.qsize():
+            self._queue.get_nowait()
+
         logger.info('{} sensor closed'.format(self.__class__.__name__))
 
     def _set_result(self):
@@ -173,14 +174,7 @@ class Reader:
         .. seealso:: :py:meth:`Reader.read_async`
         """
         value = self._converter(bytearray(self._data))
-        if self._future is None:
-            logger.warning(
-                '{} coroutine not awaited, ignoring data: {}'
-                .format(self.__class__.__name__, value)
-            )
-        else:
-            self._future.set_result(value)
-            self._future = None
+        self._queue.put_nowait(value)
 
 
 class Temperature(Reader):

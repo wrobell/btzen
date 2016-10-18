@@ -82,6 +82,7 @@ reader = readers['button'] = bus.sensor(
     args.device, btzen.Button, notifying=True
 )
 tasks.append(read_button(readers['button']))
+
 try:
     loop.run_until_complete(asyncio.gather(*tasks))
 finally:
