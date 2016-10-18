@@ -101,7 +101,7 @@ class Bus:
             if processed == 1 and device != ffi.NULL:
                 assert device in self._sensors
                 sensor = self._sensors[device]
-                sensor.set_result()
+                sensor._set_result()
 
     def _find_path(self, mac, uuid):
         if uuid is None:

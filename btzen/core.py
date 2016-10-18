@@ -118,21 +118,24 @@ class Reader:
         r = lib.bt_device_write(self._bus, self._device.chr_period, [value], 1)
 
     def read(self):
+        """
+        Read and return sensor data.
+        """
         with READ_LOCK:
             lib.bt_device_read(self._bus, self._device, self._data)
         return self._converter(bytearray(self._data))
 
     async def read_async(self):
+        """
+        Read and return sensor data.
+
+        This method is a coroutine.
+        """
         future = self._future = self._loop.create_future()
         if not self._notifying:
             r = lib.bt_device_read_async(self._bus, self._device)
         await future
         return future.result()
-
-    def set_result(self):
-        value = self._converter(bytearray(self._data))
-        self._future.set_result(value)
-        self._future = None
 
     def close(self):
         if self._notifying:
@@ -145,6 +148,22 @@ class Reader:
             len(self._params.config_off)
         )
         logger.info('{} sensor closed'.format(self.__class__.__name__))
+
+    def _set_result(self):
+        """
+        Set result of asynchronous call.
+
+        .. seealso:: :py:meth:`Reader.read_async`
+        """
+        value = self._converter(bytearray(self._data))
+        if self._future is None:
+            logger.warning(
+                '{} coroutine not awaited, ignoring data: {}'
+                .format(self.__class__.__name__, value)
+            )
+        else:
+            self._future.set_result(value)
+            self._future = None
 
 
 class Temperature(Reader):
