@@ -51,7 +51,7 @@ int bt_device_is_connected(sd_bus *bus, const char *mac) {
     return 0;
 }
 
-int bt_device_property_str(sd_bus *bus, const char *path, char **name) {
+int bt_device_property_str(sd_bus *bus, const char *path, const char *property, char **name) {
     int r;
     char *data;
     sd_bus_message *m = NULL;
@@ -62,7 +62,7 @@ int bt_device_property_str(sd_bus *bus, const char *path, char **name) {
         "org.bluez",
         path,
         "org.bluez.Device1",
-        "Name",
+        property,
         &error,
         &m,
         "s"
@@ -82,8 +82,8 @@ finish:
     return r;
 }
 
-int bt_device_services_resolved(sd_bus *bus, const char *path) {
-    uint8_t resolved;
+int bt_device_property_bool(sd_bus *bus, const char *path, const char *property) {
+    uint8_t value;
     int r;
     sd_bus_message *m = NULL;
     sd_bus_error error = SD_BUS_ERROR_NULL;
@@ -93,7 +93,7 @@ int bt_device_services_resolved(sd_bus *bus, const char *path) {
         "org.bluez",
         path,
         "org.bluez.Device1",
-        "ServicesResolved",
+        property,
         &error,
         &m,
         "b"
@@ -102,12 +102,12 @@ int bt_device_services_resolved(sd_bus *bus, const char *path) {
         fprintf(stderr, "Failed to read ServicesResolved property: %s\n", error.message);
         goto finish;
     }
-    r = sd_bus_message_read(m, "b", &resolved);
+    r = sd_bus_message_read(m, "b", &value);
     if (r < 0) {
         fprintf(stderr, "Failed to get ServicesResolved property data\n");
         goto finish;
     }
-    r = resolved;
+    r = value;
 
 finish:
     //sd_bus_message_unref(m); FIXME

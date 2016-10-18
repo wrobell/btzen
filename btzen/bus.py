@@ -55,7 +55,9 @@ class Bus:
             path = ffi.new('char[]', path.encode())
             r = lib.bt_device_connect(self._bus, path)
             for i in range(10):
-                resolved = lib.bt_device_services_resolved(self._bus, path)
+                resolved = lib.bt_device_property_bool(
+                    self._bus, path, 'ServicesResolved'.encode()
+                )
                 if resolved == 1:
                     break
                 logger.debug(
@@ -67,7 +69,7 @@ class Bus:
                 raise ValueError('not resolved')
 
             name = ffi.new('char**')
-            r = lib.bt_device_property_str(self._bus, path, name)
+            r = lib.bt_device_property_str(self._bus, path, 'Name'.encode(), name)
             self._dev_names[mac] = ffi.string(name[0]).decode()
 
         items = []

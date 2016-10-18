@@ -44,8 +44,8 @@ int sd_bus_get_fd(sd_bus*);
 void *sd_bus_get_current_userdata(sd_bus*);
 
 int bt_device_connect(sd_bus*, const char*);
-int bt_device_property_str(sd_bus *bus, const char *, char**);
-int bt_device_services_resolved(sd_bus*, const char*);
+int bt_device_property_str(sd_bus *bus, const char*, const char*, char**);
+int bt_device_property_bool(sd_bus*, const char*, const char*);
 t_bt_device *bt_device_last(void);
 int bt_device_write(sd_bus*, const char*, const uint8_t*, ssize_t);
 int bt_device_read(sd_bus*, t_bt_device*, uint8_t[]);
