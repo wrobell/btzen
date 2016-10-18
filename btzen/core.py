@@ -167,7 +167,7 @@ class Reader:
 
         logger.info('{} sensor closed'.format(self.__class__.__name__))
 
-    def _process_async(self):
+    def _process_event(self):
         """
         Set sensor data as result of current asynchronous call.
 
