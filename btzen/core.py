@@ -78,7 +78,7 @@ data_converter = lambda name, uuid: \
 class Reader:
     def __init__(self, params, bus, loop, notifying):
         self._loop = loop
-        self._queue = asyncio.Queue()
+        self._queue = asyncio.Queue(loop=loop)
 
         self._notifying = notifying
         self._params = params
