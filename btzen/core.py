@@ -83,14 +83,14 @@ class Reader:
         self._notifying = notifying
         self._params = params
         self._bus = bus
-        self._data = ffi.new('uint8_t[]', self.DATA_LEN)
+        self._data = bytearray(self.DATA_LEN)
 
         # keep reference to device data with the dictionary below
         self._device_data = {
             'chr_data': ffi.new('char[]', params.path_data),
             'chr_conf': ffi.new('char[]', params.path_conf),
             'chr_period': ffi.new('char[]', params.path_period),
-            'data': self._data,
+            'data': ffi.from_buffer(self._data),
             'len': self.DATA_LEN,
         }
         self._device = ffi.new('t_bt_device*', self._device_data)
@@ -128,8 +128,8 @@ class Reader:
         Read and return sensor data.
         """
         with READ_LOCK:
-            lib.bt_device_read(self._bus, self._device, self._data)
-        return self._converter(bytearray(self._data))
+            lib.bt_device_read(self._bus, self._device, ffi.from_buffer(self._data))
+        return self._converter(self._data)
 
     async def read_async(self):
         """
@@ -167,13 +167,13 @@ class Reader:
 
         logger.info('{} sensor closed'.format(self.__class__.__name__))
 
-    def _set_result(self):
+    def _process_async(self):
         """
-        Set result of asynchronous call.
+        Set sensor data as result of current asynchronous call.
 
         .. seealso:: :py:meth:`Reader.read_async`
         """
-        value = self._converter(bytearray(self._data))
+        value = self._converter(self._data)
         self._queue.put_nowait(value)
 
 
