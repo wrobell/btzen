@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 READ_LOCK = threading.Lock()
 
 
+# TODO: fix for CC2541DK
 def converter_epcos_t5400_pressure(dev, p_conf):
     p_calib = dbus.find_sensor(dev, dev_uuid(0xaa43))
     p_conf._obj.WriteValue([2])
@@ -112,8 +113,10 @@ class Reader:
                 len(config_on)
             )
 
-        factory = data_converter('CC2650 SensorTag', self.UUID_DATA) # FIXME: hardcoded name
-        self._converter = factory('CC2650 SensorTag', None)
+        name = self._params.name
+        factory = data_converter(name, self.UUID_DATA)
+        # TODO: fix for CC2541DK
+        self._converter = factory(name, None)
 
     def set_interval(self, interval):
         value = int(interval * 100)

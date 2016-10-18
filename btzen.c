@@ -39,12 +39,9 @@ int bt_device_connect(sd_bus *bus, const char *path) {
         &m,
         NULL
     );
-    if (r < 0) {
+    if (r < 0)
         fprintf(stderr, "Failed to issue method call: %s\n", error.message);
-        goto finish;
-    }
 
-finish:
     sd_bus_message_unref(m);
     sd_bus_error_free(&error);
     return r;
@@ -52,6 +49,37 @@ finish:
 
 int bt_device_is_connected(sd_bus *bus, const char *mac) {
     return 0;
+}
+
+int bt_device_property_str(sd_bus *bus, const char *path, char **name) {
+    int r;
+    char *data;
+    sd_bus_message *m = NULL;
+    sd_bus_error error = SD_BUS_ERROR_NULL;
+
+    r = sd_bus_get_property(
+        bus,
+        "org.bluez",
+        path,
+        "org.bluez.Device1",
+        "Name",
+        &error,
+        &m,
+        "s"
+    );
+    if (r < 0) {
+        fprintf(stderr, "Failed to read Name property: %s\n", error.message);
+        goto finish;
+    }
+    r = sd_bus_message_read(m, "s", &data);
+    *name = strdup(data);
+    if (r < 0)
+        fprintf(stderr, "Failed to get Name property data\n");
+
+finish:
+    sd_bus_message_unref(m);
+    sd_bus_error_free(&error);
+    return r;
 }
 
 int bt_device_services_resolved(sd_bus *bus, const char *path) {

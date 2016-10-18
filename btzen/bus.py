@@ -27,7 +27,7 @@ from _btzen import ffi, lib
 logger = logging.getLogger(__name__)
 
 Parameters = namedtuple('Parameters', [
-    'path_data', 'path_conf', 'path_period', 'config_on',
+    'name', 'path_data', 'path_conf', 'path_period', 'config_on',
     'config_on_notify', 'config_off',
 ])
 
@@ -46,6 +46,8 @@ class Bus:
         self._loop.add_reader(self._fd, self._process_event)
 
         self._sensors = {}
+        self._chr_uuid = []
+        self._dev_names = {}
 
     def connect(self, *args):
         for mac in args:
@@ -63,6 +65,10 @@ class Bus:
                 time.sleep(1)
             if i == 9:
                 raise ValueError('not resolved')
+
+            name = ffi.new('char**')
+            r = lib.bt_device_property_str(self._bus, path, name)
+            self._dev_names[mac] = ffi.string(name[0]).decode()
 
         items = []
         root = dev_chr = ffi.new('t_bt_device_chr **')
@@ -82,6 +88,7 @@ class Bus:
         assert isinstance(cls.UUID_PERIOD, str) or cls.UUID_PERIOD is None
 
         params = Parameters(
+            self._dev_names[mac],
             self._find_path(mac, cls.UUID_DATA),
             self._find_path(mac, cls.UUID_CONF),
             self._find_path(mac, cls.UUID_PERIOD),
