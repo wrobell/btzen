@@ -103,14 +103,15 @@ class Bus:
         return reader
 
     def _process_event(self):
-        processed = 1
+        processed = lib.sd_bus_process(self._bus, ffi.NULL)
         while processed > 0:
-            processed = lib.sd_bus_process(self._bus, ffi.NULL)
             device = lib.bt_device_last()
-            if processed == 1 and device != ffi.NULL:
+            if device != ffi.NULL:
                 assert device in self._sensors
                 sensor = self._sensors[device]
                 sensor._process_event()
+
+            processed = lib.sd_bus_process(self._bus, ffi.NULL)
 
     def _find_path(self, mac, uuid):
         if uuid is None:
