@@ -47,10 +47,6 @@ int bt_device_connect(sd_bus *bus, const char *path) {
     return r;
 }
 
-int bt_device_is_connected(sd_bus *bus, const char *mac) {
-    return 0;
-}
-
 int bt_device_property_str(sd_bus *bus, const char *path, const char *property, char **name) {
     int r;
     char *data;
