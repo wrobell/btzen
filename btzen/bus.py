@@ -36,7 +36,7 @@ def _mac(mac):
     return mac.replace(':', '_').upper()
 
 class Bus:
-    thread_local = threading.local()
+    THREAD_LOCAL = threading.local()
 
     def __init__(self, loop=None):
         self._loop = asyncio.get_event_loop() if loop is None else loop
@@ -50,7 +50,7 @@ class Bus:
 
     @staticmethod
     def get_bus():
-        local = Bus.thread_local
+        local = Bus.THREAD_LOCAL
         if not hasattr(local, 'bus'):
             local.bus = SDBus()
         return local.bus.bus
