@@ -104,54 +104,6 @@ class Reader:
         Reader.BUS.register(self)
         self._enable()
 
-    def _set_parameters(self, name):
-        bus = Reader.BUS
-        mac = self._mac
-        self._params = params = Parameters(
-            name,
-            bus.sensor_path(mac, self.UUID_DATA),
-            bus.sensor_path(mac, self.UUID_CONF),
-            bus.sensor_path(mac, self.UUID_PERIOD),
-            self.CONFIG_ON,
-            self.CONFIG_ON_NOTIFY,
-            self.CONFIG_OFF,
-        )
-
-        # keep reference to device data with the dictionary below
-        self._device_data = {
-            'chr_data': ffi.new('char[]', params.path_data),
-            'chr_conf': ffi.new('char[]', params.path_conf),
-            'chr_period': ffi.new('char[]', params.path_period),
-            'data': ffi.from_buffer(self._data),
-            'len': self.DATA_LEN,
-        }
-        self._device = ffi.new('t_bt_device*', self._device_data)
-
-        # ceate data converter
-        name = params.name
-        factory = data_converter(name, self.UUID_DATA)
-        # TODO: fix for CC2541DK
-        self._converter = factory(name, None)
-
-    def _enable(self):
-        self.set_interval(1)
-
-        if self._notifying:
-            config_on = self._params.config_on_notify
-            r = lib.bt_device_start_notify(Reader.BUS.get_bus(), self._device)
-        else:
-            config_on = self._params.config_on
-
-        # enabled switched off sensor; some sensors are always on,
-        # i.e. button
-        if config_on:
-            r = lib.bt_device_write(
-                Reader.BUS.get_bus(),
-                self._device.chr_conf,
-                config_on,
-                len(config_on)
-            )
-
     def set_interval(self, interval):
         value = int(interval * 100)
         assert value < 256
@@ -208,6 +160,54 @@ class Reader:
         """
         value = self._converter(self._data)
         self._queue.put_nowait(value)
+
+    def _set_parameters(self, name):
+        bus = Reader.BUS
+        mac = self._mac
+        self._params = params = Parameters(
+            name,
+            bus.sensor_path(mac, self.UUID_DATA),
+            bus.sensor_path(mac, self.UUID_CONF),
+            bus.sensor_path(mac, self.UUID_PERIOD),
+            self.CONFIG_ON,
+            self.CONFIG_ON_NOTIFY,
+            self.CONFIG_OFF,
+        )
+
+        # keep reference to device data with the dictionary below
+        self._device_data = {
+            'chr_data': ffi.new('char[]', params.path_data),
+            'chr_conf': ffi.new('char[]', params.path_conf),
+            'chr_period': ffi.new('char[]', params.path_period),
+            'data': ffi.from_buffer(self._data),
+            'len': self.DATA_LEN,
+        }
+        self._device = ffi.new('t_bt_device*', self._device_data)
+
+        # ceate data converter
+        name = params.name
+        factory = data_converter(name, self.UUID_DATA)
+        # TODO: fix for CC2541DK
+        self._converter = factory(name, None)
+
+    def _enable(self):
+        self.set_interval(1)
+
+        if self._notifying:
+            config_on = self._params.config_on_notify
+            r = lib.bt_device_start_notify(Reader.BUS.get_bus(), self._device)
+        else:
+            config_on = self._params.config_on
+
+        # enabled switched off sensor; some sensors are always on,
+        # i.e. button
+        if config_on:
+            r = lib.bt_device_write(
+                Reader.BUS.get_bus(),
+                self._device.chr_conf,
+                config_on,
+                len(config_on)
+            )
 
 
 class Temperature(Reader):
