@@ -17,12 +17,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .bus import Bus
 from .core import Temperature, Humidity, Pressure, Light, Accelerometer, \
     Button
 
 __all__ = [
-    'Bus', 'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
+    'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
     'Button',
 ]
 

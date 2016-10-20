@@ -26,6 +26,7 @@ import btzen
 
 
 async def read_sensor(name, reader):
+    reader.connect()
     while True:
         t1 = loop.time()
         value = await reader.read_async()
@@ -35,6 +36,8 @@ async def read_sensor(name, reader):
         await asyncio.sleep(-loop.time() % 1)
 
 async def read_accelerometer(reader):
+    reader.connect()
+    reader.set_interval(0.1)
     while True:
         t1 = loop.time()
         values = await reader.read_async()
@@ -43,6 +46,7 @@ async def read_accelerometer(reader):
         print('accelerometer: {} ({:.4f}s)'.format(values, t2 - t1))
 
 async def read_button(reader):
+    reader.connect()
     while True:
         t1 = loop.time()
         value = await reader.read_async()
@@ -57,14 +61,12 @@ parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
 print('connecting to {}...'.format(args.device))
-bus = btzen.Bus()
-bus.connect(args.device)
 
 names = ['pressure', 'temperature', 'humidity', 'light']
 classes = [
     btzen.Pressure, btzen.Temperature, btzen.Humidity, btzen.Light,
 ]
-readers = ((n, bus.sensor(args.device, c)) for c, n in zip(classes, names))
+readers = ((n, c(args.device)) for c, n in zip(classes, names))
 readers = {n: r for n, r in readers if r is not None}
 print('sensors initialized')
 
@@ -72,15 +74,10 @@ loop = asyncio.get_event_loop()
 sensors = sorted([(n, r) for n, r in readers.items() if r])
 tasks = [read_sensor(n, r) for n, r in sensors]
 
-reader = readers['accelerometer'] = bus.sensor(
-    args.device, btzen.Accelerometer, notifying=True
-)
-reader.set_interval(0.2)
+reader = readers['accelerometer'] = btzen.Accelerometer(args.device, notifying=True)
 tasks.append(read_accelerometer(reader))
 
-reader = readers['button'] = bus.sensor(
-    args.device, btzen.Button, notifying=True
-)
+reader = readers['button'] = btzen.Button(args.device, notifying=True)
 tasks.append(read_button(readers['button']))
 
 try:

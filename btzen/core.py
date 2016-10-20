@@ -30,9 +30,11 @@ import asyncio
 import functools
 import logging
 import struct
+from collections import namedtuple
 
 from _btzen import ffi, lib
 from .import conv
+from .bus import Bus
 
 logger = logging.getLogger(__name__)
 
@@ -69,16 +71,51 @@ DATA_CONVERTER = {
 data_converter = lambda name, uuid: \
     DATA_CONVERTER[(name, uuid)]
 
+Parameters = namedtuple('Parameters', [
+    'name', 'path_data', 'path_conf', 'path_period', 'config_on',
+    'config_on_notify', 'config_off',
+])
+
 
 class Reader:
-    def __init__(self, params, bus, loop, notifying):
-        self._loop = loop
-        self._queue = asyncio.Queue(loop=loop)
+    BUS = None
 
+    def __init__(self, mac, notifying=False, loop=None):
+        self._mac = mac
         self._notifying = notifying
-        self._params = params
-        self._bus = bus
+        self._loop = loop if loop else asyncio.get_event_loop()
+        self._queue = asyncio.Queue(loop=self._loop)
+
+        self._params = None
         self._data = bytearray(self.DATA_LEN)
+        self._device_data = None
+        self._device = None
+
+        if Reader.BUS is None:
+            Reader.BUS = Bus(self._loop)
+
+    def connect(self):
+        assert isinstance(self.UUID_DATA, str)
+        assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
+        assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
+
+        name = Reader.BUS.connect(self._mac, self)
+        self._set_parameters(name)
+        Reader.BUS.register(self)
+        self._enable()
+
+    def _set_parameters(self, name):
+        bus = Reader.BUS
+        mac = self._mac
+        self._params = params = Parameters(
+            name,
+            bus.sensor_path(mac, self.UUID_DATA),
+            bus.sensor_path(mac, self.UUID_CONF),
+            bus.sensor_path(mac, self.UUID_PERIOD),
+            self.CONFIG_ON,
+            self.CONFIG_ON_NOTIFY,
+            self.CONFIG_OFF,
+        )
 
         # keep reference to device data with the dictionary below
         self._device_data = {
@@ -90,11 +127,18 @@ class Reader:
         }
         self._device = ffi.new('t_bt_device*', self._device_data)
 
+        # ceate data converter
+        name = params.name
+        factory = data_converter(name, self.UUID_DATA)
+        # TODO: fix for CC2541DK
+        self._converter = factory(name, None)
+
+    def _enable(self):
         self.set_interval(1)
 
         if self._notifying:
             config_on = self._params.config_on_notify
-            r = lib.bt_device_start_notify(self._bus.get_bus(), self._device)
+            r = lib.bt_device_start_notify(Reader.BUS.get_bus(), self._device)
         else:
             config_on = self._params.config_on
 
@@ -102,27 +146,22 @@ class Reader:
         # i.e. button
         if config_on:
             r = lib.bt_device_write(
-                self._bus.get_bus(),
+                Reader.BUS.get_bus(),
                 self._device.chr_conf,
                 config_on,
                 len(config_on)
             )
 
-        name = self._params.name
-        factory = data_converter(name, self.UUID_DATA)
-        # TODO: fix for CC2541DK
-        self._converter = factory(name, None)
-
     def set_interval(self, interval):
         value = int(interval * 100)
         assert value < 256
-        r = lib.bt_device_write(self._bus.get_bus(), self._device.chr_period, [value], 1)
+        r = lib.bt_device_write(Reader.BUS.get_bus(), self._device.chr_period, [value], 1)
 
     def read(self):
         """
         Read and return sensor data.
         """
-        lib.bt_device_read(self._bus.get_bus(), self._device, ffi.from_buffer(self._data))
+        lib.bt_device_read(Reader.BUS.get_bus(), self._device, ffi.from_buffer(self._data))
         return self._converter(self._data)
 
     async def read_async(self):
@@ -132,7 +171,7 @@ class Reader:
         This method is a coroutine.
         """
         if not self._notifying:
-            r = lib.bt_device_read_async(self._bus.get_bus(), self._device)
+            r = lib.bt_device_read_async(Reader.BUS.get_bus(), self._device)
         value = await self._queue.get()
         return value
 
@@ -143,13 +182,13 @@ class Reader:
         Pending, asynchronous coroutines are cancelled.
         """
         if self._notifying:
-            r = lib.bt_device_stop_notify(self._bus.get_bus(), self._device)
+            r = lib.bt_device_stop_notify(Reader.BUS.get_bus(), self._device)
 
         # disable switched on sensor; some sensors stay always on,
         # i.e. button
         if self._params.config_off:
             r = lib.bt_device_write(
-                self._bus.get_bus(),
+                Reader.BUS.get_bus(),
                 self._device.chr_conf,
                 self._params.config_off,
                 len(self._params.config_off)
