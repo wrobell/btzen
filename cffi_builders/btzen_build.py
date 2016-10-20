@@ -38,7 +38,8 @@ typedef struct bt_device_chr {
     struct bt_device_chr *next;
 } t_bt_device_chr;
 
-int sd_bus_open_system(sd_bus**);
+int sd_bus_default_system(sd_bus**);
+sd_bus *sd_bus_unref(sd_bus*);
 int sd_bus_process(sd_bus*, sd_bus_message**);
 int sd_bus_get_fd(sd_bus*);
 void *sd_bus_get_current_userdata(sd_bus*);
