@@ -37,6 +37,7 @@ def _mac(mac):
 
 class Bus:
     thread_local = threading.local()
+
     def __init__(self, loop=None):
         self._loop = asyncio.get_event_loop() if loop is None else loop
 
@@ -58,20 +59,25 @@ class Bus:
         for mac in args:
             path = '/org/bluez/hci0/dev_{}'.format(_mac(mac))
             path = ffi.new('char[]', path.encode())
-            r = lib.bt_device_connect(self.get_bus(), path)
-            for i in range(10):
-                resolved = lib.bt_device_property_bool(
-                    self.get_bus(), path, 'ServicesResolved'.encode()
-                )
-                if resolved == 1:
-                    break
-                logger.debug(
-                    'bluetooth device {} services not resolved, wait 1s...'
-                    .format(mac)
-                )
-                time.sleep(1)
-            if i == 9:
-                raise ValueError('not resolved')
+
+            connected = lib.bt_device_property_bool(
+                self.get_bus(), path, 'Connected'.encode()
+            )
+            if not connected:
+                r = lib.bt_device_connect(self.get_bus(), path)
+                for i in range(10):
+                    resolved = lib.bt_device_property_bool(
+                        self.get_bus(), path, 'ServicesResolved'.encode()
+                    )
+                    if resolved == 1:
+                        break
+                    logger.debug(
+                        'bluetooth device {} services not resolved, wait 1s...'
+                        .format(mac)
+                    )
+                    time.sleep(1)
+                if i == 9:
+                    raise ValueError('not resolved')
 
             name = ffi.new('char**')
             r = lib.bt_device_property_str(self.get_bus(), path, 'Name'.encode(), name)
