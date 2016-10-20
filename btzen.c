@@ -40,7 +40,7 @@ int bt_device_connect(sd_bus *bus, const char *path) {
         NULL
     );
     if (r < 0)
-        fprintf(stderr, "Failed to issue method call: %s\n", error.message);
+        fprintf(stderr, "Failed to issue connection call: %s\n", error.message);
 
     sd_bus_message_unref(m);
     sd_bus_error_free(&error);

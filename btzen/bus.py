@@ -24,6 +24,7 @@ import time
 from functools import lru_cache
 
 from _btzen import ffi, lib
+from .error import ConnectionError
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +51,15 @@ class Bus:
 
     def connect(self, mac, sensor):
         path = self._get_device_path(mac)
-        connected = lib.bt_device_property_bool(
+        r = connected = lib.bt_device_property_bool(
             self.get_bus(), path, 'Connected'.encode()
         )
+        if r < 0:
+            raise ConnectionError('Cannot check connection to {}'.format(mac))
         if not connected:
             r = lib.bt_device_connect(self.get_bus(), path)
+            if r < 0:
+                raise ConnectionError('Connection to {} failed'.format(mac))
             for i in range(10):
                 resolved = lib.bt_device_property_bool(
                     self.get_bus(), path, 'ServicesResolved'.encode()
@@ -67,7 +72,7 @@ class Bus:
                 )
                 time.sleep(1)
             if i == 9:
-                raise ValueError('not resolved')
+                raise ConnectionError('Cannot resolve services of {}'.format(mac))
         return self._get_device_name(mac)
 
     def register(self, sensor):
