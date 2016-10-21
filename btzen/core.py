@@ -138,7 +138,7 @@ class Reader:
 
         # disable switched on sensor; some sensors stay always on,
         # i.e. button
-        if self._params.config_off:
+        if self._params and self._params.config_off:
             r = lib.bt_device_write(
                 Reader.BUS.get_bus(),
                 self._device.chr_conf,
