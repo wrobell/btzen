@@ -144,7 +144,7 @@ class SDBus:
         self.bus = self.bus_ref[0]
 
     def __del__(self):
-        logger.info('destroy reference to system bus')
         lib.sd_bus_unref(self.bus)
+        logger.info('reference to system bus destroyed')
 
 # vim: sw=4:et:ai
