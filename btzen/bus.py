@@ -78,6 +78,9 @@ class Bus:
     def register(self, sensor):
         self._sensors[sensor._device] = sensor
 
+    def unregister(self, sensor):
+        del self._sensors[sensor._device]
+
     def sensor_path(self, mac, uuid):
         if uuid is None:
             return b''

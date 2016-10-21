@@ -150,6 +150,8 @@ class Reader:
         while self._queue.qsize():
             self._queue.get_nowait()
 
+        Reader.BUS.unregister(self)
+
         logger.info('{} sensor closed'.format(self.__class__.__name__))
 
     def _process_event(self):
