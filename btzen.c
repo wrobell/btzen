@@ -6,7 +6,7 @@ typedef struct {
     char *chr_data;
     char *chr_conf;
     char *chr_period;
-    uint8_t *data;
+    char *data;
     size_t len;
 } t_bt_device;
 
