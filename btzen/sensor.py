@@ -46,6 +46,9 @@ Parameters = namedtuple('Parameters', [
 
 
 class Sensor:
+    """
+    :var _system_bus: System D-Bus reference (not thread safe).
+    """
     BUS = None
 
     def __init__(self, mac, notifying=False, loop=None):
@@ -61,6 +64,7 @@ class Sensor:
 
         if Sensor.BUS is None:
             Sensor.BUS = Bus(self._loop)
+        self._system_bus = Sensor.BUS.get_bus()
 
     def connect(self):
         assert isinstance(self.UUID_DATA, str)
@@ -88,10 +92,10 @@ class Sensor:
         """
         Read and return sensor data.
 
-        This method is a coroutine.
+        This method is a coroutine and is *not* thread safe.
         """
         if not self._notifying:
-            r = lib.bt_device_read_async(Sensor.BUS.get_bus(), self._device)
+            r = lib.bt_device_read_async(self._system_bus, self._device)
         value = await self._queue.get()
         return value
 
