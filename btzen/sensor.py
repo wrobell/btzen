@@ -45,7 +45,7 @@ Parameters = namedtuple('Parameters', [
 ])
 
 
-class Reader:
+class Sensor:
     BUS = None
 
     def __init__(self, mac, notifying=False, loop=None):
@@ -59,29 +59,29 @@ class Reader:
         self._device_data = None
         self._device = None
 
-        if Reader.BUS is None:
-            Reader.BUS = Bus(self._loop)
+        if Sensor.BUS is None:
+            Sensor.BUS = Bus(self._loop)
 
     def connect(self):
         assert isinstance(self.UUID_DATA, str)
         assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
         assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
 
-        name = Reader.BUS.connect(self._mac, self)
+        name = Sensor.BUS.connect(self._mac, self)
         self._set_parameters(name)
-        Reader.BUS.register(self)
+        Sensor.BUS.register(self)
         self._enable()
 
     def set_interval(self, interval):
         value = int(interval * 100)
         assert value < 256
-        r = lib.bt_device_write(Reader.BUS.get_bus(), self._device.chr_period, [value], 1)
+        r = lib.bt_device_write(Sensor.BUS.get_bus(), self._device.chr_period, [value], 1)
 
     def read(self):
         """
         Read and return sensor data.
         """
-        lib.bt_device_read(Reader.BUS.get_bus(), self._device, ffi.from_buffer(self._data))
+        lib.bt_device_read(Sensor.BUS.get_bus(), self._device, ffi.from_buffer(self._data))
         return self._converter(self._data)
 
     async def read_async(self):
@@ -91,7 +91,7 @@ class Reader:
         This method is a coroutine.
         """
         if not self._notifying:
-            r = lib.bt_device_read_async(Reader.BUS.get_bus(), self._device)
+            r = lib.bt_device_read_async(Sensor.BUS.get_bus(), self._device)
         value = await self._queue.get()
         return value
 
@@ -102,13 +102,13 @@ class Reader:
         Pending, asynchronous coroutines are cancelled.
         """
         if self._notifying:
-            r = lib.bt_device_stop_notify(Reader.BUS.get_bus(), self._device)
+            r = lib.bt_device_stop_notify(Sensor.BUS.get_bus(), self._device)
 
         # disable switched on sensor; some sensors stay always on,
         # i.e. button
         if self._params and self._params.config_off:
             r = lib.bt_device_write(
-                Reader.BUS.get_bus(),
+                Sensor.BUS.get_bus(),
                 self._device.chr_conf,
                 self._params.config_off,
                 len(self._params.config_off)
@@ -118,7 +118,7 @@ class Reader:
         while self._queue.qsize():
             self._queue.get_nowait()
 
-        Reader.BUS.unregister(self)
+        Sensor.BUS.unregister(self)
 
         logger.info('{} sensor closed'.format(self.__class__.__name__))
 
@@ -126,13 +126,13 @@ class Reader:
         """
         Set sensor data as result of current asynchronous call.
 
-        .. seealso:: :py:meth:`Reader.read_async`
+        .. seealso:: :py:meth:`Sensor.read_async`
         """
         value = self._converter(self._data)
         self._queue.put_nowait(value)
 
     def _set_parameters(self, name):
-        bus = Reader.BUS
+        bus = Sensor.BUS
         mac = self._mac
         self._params = params = Parameters(
             name,
@@ -165,7 +165,7 @@ class Reader:
 
         if self._notifying:
             config_on = self._params.config_on_notify
-            r = lib.bt_device_start_notify(Reader.BUS.get_bus(), self._device)
+            r = lib.bt_device_start_notify(Sensor.BUS.get_bus(), self._device)
         else:
             config_on = self._params.config_on
 
@@ -173,14 +173,14 @@ class Reader:
         # i.e. button
         if config_on:
             r = lib.bt_device_write(
-                Reader.BUS.get_bus(),
+                Sensor.BUS.get_bus(),
                 self._device.chr_conf,
                 config_on,
                 len(config_on)
             )
 
 
-class Temperature(Reader):
+class Temperature(Sensor):
     DATA_LEN = 4
     UUID_DATA = dev_uuid(0xaa01)
     UUID_CONF = dev_uuid(0xaa02)
@@ -190,7 +190,7 @@ class Temperature(Reader):
     CONFIG_OFF = [0]
 
 
-class Pressure(Reader):
+class Pressure(Sensor):
     DATA_LEN = 6
     UUID_DATA = dev_uuid(0xaa41)
     UUID_CONF = dev_uuid(0xaa42)
@@ -200,7 +200,7 @@ class Pressure(Reader):
     CONFIG_OFF = [0]
 
 
-class Humidity(Reader):
+class Humidity(Sensor):
     DATA_LEN = 4
     UUID_DATA = dev_uuid(0xaa21)
     UUID_CONF = dev_uuid(0xaa22)
@@ -210,7 +210,7 @@ class Humidity(Reader):
     CONFIG_OFF = [0]
 
 
-class Light(Reader):
+class Light(Sensor):
     DATA_LEN = 2
     UUID_DATA = dev_uuid(0xaa71)
     UUID_CONF = dev_uuid(0xaa72)
@@ -220,7 +220,7 @@ class Light(Reader):
     CONFIG_OFF = [0]
 
 
-class Accelerometer(Reader):
+class Accelerometer(Sensor):
     DATA_LEN = 18
     UUID_DATA = dev_uuid(0xaa81)
     UUID_CONF = dev_uuid(0xaa82)
@@ -235,7 +235,7 @@ class Accelerometer(Reader):
     CONFIG_OFF = [0, 0]
 
 
-class Button(Reader):
+class Button(Sensor):
     DATA_LEN = 1
     UUID_DATA = '0000ffe1-0000-1000-8000-00805f9b34fb'
     UUID_CONF = None
