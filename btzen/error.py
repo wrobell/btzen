@@ -27,4 +27,9 @@ class ConnectionError(Error):
     Connection error.
     """
 
+class DataReadError(Error):
+    """
+    Sensor data reading error.
+    """
+
 # vim: sw=4:et:ai

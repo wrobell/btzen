@@ -30,12 +30,16 @@ import asyncio
 import functools
 import logging
 import struct
-from collections import namedtuple
+from collections import deque, namedtuple
 
 from _btzen import ffi, lib
 from .import converter
 from .bus import Bus
+from .error import DataReadError
 from .util import dev_uuid
+
+# default length of buffer for notifying sensors
+BUFFER_LEN = 5
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +59,17 @@ class Sensor:
         self._mac = mac
         self._notifying = notifying
         self._loop = loop if loop else asyncio.get_event_loop()
-        self._queue = asyncio.Queue(loop=self._loop)
+        self._future = None
+        self._error = None
+
+        if self._notifying:
+            self._buffer = deque([], maxlen=BUFFER_LEN)
+        else:
+            self._buffer = None
 
         self._params = None
         self._data = bytearray(self.DATA_LEN)
-        self._device_data = None
+        self._device_ref = None
         self._device = None
 
         if Sensor.BUS is None:
@@ -94,10 +104,18 @@ class Sensor:
 
         This method is a coroutine and is *not* thread safe.
         """
-        if not self._notifying:
+        future = self._future = self._loop.create_future()
+
+        if self._notifying:
+            if self._error:
+                raise self._error
+            if self._buffer:
+                future.set_result(self._buffer.popleft())
+        else:
             r = lib.bt_device_read_async(self._system_bus, self._device)
-        value = await self._queue.get()
-        return value
+
+        await future
+        return future.result()
 
     def close(self):
         """
@@ -117,11 +135,9 @@ class Sensor:
                 self._params.config_off,
                 len(self._params.config_off)
             )
-
-        # empty data queue to avoid not done futures
-        while self._queue.qsize():
-            self._queue.get_nowait()
-
+        future = self._future
+        if future and not future.done():
+            future.set_exception(asyncio.CancelledError('Coroutine closed'))
         Sensor.BUS.unregister(self)
 
         logger.info('{} sensor closed'.format(self.__class__.__name__))
@@ -133,7 +149,27 @@ class Sensor:
         .. seealso:: :py:meth:`Sensor.read_async`
         """
         value = self._converter(self._data)
-        self._queue.put_nowait(value)
+
+        buffer = self._buffer
+        future = self._future
+
+        # Sensor coroutine is awaited (Sensor.read_async is called)
+        if future and not future.done():
+            # use buffer for notifying sensors
+            if self._notifying and buffer:
+                item = buffer.popleft()
+                buffer.append(value)
+                value = item
+
+            future.set_result(value)
+        else:
+            if self._notifying and len(buffer) == BUFFER_LEN:
+                self._error = DataReadError('Data buffer full')
+            elif self._notifying:
+                buffer.append(value)
+            else:
+                ex = DataReadError('Sensor coroutine not awaited')
+                future.set_exception(ex)
 
     def _set_parameters(self, name):
         bus = Sensor.BUS
@@ -149,14 +185,14 @@ class Sensor:
         )
 
         # keep reference to device data with the dictionary below
-        self._device_data = {
+        self._device_ref = {
             'chr_data': ffi.new('char[]', params.path_data),
             'chr_conf': ffi.new('char[]', params.path_conf),
             'chr_period': ffi.new('char[]', params.path_period),
             'data': ffi.from_buffer(self._data),
             'len': self.DATA_LEN,
         }
-        self._device = ffi.new('t_bt_device*', self._device_data)
+        self._device = ffi.new('t_bt_device*', self._device_ref)
 
         # ceate data converter
         name = params.name
