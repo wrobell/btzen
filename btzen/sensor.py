@@ -244,8 +244,6 @@ class Sensor:
         self._converter = factory(name, None)
 
     def _enable(self):
-        self.set_interval(1)
-
         if self._notifying:
             config_on = self._params.config_on_notify
             r = lib.bt_device_start_notify(Sensor.BUS.get_bus(), self._device)
