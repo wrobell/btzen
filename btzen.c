@@ -158,7 +158,7 @@ finish:
     return r;
 }
 
-int bt_device_read(sd_bus *bus, t_bt_device *dev, uint8_t data[]) {
+int bt_device_read(sd_bus *bus, t_bt_device *dev, char data[]) {
     int r;
     size_t len;
     const void *buff;
