@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .core import Temperature, Humidity, Pressure, Light, Accelerometer, \
+from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
     Button
 
 __all__ = [

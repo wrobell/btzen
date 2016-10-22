@@ -33,7 +33,7 @@ import struct
 from collections import namedtuple
 
 from _btzen import ffi, lib
-from .import conv
+from .import converter
 from .bus import Bus
 
 logger = logging.getLogger(__name__)
@@ -44,28 +44,28 @@ def converter_epcos_t5400_pressure(dev, p_conf):
     p_conf._obj.WriteValue([2])
     calib = p_calib._obj.ReadValue({})
     calib = struct.unpack('<4H4h', bytearray(calib))
-    return functools.partial(conv.epcos_t5400_pressure, calib)
+    return functools.partial(converter.epcos_t5400_pressure, calib)
 
 
 dev_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
 
 # (sensor name, sensor id): data converter
 DATA_CONVERTER = {
-    ('TI BLE Sensor Tag', dev_uuid(0xaa01)):lambda *args: conv.tmp006_temp,
-    ('TI BLE Sensor Tag', dev_uuid(0xaa21)): lambda *args: conv.sht21_humidity,
+    ('TI BLE Sensor Tag', dev_uuid(0xaa01)):lambda *args: converter.tmp006_temp,
+    ('TI BLE Sensor Tag', dev_uuid(0xaa21)): lambda *args: converter.sht21_humidity,
     ('TI BLE Sensor Tag', dev_uuid(0xaa41)): converter_epcos_t5400_pressure,
-    ('SensorTag 2.0', dev_uuid(0xaa01)):lambda *args: conv.tmp006_temp,
-    ('SensorTag 2.0', dev_uuid(0xaa21)): lambda *args: conv.hdc1000_humidity,
-    ('SensorTag 2.0', dev_uuid(0xaa41)): lambda *args: conv.bmp280_pressure,
-    ('SensorTag 2.0', dev_uuid(0xaa71)): lambda *args: conv.opt3001_light,
-    ('SensorTag 2.0', dev_uuid(0xaa81)): lambda *args: conv.mpu9250_motion,
-    ('SensorTag 2.0', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: conv.first_arg,
-    ('CC2650 SensorTag', dev_uuid(0xaa01)):lambda *args: conv.tmp006_temp,
-    ('CC2650 SensorTag', dev_uuid(0xaa21)): lambda *args: conv.hdc1000_humidity,
-    ('CC2650 SensorTag', dev_uuid(0xaa41)): lambda *args: conv.bmp280_pressure,
-    ('CC2650 SensorTag', dev_uuid(0xaa71)): lambda *args: conv.opt3001_light,
-    ('CC2650 SensorTag', dev_uuid(0xaa81)): lambda *args: conv.mpu9250_motion,
-    ('CC2650 SensorTag', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: conv.first_arg,
+    ('SensorTag 2.0', dev_uuid(0xaa01)):lambda *args: converter.tmp006_temp,
+    ('SensorTag 2.0', dev_uuid(0xaa21)): lambda *args: converter.hdc1000_humidity,
+    ('SensorTag 2.0', dev_uuid(0xaa41)): lambda *args: converter.bmp280_pressure,
+    ('SensorTag 2.0', dev_uuid(0xaa71)): lambda *args: converter.opt3001_light,
+    ('SensorTag 2.0', dev_uuid(0xaa81)): lambda *args: converter.mpu9250_motion,
+    ('SensorTag 2.0', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: converter.first_arg,
+    ('CC2650 SensorTag', dev_uuid(0xaa01)):lambda *args: converter.tmp006_temp,
+    ('CC2650 SensorTag', dev_uuid(0xaa21)): lambda *args: converter.hdc1000_humidity,
+    ('CC2650 SensorTag', dev_uuid(0xaa41)): lambda *args: converter.bmp280_pressure,
+    ('CC2650 SensorTag', dev_uuid(0xaa71)): lambda *args: converter.opt3001_light,
+    ('CC2650 SensorTag', dev_uuid(0xaa81)): lambda *args: converter.mpu9250_motion,
+    ('CC2650 SensorTag', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: converter.first_arg,
 }
 
 data_converter = lambda name, uuid: \
