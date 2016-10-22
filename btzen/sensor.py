@@ -35,11 +35,11 @@ from collections import deque, namedtuple
 from _btzen import ffi, lib
 from .import converter
 from .bus import Bus
-from .error import DataReadError
+from .error import ConfigurationError, DataReadError
 from .util import dev_uuid
 
 # default length of buffer for notifying sensors
-BUFFER_LEN = 5
+BUFFER_LEN = 100
 
 logger = logging.getLogger(__name__)
 
@@ -93,9 +93,13 @@ class Sensor:
         self._enable()
 
     def set_interval(self, interval):
-        value = int(interval * 100)
-        assert value < 256
-        r = lib.bt_device_write(Sensor.BUS.get_bus(), self._device.chr_period, [value], 1)
+        if self._params.path_period:
+            value = int(interval * 100)
+            assert value < 256
+            r = lib.bt_device_write(Sensor.BUS.get_bus(), self._device.chr_period, [value], 1)
+            if r < 0:
+                msg = 'Cannot set sensor interval value: {}'.format(r)
+                raise ConfigurationError(msg)
 
     def read(self):
         """

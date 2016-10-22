@@ -27,6 +27,11 @@ class ConnectionError(Error):
     Connection error.
     """
 
+class ConfigurationError(Error):
+    """
+    Sensor configuration error.
+    """
+
 class DataReadError(Error):
     """
     Sensor data reading error.
