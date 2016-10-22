@@ -48,6 +48,7 @@ int bt_device_connect(sd_bus*, const char*);
 int bt_device_property_str(sd_bus *bus, const char*, const char*, char**);
 int bt_device_property_bool(sd_bus*, const char*, const char*);
 t_bt_device *bt_device_last(void);
+int bt_device_async_error_no(void);
 int bt_device_write(sd_bus*, const char*, const uint8_t*, ssize_t);
 int bt_device_read(sd_bus*, t_bt_device*, uint8_t[]);
 int bt_device_start_notify(sd_bus*, t_bt_device*);

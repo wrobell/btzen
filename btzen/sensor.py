@@ -103,7 +103,9 @@ class Sensor:
 
         Method is thread safe.
         """
-        lib.bt_device_read(Sensor.BUS.get_bus(), self._device, ffi.from_buffer(self._data))
+        r = lib.bt_device_read(Sensor.BUS.get_bus(), self._device, ffi.from_buffer(self._data))
+        if r < 0:
+            raise DataReadError('Sensor data read error: {}'.format(r))
         return self._converter(self._data)
 
     async def read_async(self):
@@ -121,6 +123,8 @@ class Sensor:
                 future.set_result(self._buffer.popleft())
         else:
             r = lib.bt_device_read_async(self._system_bus, self._device)
+            if r < 0:
+                raise DataReadError('Sensor data read error: {}'.format(r))
 
         await future
         return future.result()
@@ -135,7 +139,8 @@ class Sensor:
         Method is thread safe.
         """
         if self._notifying:
-            r = lib.bt_device_stop_notify(Sensor.BUS.get_bus(), self._device)
+            # ignore any errors when closing sensor
+            lib.bt_device_stop_notify(Sensor.BUS.get_bus(), self._device)
 
         # disable switched on sensor; some sensors stay always on,
         # i.e. button
@@ -148,7 +153,8 @@ class Sensor:
             )
         future = self._future
         if future and not future.done():
-            future.set_exception(asyncio.CancelledError('Coroutine closed'))
+            ex = asyncio.CancelledError('Sensor coroutine closed')
+            future.set_exception(ex)
         Sensor.BUS.unregister(self)
 
         logger.info('{} sensor closed'.format(self.__class__.__name__))
@@ -159,11 +165,22 @@ class Sensor:
 
         .. seealso:: :py:meth:`Sensor.read_async`
         """
-        value = self._converter(self._data)
-
         buffer = self._buffer
         future = self._future
         awaited  = future and not future.done()
+
+        r = lib.bt_device_async_error_no()
+        if r < 0:
+            ex = DataReadError('Sensor data read error: {}'.format(r))
+            if awaited:
+                future.set_exception(ex)
+            elif self._notifying:
+                self._error = ex
+            else:
+                raise ex
+            return
+
+        value = self._converter(self._data)
 
         if self._notifying:
             # if buffer is non-empty, process data through buffer

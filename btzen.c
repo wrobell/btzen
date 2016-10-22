@@ -16,12 +16,24 @@ typedef struct bt_device_chr {
     struct bt_device_chr *next;
 } t_bt_device_chr;
 
+
+/*
+ * pointer to last processed sensor device by asynchronous callbacks
+ * - bt_device_notification_data
+ * - bt_device_data
+ */
 static t_bt_device *last_device = NULL;
+
+static int bt_error_no = 0;
 
 t_bt_device *bt_device_last(void) {
     t_bt_device *dev = last_device;
     last_device = NULL;
     return dev;
+}
+
+int bt_device_async_error_no(void) {
+    return bt_error_no;
 }
 
 int bt_device_connect(sd_bus *bus, const char *path) {
@@ -188,27 +200,64 @@ static int bt_device_notification_data(sd_bus_message *m, void *data, sd_bus_err
     char *name;
     size_t len;
     const void *buff;
-    t_bt_device *dev = data;
+    last_device = data;
 
     r = sd_bus_message_skip(m, "s"); /* org.bluez.GattCharacteristic1 */
-    sd_bus_message_enter_container(m, SD_BUS_TYPE_ARRAY, "{sv}");
+    if (r < 0) {
+        bt_error_no = r;
+        return r;
+    }
+
+    r = sd_bus_message_enter_container(m, SD_BUS_TYPE_ARRAY, "{sv}");
+    if (r < 0) {
+        bt_error_no = r;
+        return r;
+    }
+
     while ((r = sd_bus_message_enter_container(m, SD_BUS_TYPE_DICT_ENTRY, "sv")) > 0) {
-        sd_bus_message_read(m, "s", &name);
+        r = sd_bus_message_read(m, "s", &name);
+        if (r < 0) {
+            bt_error_no = r;
+            return r;
+        }
 
         if (!strcmp(name, "Value")) {
             r = sd_bus_message_enter_container(m, SD_BUS_TYPE_VARIANT, "ay");
+            if (r < 0) {
+                bt_error_no = r;
+                return r;
+            }
             r = sd_bus_message_read_array(m, 'y', &buff, &len);
-            sd_bus_message_exit_container(m); /* variant */
-            memcpy(dev->data, buff, dev->len);
-            last_device = dev;
+            if (r < 0) {
+                bt_error_no = r;
+                return r;
+            }
+            r = sd_bus_message_exit_container(m); /* variant */
+            if (r < 0) {
+                bt_error_no = r;
+                return r;
+            }
+            memcpy(last_device->data, buff, last_device->len);
 
-            sd_bus_message_exit_container(m); /* dict entry */
+            r = sd_bus_message_exit_container(m); /* dict entry */
+            if (r < 0) {
+                bt_error_no = r;
+                return r;
+            }
             break;
         }
 
-        sd_bus_message_exit_container(m); /* dict entry */
+        r = sd_bus_message_exit_container(m); /* dict entry */
+        if (r < 0) {
+            bt_error_no = r;
+            return r;
+        }
     }
-    sd_bus_message_exit_container(m); /* array entry */
+    r = sd_bus_message_exit_container(m); /* array entry */
+    if (r < 0) {
+        bt_error_no = r;
+        return r;
+    }
     return 0;
 }
 
@@ -286,16 +335,15 @@ static int bt_device_data(sd_bus_message *m, void *user_data, sd_bus_error *erro
     int r;
     size_t len;
     const void *buff;
-    t_bt_device *dev = user_data;
 
+    last_device = user_data;
     r = sd_bus_message_read_array(m, 'y', &buff, &len);
     if (r < 0) {
         fprintf(stderr, "Failed to parse response message: %s\n", strerror(-r));
+        bt_error_no = r;
         return r;
     }
-
-    memcpy(dev->data, buff, dev->len);
-    last_device = dev;
+    memcpy(last_device->data, buff, last_device->len);
     return 0;
 }
 
