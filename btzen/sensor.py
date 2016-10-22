@@ -35,41 +35,9 @@ from collections import namedtuple
 from _btzen import ffi, lib
 from .import converter
 from .bus import Bus
+from .util import dev_uuid
 
 logger = logging.getLogger(__name__)
-
-# TODO: fix for CC2541DK
-def converter_epcos_t5400_pressure(dev, p_conf):
-    p_calib = dbus.find_sensor(dev, dev_uuid(0xaa43))
-    p_conf._obj.WriteValue([2])
-    calib = p_calib._obj.ReadValue({})
-    calib = struct.unpack('<4H4h', bytearray(calib))
-    return functools.partial(converter.epcos_t5400_pressure, calib)
-
-
-dev_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
-
-# (sensor name, sensor id): data converter
-DATA_CONVERTER = {
-    ('TI BLE Sensor Tag', dev_uuid(0xaa01)):lambda *args: converter.tmp006_temp,
-    ('TI BLE Sensor Tag', dev_uuid(0xaa21)): lambda *args: converter.sht21_humidity,
-    ('TI BLE Sensor Tag', dev_uuid(0xaa41)): converter_epcos_t5400_pressure,
-    ('SensorTag 2.0', dev_uuid(0xaa01)):lambda *args: converter.tmp006_temp,
-    ('SensorTag 2.0', dev_uuid(0xaa21)): lambda *args: converter.hdc1000_humidity,
-    ('SensorTag 2.0', dev_uuid(0xaa41)): lambda *args: converter.bmp280_pressure,
-    ('SensorTag 2.0', dev_uuid(0xaa71)): lambda *args: converter.opt3001_light,
-    ('SensorTag 2.0', dev_uuid(0xaa81)): lambda *args: converter.mpu9250_motion,
-    ('SensorTag 2.0', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: converter.first_arg,
-    ('CC2650 SensorTag', dev_uuid(0xaa01)):lambda *args: converter.tmp006_temp,
-    ('CC2650 SensorTag', dev_uuid(0xaa21)): lambda *args: converter.hdc1000_humidity,
-    ('CC2650 SensorTag', dev_uuid(0xaa41)): lambda *args: converter.bmp280_pressure,
-    ('CC2650 SensorTag', dev_uuid(0xaa71)): lambda *args: converter.opt3001_light,
-    ('CC2650 SensorTag', dev_uuid(0xaa81)): lambda *args: converter.mpu9250_motion,
-    ('CC2650 SensorTag', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: converter.first_arg,
-}
-
-data_converter = lambda name, uuid: \
-    DATA_CONVERTER[(name, uuid)]
 
 Parameters = namedtuple('Parameters', [
     'name', 'path_data', 'path_conf', 'path_period', 'config_on',
@@ -188,7 +156,7 @@ class Reader:
 
         # ceate data converter
         name = params.name
-        factory = data_converter(name, self.UUID_DATA)
+        factory = converter.data_converter(name, self.UUID_DATA)
         # TODO: fix for CC2541DK
         self._converter = factory(name, None)
 

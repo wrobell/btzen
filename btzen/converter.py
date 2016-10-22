@@ -22,6 +22,7 @@ Data conversion functions for various sensors.
 """
 
 import struct
+from .util import dev_uuid
 
 SHT21_TEMP = 175.72 / 65536
 SHT21_HUMIDITY = 125 / 65536
@@ -61,5 +62,40 @@ def mpu9250_motion(data):
     accel = tuple(v / MPU9250_ACCEL_2G for v in data[3:6])
     #magnet = data[6:]
     return accel
+
+# TODO: fix for CC2541DK
+def converter_epcos_t5400_pressure(dev, p_conf):
+    p_calib = dbus.find_sensor(dev, dev_uuid(0xaa43))
+    p_conf._obj.WriteValue([2])
+    calib = p_calib._obj.ReadValue({})
+    calib = struct.unpack('<4H4h', bytearray(calib))
+    return functools.partial(epcos_t5400_pressure, calib)
+
+
+# (sensor name, sensor id): data converter
+DATA_CONVERTER = {
+    ('TI BLE Sensor Tag', dev_uuid(0xaa01)):lambda *args: tmp006_temp,
+    ('TI BLE Sensor Tag', dev_uuid(0xaa21)): lambda *args: sht21_humidity,
+    ('TI BLE Sensor Tag', dev_uuid(0xaa41)): converter_epcos_t5400_pressure,
+    ('SensorTag 2.0', dev_uuid(0xaa01)):lambda *args: tmp006_temp,
+    ('SensorTag 2.0', dev_uuid(0xaa21)): lambda *args: hdc1000_humidity,
+    ('SensorTag 2.0', dev_uuid(0xaa41)): lambda *args: bmp280_pressure,
+    ('SensorTag 2.0', dev_uuid(0xaa71)): lambda *args: opt3001_light,
+    ('SensorTag 2.0', dev_uuid(0xaa81)): lambda *args: mpu9250_motion,
+    ('SensorTag 2.0', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: first_arg,
+    ('CC2650 SensorTag', dev_uuid(0xaa01)):lambda *args: tmp006_temp,
+    ('CC2650 SensorTag', dev_uuid(0xaa21)): lambda *args: hdc1000_humidity,
+    ('CC2650 SensorTag', dev_uuid(0xaa41)): lambda *args: bmp280_pressure,
+    ('CC2650 SensorTag', dev_uuid(0xaa71)): lambda *args: opt3001_light,
+    ('CC2650 SensorTag', dev_uuid(0xaa81)): lambda *args: mpu9250_motion,
+    ('CC2650 SensorTag', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: first_arg,
+}
+
+# return data conversion function for sensor device name and sensor UUID
+# value
+data_converter = lambda name, uuid: \
+    DATA_CONVERTER[(name, uuid)]
+
+__all__ = ['data_converter']
 
 # vim: sw=4:et:ai
