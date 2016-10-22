@@ -44,12 +44,24 @@ class Bus:
 
     @staticmethod
     def get_bus():
+        """
+        Get system bus reference.
+
+        The reference is local to current thread.
+        """
         local = Bus.THREAD_LOCAL
         if not hasattr(local, 'bus'):
             local.bus = SDBus()
         return local.bus.bus
 
-    def connect(self, mac, sensor):
+    def connect(self, mac):
+        """
+        Connect to Bluetooth device.
+
+        If connected, the method does nothing.
+
+        :param mac: MAC address of Bluetooth device.
+        """
         path = self._get_device_path(mac)
         r = connected = lib.bt_device_property_bool(
             self.get_bus(), path, 'Connected'.encode()
@@ -76,10 +88,19 @@ class Bus:
         return self._get_device_name(mac)
 
     def register(self, sensor):
+        """
+        Register sensor on the sensor bus.
+        """
         self._sensors[sensor._device] = sensor
 
     def unregister(self, sensor):
-        del self._sensors[sensor._device]
+        """
+        Unregister sensor object from the sensor bus.
+        """
+        sensors = self._sensors
+        dev = sensor._device
+        if dev in sensors:
+            del sensors[dev]
 
     def sensor_path(self, mac, uuid):
         if uuid is None:

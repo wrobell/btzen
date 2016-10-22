@@ -77,11 +77,17 @@ class Sensor:
         self._system_bus = Sensor.BUS.get_bus()
 
     def connect(self):
+        """
+        Connect to sensor Bluetooth device and register sensor on sensor
+        bus.
+
+        Method is thread safe.
+        """
         assert isinstance(self.UUID_DATA, str)
         assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
         assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
 
-        name = Sensor.BUS.connect(self._mac, self)
+        name = Sensor.BUS.connect(self._mac)
         self._set_parameters(name)
         Sensor.BUS.register(self)
         self._enable()
@@ -94,6 +100,8 @@ class Sensor:
     def read(self):
         """
         Read and return sensor data.
+
+        Method is thread safe.
         """
         lib.bt_device_read(Sensor.BUS.get_bus(), self._device, ffi.from_buffer(self._data))
         return self._converter(self._data)
@@ -119,9 +127,12 @@ class Sensor:
 
     def close(self):
         """
-        Disable sensor and stop reading sensor data.
+        Disable sensor, stop reading sensor data and unregister sensor from
+        the sensor bus.
 
         Pending, asynchronous coroutines are cancelled.
+
+        Method is thread safe.
         """
         if self._notifying:
             r = lib.bt_device_stop_notify(Sensor.BUS.get_bus(), self._device)
