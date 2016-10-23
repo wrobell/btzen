@@ -142,6 +142,11 @@ class Sensor:
 
         Method is thread safe.
         """
+        name = self.__class__.__name__
+        if not self._device:
+            logger.info('{} sensor device not initialized yet'.format(name))
+            return
+
         if self._notifying:
             # ignore any errors when closing sensor
             lib.bt_device_stop_notify(Sensor.BUS.get_bus(), self._device)
@@ -161,7 +166,7 @@ class Sensor:
             future.set_exception(ex)
         Sensor.BUS.unregister(self)
 
-        logger.info('{} sensor closed'.format(self.__class__.__name__))
+        logger.info('{} sensor closed'.format(name))
 
     def _process_event(self):
         """
