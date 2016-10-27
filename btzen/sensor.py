@@ -71,10 +71,7 @@ class Sensor:
         self._data = bytearray(self.DATA_LEN)
         self._device_ref = None
         self._device = None
-
-        if Sensor.BUS is None:
-            Sensor.BUS = Bus(self._loop)
-        self._system_bus = Sensor.BUS.get_bus()
+        self._system_bus = None
 
     def connect(self):
         """
@@ -86,6 +83,10 @@ class Sensor:
         assert isinstance(self.UUID_DATA, str)
         assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
         assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
+
+        if Sensor.BUS is None:
+            Sensor.BUS = Bus(self._loop)
+        self._system_bus = Sensor.BUS.get_bus()
 
         name = Sensor.BUS.connect(self._mac)
         self._set_parameters(name)
@@ -142,11 +143,6 @@ class Sensor:
 
         Method is thread safe.
         """
-        name = self.__class__.__name__
-        if not self._device:
-            logger.info('{} sensor device not initialized yet'.format(name))
-            return
-
         if self._notifying:
             # ignore any errors when closing sensor
             lib.bt_device_stop_notify(Sensor.BUS.get_bus(), self._device)
@@ -164,9 +160,13 @@ class Sensor:
         if future and not future.done():
             ex = asyncio.CancelledError('Sensor coroutine closed')
             future.set_exception(ex)
-        Sensor.BUS.unregister(self)
 
-        logger.info('{} sensor closed'.format(name))
+        n = Sensor.BUS.unregister(self)
+        if n == 0:
+            Sensor.BUS = None
+        self._system_bus = None
+
+        logger.info('{} sensor closed'.format(self.__class__.__name__))
 
     def _process_event(self):
         """
