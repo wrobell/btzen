@@ -118,7 +118,6 @@ int bt_device_property_bool(sd_bus *bus, const char *path, const char *property)
     r = value;
 
 finish:
-    //sd_bus_message_unref(m); FIXME
     sd_bus_error_free(&error);
     return r;
 }
