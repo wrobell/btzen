@@ -149,7 +149,7 @@ class Sensor:
 
         # disable switched on sensor; some sensors stay always on,
         # i.e. button
-        if self._params and self._params.config_off:
+        if self._params and self._params.config_off and self._device:
             r = lib.bt_device_write(
                 Sensor.BUS.get_bus(),
                 self._device.chr_conf,
