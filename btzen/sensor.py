@@ -143,7 +143,7 @@ class Sensor:
 
         Method is thread safe.
         """
-        if self._notifying:
+        if self._notifying and self._device:
             # ignore any errors when closing sensor
             lib.bt_device_stop_notify(Sensor.BUS.get_bus(), self._device)
 
