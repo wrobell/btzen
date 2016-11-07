@@ -239,6 +239,7 @@ class Sensor:
             'chr_period': ffi.new('char[]', params.path_period),
             'data': ffi.from_buffer(self._data),
             'len': self.DATA_LEN,
+            'callback': lib.sensor_data_callback,
         }
         self._device = ffi.new('t_bt_device*', self._device_ref)
 
@@ -330,5 +331,13 @@ class Button(Sensor):
     CONFIG_ON = None
     CONFIG_ON_NOTIFY = None
     CONFIG_OFF = None
+
+
+@ffi.def_extern()
+def sensor_data_callback(device):
+    """
+    Called by C-level layer to notify about completed asynchronous call.
+    """
+    Sensor.BUS._sensors[device]._process_event()
 
 # vim: sw=4:et:ai

@@ -63,12 +63,10 @@ class Bus:
         :param mac: MAC address of Bluetooth device.
         """
         path = self._get_device_path(mac)
-        r = connected = lib.bt_device_property_bool(
+        connected = lib.bt_device_property_bool(
             self.get_bus(), path, 'Connected'.encode()
         )
-        if r < 0:
-            raise ConnectionError('Cannot check connection to {}'.format(mac))
-        if not connected:
+        if connected != 1:
             r = lib.bt_device_connect(self.get_bus(), path)
             if r < 0:
                 raise ConnectionError('Connection to {} failed'.format(mac))
@@ -146,12 +144,6 @@ class Bus:
     def _process_event(self):
         processed = lib.sd_bus_process(self.get_bus(), ffi.NULL)
         while processed > 0:
-            device = lib.bt_device_last()
-            if device != ffi.NULL:
-                assert device in self._sensors
-                sensor = self._sensors[device]
-                sensor._process_event()
-
             processed = lib.sd_bus_process(self.get_bus(), ffi.NULL)
 
 
