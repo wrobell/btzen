@@ -11,6 +11,7 @@ Features
      - humidity
      - light (CC2541DK only)
      - accelerometer (CC2541DK only)
+     - buttons (CC2541DK only)
 
 2. Sensor data access using `asyncio` coroutines.
 
@@ -29,5 +30,5 @@ Requirements
 
 - bluez 5.41
 - Python 3.5
-- Python D-Bus bindings
+- `sd-bus` (part of `systemd`)
 

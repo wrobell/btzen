@@ -2,7 +2,7 @@
 #
 # BTZen - Bluetooh Smart sensor reading library.
 #
-# Copyright (C) 2015 by Artur Wroblewski <wrobell@pld-linux.org>
+# Copyright (C) 2015-2016 by Artur Wroblewski <wrobell@pld-linux.org>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,78 +21,67 @@
 import argparse
 import asyncio
 import logging
-import threading
-import signal
-import sys
-
-import dbus
-from dbus.mainloop.glib import DBusGMainLoop
-from gi.repository import GObject
 
 import btzen
 
-def sensor_reader(cls, name):
-    obj = None
-    try:
-        obj = cls(bus, dev)
-    except ValueError as ex:
-        print(ex)
-    return obj
 
-
-async def read_data(name, f):
-    t1 = loop.time()
-    value = await f()
-    if isinstance(value, (float, int)):
-        value = '{:.1f}'.format(value)
-    elif isinstance(value, tuple):
-        value = ', '.join('{:.2f}'.format(v) for v in value)
-    else:
-        assert False, 'float, int or tuple expected'
-    t2 = loop.time()
-    print('{}: {} ({:.4f}s)'.format(name, value, t2 - t1))
-
-
-async def read_sensors(sensors):
+async def read_sensor(name, reader):
+    reader.connect()
     while True:
-        tasks = [read_data(n, r.read_async) for n, r in sensors]
-        await asyncio.gather(*tasks)
-        print()
+        t1 = loop.time()
+        value = await reader.read_async()
+        value = '{:.1f}'.format(value)
+        t2 = loop.time()
+        print('{}: {} ({:.4f}s)'.format(name, value, t2 - t1))
         await asyncio.sleep(-loop.time() % 1)
+
+async def read_accelerometer(reader):
+    reader.connect()
+    reader.set_interval(0.1)
+    while True:
+        t1 = loop.time()
+        values = await reader.read_async()
+        values = ', '.join('{:.4f}'.format(v) for v in values)
+        t2 = loop.time()
+        print('accelerometer: {} ({:.4f}s)'.format(values, t2 - t1))
+
+async def read_button(reader):
+    reader.connect()
+    while True:
+        t1 = loop.time()
+        value = await reader.read_async()
+        t2 = loop.time()
+        print('button: {} ({:.4f}s)'.format(value, t2 - t1))
 
 
 logging.basicConfig(level=logging.DEBUG)
-
-dbus_loop = DBusGMainLoop(set_as_default=True)
-dbus_main_loop = GObject.MainLoop()
-bus = dbus.SystemBus(mainloop=dbus_loop)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
 print('connecting to {}...'.format(args.device))
-dev = btzen.connect(bus, args.device)
-print('connected to {}'.format(dev.Name))
 
-names = ['pressure', 'temperature', 'humidity', 'light', 'accelerometer']
+names = ['pressure', 'temperature', 'humidity', 'light']
 classes = [
     btzen.Pressure, btzen.Temperature, btzen.Humidity, btzen.Light,
-    btzen.Accelerometer,
 ]
-readers = ((n, sensor_reader(c, n)) for c, n in zip(classes, names))
+readers = ((n, c(args.device)) for c, n in zip(classes, names))
 readers = {n: r for n, r in readers if r is not None}
 print('sensors initialized')
 
-# start DBUS loop for async calls
-thread = threading.Thread(target=dbus_main_loop.run, daemon=True)
-thread.start()
 loop = asyncio.get_event_loop()
-loop.add_signal_handler(signal.SIGTERM, sys.exit)
-
 sensors = sorted([(n, r) for n, r in readers.items() if r])
+tasks = [read_sensor(n, r) for n, r in sensors]
+
+reader = readers['accelerometer'] = btzen.Accelerometer(args.device, notifying=True)
+tasks.append(read_accelerometer(reader))
+
+reader = readers['button'] = btzen.Button(args.device, notifying=True)
+tasks.append(read_button(readers['button']))
+
 try:
-    loop.run_until_complete(read_sensors(sensors))
+    loop.run_until_complete(asyncio.gather(*tasks))
 finally:
     for r in readers.values():
         r.close()

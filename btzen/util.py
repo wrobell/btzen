@@ -17,14 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
-    Button
-from .error import *
-
-__all__ = [
-    'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
-    'Button', 'Error', 'ConnectionError', 'ConfigurationError',
-    'DataReadError',
-]
+# function to convert 16-bit part uuid to full 128-bit UUID string
+dev_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
 
 # vim: sw=4:et:ai

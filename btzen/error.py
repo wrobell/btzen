@@ -17,14 +17,24 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
-    Button
-from .error import *
+class Error(Exception):
+    """
+    Base, abstract BTZen exception.
+    """
 
-__all__ = [
-    'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
-    'Button', 'Error', 'ConnectionError', 'ConfigurationError',
-    'DataReadError',
-]
+class ConnectionError(Error):
+    """
+    Connection error.
+    """
+
+class ConfigurationError(Error):
+    """
+    Sensor configuration error.
+    """
+
+class DataReadError(Error):
+    """
+    Sensor data reading error.
+    """
 
 # vim: sw=4:et:ai

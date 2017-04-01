@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 #
 # BTZen - Bluetooh Smart sensor reading library.
 #
@@ -17,14 +18,37 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
-    Button
-from .error import *
+import argparse
+import logging
+import time
 
-__all__ = [
-    'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
-    'Button', 'Error', 'ConnectionError', 'ConfigurationError',
-    'DataReadError',
-]
+import btzen
+
+logging.basicConfig(level=logging.DEBUG)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('device', help='MAC address of device')
+args = parser.parse_args()
+
+print('connecting to {}...'.format(args.device))
+sensor = btzen.Pressure(args.device)
+sensor.connect()
+
+# not many pressure value changes
+start = time.monotonic()
+for i in range(10):
+    print(sensor.read())
+    time.sleep(0.1)
+print('elapsed {:.4f}'.format(time.monotonic() - start))
+
+# expected more pressure value changes
+sensor.set_interval(0.1)
+start = time.monotonic()
+for i in range(10):
+    print(sensor.read())
+    time.sleep(0.1)
+print('elapsed {:.4f}'.format(time.monotonic() - start))
+
+sensor.close()
 
 # vim: sw=4:et:ai
