@@ -23,6 +23,7 @@ ffi = cffi.FFI()
 ffi.cdef("""
 typedef struct sd_bus sd_bus;
 typedef struct sd_bus_message sd_bus_message;
+typedef void (*t_bt_device_callback)(void*);
 
 typedef struct {
     char *chr_data;
@@ -30,6 +31,7 @@ typedef struct {
     char *chr_period;
     char *data;
     size_t len;
+    t_bt_device_callback callback;
 } t_bt_device;
 
 typedef struct bt_device_chr {
@@ -37,6 +39,8 @@ typedef struct bt_device_chr {
     char *uuid;
     struct bt_device_chr *next;
 } t_bt_device_chr;
+
+extern "Python" void sensor_data_callback(void*);
 
 int sd_bus_default_system(sd_bus**);
 sd_bus *sd_bus_unref(sd_bus*);
@@ -47,7 +51,6 @@ void *sd_bus_get_current_userdata(sd_bus*);
 int bt_device_connect(sd_bus*, const char*);
 int bt_device_property_str(sd_bus *bus, const char*, const char*, char**);
 int bt_device_property_bool(sd_bus*, const char*, const char*);
-t_bt_device *bt_device_last(void);
 int bt_device_async_error_no(void);
 int bt_device_write(sd_bus*, const char*, const uint8_t*, ssize_t);
 int bt_device_read(sd_bus*, t_bt_device*, char[]);

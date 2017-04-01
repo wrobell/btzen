@@ -2,12 +2,15 @@
 #include <stdlib.h>
 #include <systemd/sd-bus.h>
 
+typedef void (*t_bt_device_callback)(void*);
+
 typedef struct {
     char *chr_data;
     char *chr_conf;
     char *chr_period;
     char *data;
     size_t len;
+    t_bt_device_callback callback;
 } t_bt_device;
 
 typedef struct bt_device_chr {
@@ -16,21 +19,7 @@ typedef struct bt_device_chr {
     struct bt_device_chr *next;
 } t_bt_device_chr;
 
-
-/*
- * pointer to last processed sensor device by asynchronous callbacks
- * - bt_device_notification_data
- * - bt_device_data
- */
-static t_bt_device *last_device = NULL;
-
 static int bt_error_no = 0;
-
-t_bt_device *bt_device_last(void) {
-    t_bt_device *dev = last_device;
-    last_device = NULL;
-    return dev;
-}
 
 int bt_device_async_error_no(void) {
     return bt_error_no;
@@ -118,7 +107,6 @@ int bt_device_property_bool(sd_bus *bus, const char *path, const char *property)
     r = value;
 
 finish:
-    //sd_bus_message_unref(m); FIXME
     sd_bus_error_free(&error);
     return r;
 }
@@ -200,7 +188,7 @@ static int bt_device_notification_data(sd_bus_message *m, void *data, sd_bus_err
     char *name;
     size_t len;
     const void *buff;
-    last_device = data;
+    t_bt_device *dev = data;
 
     r = sd_bus_message_skip(m, "s"); /* org.bluez.GattCharacteristic1 */
     if (r < 0) {
@@ -237,7 +225,7 @@ static int bt_device_notification_data(sd_bus_message *m, void *data, sd_bus_err
                 bt_error_no = r;
                 return r;
             }
-            memcpy(last_device->data, buff, last_device->len);
+            memcpy(dev->data, buff, dev->len);
 
             r = sd_bus_message_exit_container(m); /* dict entry */
             if (r < 0) {
@@ -258,6 +246,7 @@ static int bt_device_notification_data(sd_bus_message *m, void *data, sd_bus_err
         bt_error_no = r;
         return r;
     }
+    dev->callback(dev);
     return 0;
 }
 
@@ -336,14 +325,15 @@ static int bt_device_data(sd_bus_message *m, void *user_data, sd_bus_error *erro
     size_t len;
     const void *buff;
 
-    last_device = user_data;
+    t_bt_device *dev = user_data;
     r = sd_bus_message_read_array(m, 'y', &buff, &len);
     if (r < 0) {
         fprintf(stderr, "Failed to parse response message: %s\n", strerror(-r));
         bt_error_no = r;
         return r;
     }
-    memcpy(last_device->data, buff, last_device->len);
+    memcpy(dev->data, buff, dev->len);
+    dev->callback(dev);
     return 0;
 }
 
