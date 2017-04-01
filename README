@@ -14,6 +14,7 @@ Features
      - buttons (CC2541DK only)
 
 2. Sensor data access using `asyncio` coroutines.
+3. Notifications interface is supported.
 
 Please update your sensor device to its latest firmware.
 
