@@ -13,6 +13,8 @@ Features
      - accelerometer (CC2541DK only)
      - buttons (CC2541DK only)
 
+   - Mi Smart Scale
+
 2. Sensor data access using `asyncio` coroutines.
 3. Notifications interface is supported.
 

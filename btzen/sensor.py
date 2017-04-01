@@ -332,6 +332,17 @@ class Button(Sensor):
     CONFIG_ON_NOTIFY = None
     CONFIG_OFF = None
 
+class Weight(Sensor):
+    DATA_LEN = 9
+    UUID_DATA = '00002a9d-0000-1000-8000-00805f9b34fb'
+
+    UUID_CONF = None
+    UUID_PERIOD = None
+
+    CONFIG_ON = None
+    CONFIG_ON_NOTIFY = None
+    CONFIG_OFF = None
+
 
 @ffi.def_extern()
 def sensor_data_callback(device):

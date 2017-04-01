@@ -18,12 +18,12 @@
 #
 
 from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
-    Button
+    Button, Weight
 from .error import *
 
 __all__ = [
     'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
-    'Button', 'Error', 'ConnectionError', 'ConfigurationError',
+    'Button', 'Weight', 'Error', 'ConnectionError', 'ConfigurationError',
     'DataReadError',
 ]
 

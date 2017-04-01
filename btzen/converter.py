@@ -22,7 +22,10 @@ Data conversion functions for various sensors.
 """
 
 import struct
+from collections import namedtuple
 from .util import dev_uuid
+
+Weight = namedtuple('Weight', 'weight stabilized')
 
 SHT21_TEMP = 175.72 / 65536
 SHT21_HUMIDITY = 125 / 65536
@@ -71,6 +74,11 @@ def converter_epcos_t5400_pressure(dev, p_conf):
     calib = struct.unpack('<4H4h', bytearray(calib))
     return functools.partial(epcos_t5400_pressure, calib)
 
+# see https://github.com/oliexdev/openScale/wiki/Xiaomi-Bluetooth-Mi-Scale
+def mi_weight_scale(data):
+    status, weight = struct.unpack('<BH', data[0:3])
+    stabilized = (status & 0x20) == 0x20
+    return Weight(weight * 0.005, stabilized)
 
 # (sensor name, sensor id): data converter
 DATA_CONVERTER = {
@@ -89,6 +97,7 @@ DATA_CONVERTER = {
     ('CC2650 SensorTag', dev_uuid(0xaa71)): lambda *args: opt3001_light,
     ('CC2650 SensorTag', dev_uuid(0xaa81)): lambda *args: mpu9250_motion,
     ('CC2650 SensorTag', '0000ffe1-0000-1000-8000-00805f9b34fb'): lambda *args: first_arg,
+    ('MI_SCALE', '00002a9d-0000-1000-8000-00805f9b34fb'): lambda *args: mi_weight_scale,
 }
 
 # return data conversion function for sensor device name and sensor UUID
