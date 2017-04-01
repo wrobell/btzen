@@ -18,12 +18,8 @@ Features
 
 Please update your sensor device to its latest firmware.
 
-To use the library, run `bluetoothd` with `-E` option. Then, to get MAC, as root::
-
-    $ hciconfig hci0 up
-    $ hcitool lescan
-
-The library provides `btzen` script to display sensor data::
+The library provides `btzen` script to display sensor data (scan for a
+device with `bluetoothctl` command to get MAC address of a device)::
 
     $ btzen <MAC>
 
