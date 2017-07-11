@@ -44,11 +44,22 @@ cdef extern from "<systemd/sd-bus.h>":
     int sd_bus_get_fd(sd_bus*)
     int sd_bus_process(sd_bus*, sd_bus_message**)
 
-    # int sd_bus_call_method(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, sd_bus_message**, const char*, ...)
+    int sd_bus_call_method(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, sd_bus_message**, const char*, ...)
     int sd_bus_call_method_async(sd_bus*, sd_bus_slot**, const char*, const char*, const char*, const char*, sd_bus_message_handler_t, void*, const char*, ...)
 
+    int sd_bus_get_property(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, sd_bus_message**, const char*)
+
     const sd_bus_error *sd_bus_message_get_error(sd_bus_message*)
+    int sd_bus_message_read(sd_bus_message*, const char*, ...)
+    int sd_bus_message_read_basic(sd_bus_message*, char, void*)
+    int sd_bus_message_read_array(sd_bus_message*, char, const void**, int*)
+    int sd_bus_message_enter_container(sd_bus_message*, char, const char*)
+    int sd_bus_message_exit_container(sd_bus_message*)
     int sd_bus_message_skip(sd_bus_message*, const char*)
+    int sd_bus_message_get_type(sd_bus_message*, unsigned char*)
+    int sd_bus_message_peek_type(sd_bus_message*, char*, const char**)
+
+    int sd_bus_add_match(sd_bus*, sd_bus_slot**, const char*, sd_bus_message_handler_t, void*)
 
     sd_bus *sd_bus_unref(sd_bus*)
     sd_bus_message *sd_bus_message_unref(sd_bus_message*)
@@ -109,6 +120,98 @@ def bt_connect(Bus bus, str path, task):
     )
     if r < 0:
         raise FatalError('Failed to issue connection call for {}'.format(path))
+
+cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error):
+    cdef object queue = <object>user_data
+    cdef char *name
+    cdef int value
+    cdef const char *contents
+    cdef char msg_type
+
+    r = sd_bus_message_skip(msg, 's')
+    r = sd_bus_message_enter_container(msg, 'a', '{sv}')
+    while sd_bus_message_enter_container(msg, 'e', 'sv') > 0:
+        r = sd_bus_message_read_basic(msg, 's', &name)
+
+        r = sd_bus_message_peek_type(msg, &msg_type, &contents)
+        assert chr(msg_type) == 'v', (name, msg_type, contents)
+
+        # FIXME: add support for other types
+        r = sd_bus_message_enter_container(msg, 'v', 'b')
+#        r = sd_bus_message_read_array(msg, 'y', &buff, &len)
+        r = sd_bus_message_read_basic(msg, 'b', &value)
+
+        queue.put_nowait((name, value == 1))
+
+        r = sd_bus_message_exit_container(msg)  # variant
+        r = sd_bus_message_exit_container(msg)  # dict entry
+
+        r = sd_bus_message_exit_container(msg)  # dict entry
+    r = sd_bus_message_exit_container(msg)  # array entry
+
+    return 1
+
+def bt_wait_for(Bus bus, str path, queue):
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+
+    iface = 'org.bluez.GattCharacteristic1'
+    iface = 'org.bluez.Device1'
+    rule = """\
+type='signal',\
+sender='org.bluez',\
+interface='org.freedesktop.DBus.Properties',\
+member='PropertiesChanged',\
+path='{}',\
+arg0='{}'""".format(path, iface)
+
+#   r = sd_bus_call_method(
+#       bus.bus,
+#       'org.bluez',
+#       path.encode(),
+#       iface.encode(),
+#       'StartNotify',
+#       &error,
+#       &msg,
+#       NULL,
+#       NULL
+#   )
+#   print('match start', r)
+#    if (r < 0) {
+#        fprintf(stderr, "Failed to issue StartNotify call: %s\n", error.message);
+#        goto finish;
+#    }
+    r = sd_bus_add_match(bus.bus, NULL, rule.encode(), bt_wait_for_callback, <void*>queue)
+#    if (r < 0)
+#        fprintf(stderr, "Failed to add match rule: %s\n", strerror(-r));
+#
+
+def bt_property_str(Bus bus, str path, str name):
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+    cdef char *value
+
+    r = sd_bus_get_property(
+        bus.bus,
+        'org.bluez',
+        path.encode(),
+        'org.bluez.Device1',
+        name.encode(),
+        &error,
+        &msg,
+        's'
+    )
+#    if (r < 0) {
+#        fprintf(stderr, "Failed to read Name property: %s\n", error.message);
+#        goto finish;
+#    }
+    r = sd_bus_message_read(msg, 's', &value)
+    #if (r < 0)
+    #    fprintf(stderr, "Failed to get Name property data\n");
+    sd_bus_message_unref(msg)
+    sd_bus_error_free(&error)
+
+    return value
 
 def bt_process(Bus bus):
     cdef sd_bus_message *msg
