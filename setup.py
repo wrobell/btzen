@@ -23,7 +23,8 @@
 Build setup for btsensor library.
 """
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
+from Cython.Build import cythonize
 
 setup(
     name='btzen',
@@ -42,6 +43,9 @@ setup(
         'Development Status :: 3 - Alpha',
         'Topic :: Software Development :: Libraries',
     ],
+    ext_modules=cythonize([
+        Extension('btzen._btzen', ['btzen/_btzen.pyx'], libraries=['systemd'])
+    ]),
     packages=find_packages('.'),
     scripts=('bin/btzen',),
     include_package_data=True,
