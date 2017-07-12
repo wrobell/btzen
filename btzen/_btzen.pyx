@@ -202,7 +202,7 @@ arg0='{}'""".format(path, iface)
 #        fprintf(stderr, "Failed to add match rule: %s\n", strerror(-r));
 #
 
-def bt_property_str(Bus bus, str path, str name):
+def bt_property_str(Bus bus, str path, str iface, str name):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
     cdef char *value
@@ -211,17 +211,19 @@ def bt_property_str(Bus bus, str path, str name):
         bus.bus,
         'org.bluez',
         path.encode(),
-        'org.bluez.Device1',
+        iface.encode(),
         name.encode(),
         &error,
         &msg,
         's'
     )
+    assert r == 0
 #    if (r < 0) {
 #        fprintf(stderr, "Failed to read Name property: %s\n", error.message);
 #        goto finish;
 #    }
     r = sd_bus_message_read(msg, 's', &value)
+    assert r > 0
     #if (r < 0)
     #    fprintf(stderr, "Failed to get Name property data\n");
     sd_bus_message_unref(msg)
@@ -232,5 +234,67 @@ def bt_property_str(Bus bus, str path, str name):
 def bt_process(Bus bus):
     cdef sd_bus_message *msg
     return sd_bus_process(bus.bus, &msg)
+
+def bt_characteristic(Bus bus, str path):
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+    cdef char *chr_path
+    cdef char *iface
+    cdef const char *contents
+    cdef char msg_type
+
+    r = sd_bus_call_method(
+        bus.bus,
+        'org.bluez',
+        '/',
+        'org.freedesktop.DBus.ObjectManager',
+        'GetManagedObjects',
+        &error,
+        &msg,
+        NULL
+    )
+    assert r >= 0
+#    if (r < 0) {
+#        fprintf(stderr, "Failed to issue method call: %s\n", error.message);
+#        goto finish;
+#    }
+
+    r = sd_bus_message_peek_type(msg, &msg_type, &contents)
+    assert r >= 0, r
+
+    r = sd_bus_message_enter_container(msg, 'a', '{oa{sa{sv}}}')
+    assert r >= 0, r
+#    if (r < 0) {
+#        fprintf(stderr, "GetManagedObjects interface error\n");
+#        goto finish;
+#    }
+
+    data = {}
+    while sd_bus_message_enter_container(msg, 'e', 'oa{sa{sv}}') > 0:
+        r = sd_bus_message_read(msg, 'o', &chr_path)
+        assert r > 0
+        r = sd_bus_message_enter_container(msg, 'a', '{sa{sv}}')
+        assert r > 0
+
+        while sd_bus_message_enter_container(msg, 'e', 'sa{sv}') > 0:
+            r = sd_bus_message_read(msg, "s", &iface);
+            assert r > 0
+            r = sd_bus_message_skip(msg, "a{sv}")
+            assert r > 0
+
+            if <bytes>iface == b'org.bluez.GattCharacteristic1':
+                uuid = bt_property_str(bus, chr_path, 'org.bluez.GattCharacteristic1', 'UUID')
+                data[uuid] = chr_path
+
+            sd_bus_message_exit_container(msg)
+        sd_bus_message_exit_container(msg)  # array
+        sd_bus_message_exit_container(msg)  # dict entry
+
+    sd_bus_message_exit_container(msg)  # array
+
+#finish:
+    sd_bus_message_unref(msg)
+    sd_bus_error_free(&error)
+    return data
 
 # vim: sw=4:et:ai
