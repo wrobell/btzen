@@ -24,6 +24,8 @@ from libc.stdio cimport perror
 from libc.string cimport strerror
 from libc.errno cimport errno
 
+import asyncio
+
 cdef extern from "<systemd/sd-bus.h>":
     ctypedef struct sd_bus:
         pass
@@ -75,6 +77,17 @@ cdef class Bus:
     def fileno(self):
         return self._fd_no
 
+class PropertyChange:
+    def __init__(self, *args):
+        self._queue = asyncio.Queue()
+        self.filter = set(args)
+
+    def put(self, name, value):
+        self._queue.put_nowait((name, value))
+
+    async def get(self):
+        return (await self._queue.get())
+
 class BtError(Exception):
     pass
 
@@ -121,8 +134,8 @@ def bt_connect(Bus bus, str path, task):
     if r < 0:
         raise FatalError('Failed to issue connection call for {}'.format(path))
 
-cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error):
-    cdef object queue = <object>user_data
+cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+    cdef object cb = <object>user_data
     cdef char *name
     cdef int value
     cdef const char *contents
@@ -136,12 +149,15 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
         r = sd_bus_message_peek_type(msg, &msg_type, &contents)
         assert chr(msg_type) == 'v', (name, msg_type, contents)
 
+        if cb.filter and name not in cb.filter:
+            continue
+
         # FIXME: add support for other types
         r = sd_bus_message_enter_container(msg, 'v', 'b')
 #        r = sd_bus_message_read_array(msg, 'y', &buff, &len)
         r = sd_bus_message_read_basic(msg, 'b', &value)
 
-        queue.put_nowait((name, value == 1))
+        cb.put(name, value == 1)
 
         r = sd_bus_message_exit_container(msg)  # variant
         r = sd_bus_message_exit_container(msg)  # dict entry
@@ -151,7 +167,7 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
 
     return 1
 
-def bt_wait_for(Bus bus, str path, queue):
+def bt_wait_for(Bus bus, str path, object data):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 
@@ -181,7 +197,7 @@ arg0='{}'""".format(path, iface)
 #        fprintf(stderr, "Failed to issue StartNotify call: %s\n", error.message);
 #        goto finish;
 #    }
-    r = sd_bus_add_match(bus.bus, NULL, rule.encode(), bt_wait_for_callback, <void*>queue)
+    r = sd_bus_add_match(bus.bus, NULL, rule.encode(), bt_wait_for_callback, <void*>data)
 #    if (r < 0)
 #        fprintf(stderr, "Failed to add match rule: %s\n", strerror(-r));
 #
