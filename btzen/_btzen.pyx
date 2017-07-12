@@ -24,7 +24,12 @@ from libc.stdio cimport perror
 from libc.string cimport strerror
 from libc.errno cimport errno
 
+from cpython.bytes cimport PyBytes_FromStringAndSize
+
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 cdef extern from "<systemd/sd-bus.h>":
     ctypedef struct sd_bus:
@@ -54,7 +59,7 @@ cdef extern from "<systemd/sd-bus.h>":
     const sd_bus_error *sd_bus_message_get_error(sd_bus_message*)
     int sd_bus_message_read(sd_bus_message*, const char*, ...)
     int sd_bus_message_read_basic(sd_bus_message*, char, void*)
-    int sd_bus_message_read_array(sd_bus_message*, char, const void**, int*)
+    int sd_bus_message_read_array(sd_bus_message*, char, const void**, size_t*)
     int sd_bus_message_enter_container(sd_bus_message*, char, const char*)
     int sd_bus_message_exit_container(sd_bus_message*)
     int sd_bus_message_skip(sd_bus_message*, const char*)
@@ -84,6 +89,17 @@ class PropertyChange:
 
     def put(self, name, value):
         self._queue.put_nowait((name, value))
+
+    async def get(self):
+        return (await self._queue.get())
+
+class ValueChange:
+    def __init__(self):
+        self._queue = asyncio.Queue()
+        self.filter = {'Value'}
+
+    def put(self, name, value):
+        self._queue.put_nowait(value)
 
     async def get(self):
         return (await self._queue.get())
@@ -140,6 +156,8 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
     cdef int value
     cdef const char *contents
     cdef char msg_type
+    cdef const void *buff
+    cdef size_t buff_size
 
     r = sd_bus_message_skip(msg, 's')
     r = sd_bus_message_enter_container(msg, 'a', '{sv}')
@@ -152,12 +170,28 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
         if cb.filter and name not in cb.filter:
             continue
 
-        # FIXME: add support for other types
-        r = sd_bus_message_enter_container(msg, 'v', 'b')
-#        r = sd_bus_message_read_array(msg, 'y', &buff, &len)
-        r = sd_bus_message_read_basic(msg, 'b', &value)
+        r = sd_bus_message_peek_type(msg, &msg_type, &contents)
+        assert r >= 0 and msg_type == 118  # 'v'
+        r = sd_bus_message_enter_container(msg, 'v', contents)
+        assert r >= 0
 
-        cb.put(name, value == 1)
+        if <bytes>contents == b'b':
+            r = sd_bus_message_read_basic(msg, 'b', &value)
+            assert r >= 0
+
+            r_value = value == 1
+
+        elif <bytes>contents == b'ay':
+            r = sd_bus_message_read_array(msg, 'y', &buff, &buff_size)
+            assert r >= 0
+
+            r_value = PyBytes_FromStringAndSize(<char*>buff, buff_size)
+            logger.debug('array value of size {}'.format(buff_size))
+        else:
+            # FIXME: add support for other types
+            assert False, 'unsupported type {}'.format(contents)
+
+        cb.put(name, r_value)
 
         r = sd_bus_message_exit_container(msg)  # variant
         r = sd_bus_message_exit_container(msg)  # dict entry
@@ -167,12 +201,10 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
 
     return 1
 
-def bt_wait_for(Bus bus, str path, object data):
+def bt_wait_for(Bus bus, str path, str iface, object data):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 
-    iface = 'org.bluez.GattCharacteristic1'
-    iface = 'org.bluez.Device1'
     rule = """\
 type='signal',\
 sender='org.bluez',\
@@ -230,6 +262,48 @@ def bt_property_str(Bus bus, str path, str iface, str name):
     sd_bus_error_free(&error)
 
     return value
+
+def bt_characteristic_notify(Bus bus, str path, object data):
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+
+    iface = 'org.bluez.GattCharacteristic1'
+
+    r = sd_bus_call_method(
+        bus.bus,
+        'org.bluez',
+        path.encode(),
+        iface.encode(),
+        'StartNotify',
+        &error,
+        &msg,
+        NULL,
+        NULL
+    )
+    assert r >= 0, (path, iface)
+    bt_wait_for(bus, path, iface, data)
+
+def bt_characteristic_notify_stop(Bus bus, str path):
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+
+    r = sd_bus_call_method(
+        bus.bus,
+        'org.bluez',
+        path.encode(),
+        'org.bluez.GattCharacteristic1',
+        'StopNotify',
+        &error,
+        &msg,
+        NULL,
+        NULL
+    )
+    assert r >= 0
+#    if (r < 0)
+#        fprintf(stderr, "Failed to issue StopNotify call: %s\n", error.message);
+
+    sd_bus_error_free(&error)
+    sd_bus_message_unref(msg)
 
 def bt_process(Bus bus):
     cdef sd_bus_message *msg
