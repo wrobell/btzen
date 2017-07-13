@@ -53,6 +53,11 @@ cdef extern from "<systemd/sd-bus.h>":
 
     int sd_bus_call_method(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, sd_bus_message**, const char*, ...)
     int sd_bus_call_method_async(sd_bus*, sd_bus_slot**, const char*, const char*, const char*, const char*, sd_bus_message_handler_t, void*, const char*, ...)
+    int sd_bus_message_new_method_call(sd_bus*, sd_bus_message**, const char*, const char*, const char*, const char*)
+    int sd_bus_message_append_array(sd_bus_message*, char, const void*, size_t)
+    int sd_bus_message_open_container(sd_bus_message*, char, const char*)
+    int sd_bus_message_close_container(sd_bus_message*)
+    int sd_bus_call(sd_bus*, sd_bus_message*, long, sd_bus_error*, sd_bus_message**)
 
     int sd_bus_get_property(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, sd_bus_message**, const char*)
 
@@ -262,6 +267,41 @@ def bt_property_str(Bus bus, str path, str iface, str name):
     sd_bus_error_free(&error)
 
     return value
+
+def bt_write(Bus bus, str path, bytes data):
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_message *reply = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+    cdef char* buff = data
+
+    r = sd_bus_message_new_method_call(
+        bus.bus,
+        &msg,
+        'org.bluez',
+        path.encode(),
+        'org.bluez.GattCharacteristic1',
+        'WriteValue'
+    )
+    assert r >= 0
+    #if (r < 0) {
+    #    fprintf(stderr, "Failed to create call to WriteValue\n");
+    #    goto finish;
+    #}
+
+    sd_bus_message_append_array(msg, 'y', buff, len(data))
+    sd_bus_message_open_container(msg, 'a', '{sv}')
+    sd_bus_message_close_container(msg)
+
+    r = sd_bus_call(bus.bus, msg, 0, &error, &reply)
+    assert r >= 0
+#    if (r < 0) {
+#        fprintf(stderr, "Failed to call WriteValue: %s\n", error.message);
+#        goto finish;
+#    }
+#finish:
+    sd_bus_error_free(&error)
+    sd_bus_message_unref(msg)
+    sd_bus_message_unref(reply)
 
 def bt_characteristic_notify(Bus bus, str path, object data):
     cdef sd_bus_message *msg = NULL
