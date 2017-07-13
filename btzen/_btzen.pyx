@@ -159,6 +159,7 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
     cdef object cb = <object>user_data
     cdef char *name
     cdef int value
+    cdef signed short value_short
     cdef const char *contents
     cdef char msg_type
     cdef const void *buff
@@ -183,8 +184,12 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
         if <bytes>contents == b'b':
             r = sd_bus_message_read_basic(msg, 'b', &value)
             assert r >= 0
-
             r_value = value == 1
+
+        elif <bytes>contents == b'n':
+            r = sd_bus_message_read_basic(msg, 'n', &value_short)
+            assert r >= 0
+            r_value = value_short
 
         elif <bytes>contents == b'ay':
             r = sd_bus_message_read_array(msg, 'y', &buff, &buff_size)
