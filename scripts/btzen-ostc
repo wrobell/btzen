@@ -29,7 +29,9 @@ import argparse
 import asyncio
 import logging
 import struct
+from collections import namedtuple
 from cytoolz import itertoolz as itz
+from datetime import datetime
 
 import btzen._btzen as cbtzen
 from btzen.serial import Serial
@@ -37,6 +39,18 @@ from btzen.serial import Serial
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+DiveHeader = namedtuple('DiveHeader', ['size', 'datetime', 'depth', 'duration', 'dive_number', 'version'])
+to_int = lambda value: sum(v << (s * 8) for v, s in zip(value, range(len(value))))
+to_timestamp = lambda value: datetime(value[0] + 2000, *value[1:])
+to_self = lambda value: value
+to_depth = lambda v: v * 9.80665 / 1000
+header_parsers = (to_int, to_timestamp, to_depth) + (to_self,) * 3
+
+def parse_header(item):
+    item = struct.unpack('<3s5sH3sHB', item)
+    values = zip(header_parsers, item)
+    values = (p(v) for p, v in values)
+    return DiveHeader._make(values)
 
 async def read_data(mac):
     dev = Serial(mac)
@@ -60,19 +74,15 @@ async def read_data(mac):
 
         # get 5 latests dives
         items = itz.partition(16, headers)
-        items = (struct.unpack('<3s3s2sH3sHb', bytes(item)) for item in items)
-        items = (item for item in items if item[2][0] != 255)  # remove non-dives
+        items = (bytes(v) for v in items if v[-1] != 0xff)
+        items = (parse_header(v) for v in items)
+        items = (v for v in items if v)  # remove empty dives
         items = itz.tail(5, items)
         items = reversed(items)
-        for k, item in enumerate(items, 1):
-            time = item[2]
-            date = item[1]
-            depth = item[3] * 9.80665 / 1000 
-            print( '{:3d}: {:02d}-{:02d}-{:02d} {:02d}:{:02d} {:.2f}m {:x}'.format(
-                k, date[0], date[1], date[2],
-                time[0], time[1],
-                depth, item[-1]
-            ))
+
+        for k, header in enumerate(items, 1):
+            fmt = '{:3d}: {} {:.1f}m {:x}'.format
+            print(fmt(k, header.datetime, header.depth, header.version))
     finally:
         dev.write(b'\xff')
         logger.debug('closing ostc connection')
