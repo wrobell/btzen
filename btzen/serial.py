@@ -93,9 +93,11 @@ class Serial:
         return data
 
     def write(self, data):
+        assert len(data) <= 20
         if self._rx_credits < 1:
             self._add_rx_credits()
         cbtzen.bt_write(self._bus, self._rx_uart_path, data)
+        self._rx_credits -= 1
 
     def _add_notification(self, path):
         cb = cbtzen.ValueChange()
