@@ -55,11 +55,13 @@ class Serial:
     async def connect(self):
         bus = self._bus = cbtzen.default_bus()
 
+        logger.debug('connecting to {}'.format(self._mac))
         path = '/org/bluez/hci0/dev_{}'.format(_mac(self._mac))
         task = asyncio.get_event_loop().create_future()
         cbtzen.bt_connect(bus, path, task)
         await task
 
+        logger.debug('resolving services of {}'.format(self._mac))
         cb = cbtzen.PropertyChange('ServicesResolved')
         cbtzen.bt_wait_for(bus, path, 'org.bluez.Device1', cb)
         await cb.get()
