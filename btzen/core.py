@@ -1,5 +1,5 @@
 #
-# BTZen - Bluetooh Smart sensor reading library.
+# BTZen - Bluetooth Smart sensor reading library.
 #
 # Copyright (C) 2015-2017 by Artur Wroblewski <wrobell@riseup.net>
 #

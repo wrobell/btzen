@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# BTZen - Bluetooh Smart sensor reading library.
+# BTZen - Bluetooth Smart sensor reading library.
 #
 # Copyright (C) 2015-2017 by Artur Wroblewski <wrobell@riseup.net>
 #
@@ -32,10 +32,10 @@ setup(
     author='Artur Wroblewski',
     author_email='wrobell@riseup.net',
     url='https://github.com/wrobell/btzen',
-    description='BTZen - Bluetooh Smart sensor reading library',
+    description='BTZen - Bluetooth Smart sensor reading library',
     setup_requires = ['setuptools_git >= 1.0',],
-    cffi_modules=['cffi_builders/btzen_build.py:ffi'],
-    install_requires=['cffi >= 1.4.2'],
+#    cffi_modules=['cffi_builders/btzen_build.py:ffi'],
+#    install_requires=['cffi >= 1.4.2'],
     classifiers=[
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
         'Programming Language :: Python',
