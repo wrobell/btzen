@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+#
+# BTZen - Bluetooh Smart sensor reading library.
+#
+# Copyright (C) 2015-2017 by Artur Wroblewski <wrobell@riseup.net>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+"""
+Connect to OSTC dive computer and show last five dives.
+"""
+
+# TODO: Rewriting sd-bus layer with cython. Once done, then simplify this
+# script.
+
+import argparse
+import asyncio
+import logging
+import struct
+from cytoolz import itertoolz as itz
+
+import btzen._btzen as cbtzen
+from btzen.serial import Serial
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+
+async def read_data(mac):
+    dev = Serial(mac)
+    await dev.connect()
+
+    dev.write(b'\xbb')
+    value = await dev.read(2)
+    assert value == b'\xbb\x4d'
+
+    dev.write(b'\x6e')
+    value = await dev.read(1)
+    assert value == b'\x6e'
+    dev.write(b'BTZen Connected ')
+    value = await dev.read(1)
+    assert value == b'\x4d'
+
+    try:
+        dev.write(b'\x6d')
+        headers = await dev.read(4098)
+        headers = headers[1:-1]
+
+        # get 5 latests dives
+        items = itz.partition(16, headers)
+        items = (struct.unpack('<3s3s2sH3sHb', bytes(item)) for item in items)
+        items = (item for item in items if item[2][0] != 255)  # remove non-dives
+        items = itz.tail(5, items)
+        items = reversed(items)
+        for k, item in enumerate(items, 1):
+            time = item[2]
+            date = item[1]
+            depth = item[3] * 9.80665 / 1000 
+            print( '{:3d}: {:02d}-{:02d}-{:02d} {:02d}:{:02d} {:.2f}m {:x}'.format(
+                k, date[0], date[1], date[2],
+                time[0], time[1],
+                depth, item[-1]
+            ))
+    finally:
+        dev.write(b'\xff')
+        logger.debug('closing ostc connection')
+
+def process_bus(bus):
+    r = cbtzen.bt_process(bus)
+    while r > 0:
+        r = cbtzen.bt_process(bus)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('device', help='MAC address of device')
+args = parser.parse_args()
+
+# bus = Bus(loop)
+# bus.connect(args.device)
+bus = cbtzen.default_bus()
+
+loop = asyncio.get_event_loop()
+loop.add_reader(bus.fileno, process_bus, bus)
+loop.run_until_complete(read_data(args.device))
+
+# vim: sw=4:et:ai
