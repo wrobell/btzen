@@ -97,11 +97,10 @@ class Serial:
         if self._rx_credits < 1:
             self._add_rx_credits()
         cbtzen.bt_write(self._bus, self._rx_uart_path, data)
-        self._rx_credits -= 1
 
     def _add_notification(self, path):
         cb = cbtzen.ValueChange()
-        cbtzen.bt_characteristic_notify(self._bus, path, cb) 
+        cbtzen.bt_characteristic_notify(self._bus, path, cb)
         return cb
 
     @contextmanager
