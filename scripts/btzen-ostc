@@ -73,9 +73,10 @@ async def read_data(mac):
 
         # get 5 latests dives
         items = itz.partition(16, headers)
+        # convert back to bytes, see https://github.com/pytoolz/cytoolz/issues/102
+        # also filter unused headers
         items = (bytes(v) for v in items if v[-1] != 0xff)
         items = (parse_header(v) for v in items)
-        items = (v for v in items if v)  # remove empty dives
         items = itz.tail(5, items)
         items = reversed(items)
 
