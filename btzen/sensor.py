@@ -32,7 +32,7 @@ import logging
 import struct
 from collections import deque, namedtuple
 
-from _btzen import ffi, lib
+from . import _btzen
 from .import converter
 from .bus import Bus
 from .error import ConfigurationError, DataReadError
@@ -73,7 +73,9 @@ class Sensor:
         self._device = None
         self._system_bus = None
 
-    def connect(self):
+        self._notification = None
+
+    async def connect(self):
         """
         Connect to sensor Bluetooth device and register sensor on sensor
         bus.
@@ -88,7 +90,7 @@ class Sensor:
             Sensor.BUS = Bus(self._loop)
         self._system_bus = Sensor.BUS.get_bus()
 
-        name = Sensor.BUS.connect(self._mac)
+        name = await Sensor.BUS.connect(self._mac)
         self._set_parameters(name)
         Sensor.BUS.register(self)
         self._enable()
@@ -97,7 +99,9 @@ class Sensor:
         if self._params.path_period:
             value = int(interval * 100)
             assert value < 256
-            r = lib.bt_device_write(Sensor.BUS.get_bus(), self._device.chr_period, [value], 1)
+            path = self._params.path_period
+            bus = Sensor.BUS.get_bus()
+            r = _btzen.bt_write(bus, path, bytes([value]))
             if r < 0:
                 msg = 'Cannot set sensor interval value: {}'.format(r)
                 raise ConfigurationError(msg)
@@ -119,20 +123,14 @@ class Sensor:
 
         This method is a coroutine and is *not* thread safe.
         """
-        future = self._future = self._loop.create_future()
-
         if self._notifying:
-            if self._error:
-                raise self._error
-            if self._buffer:
-                future.set_result(self._buffer.popleft())
+            task = self._notification.get()
         else:
             r = lib.bt_device_read_async(self._system_bus, self._device)
             if r < 0:
                 raise DataReadError('Sensor data read error: {}'.format(r))
 
-        await future
-        return future.result()
+        return (await task)
 
     def close(self):
         """
@@ -232,16 +230,16 @@ class Sensor:
             self.CONFIG_OFF,
         )
 
-        # keep reference to device data with the dictionary below
-        self._device_ref = {
-            'chr_data': ffi.new('char[]', params.path_data),
-            'chr_conf': ffi.new('char[]', params.path_conf),
-            'chr_period': ffi.new('char[]', params.path_period),
-            'data': ffi.from_buffer(self._data),
-            'len': self.DATA_LEN,
-            'callback': lib.sensor_data_callback,
-        }
-        self._device = ffi.new('t_bt_device*', self._device_ref)
+###       # keep reference to device data with the dictionary below
+###       self._device_ref = {
+###           'chr_data': ffi.new('char[]', params.path_data),
+###           'chr_conf': ffi.new('char[]', params.path_conf),
+###           'chr_period': ffi.new('char[]', params.path_period),
+###           'data': ffi.from_buffer(self._data),
+###           'len': self.DATA_LEN,
+###           'callback': lib.sensor_data_callback,
+###       }
+###       self._device = ffi.new('t_bt_device*', self._device_ref)
 
         # ceate data converter
         name = params.name
@@ -250,21 +248,18 @@ class Sensor:
         self._converter = factory(name, None)
 
     def _enable(self):
+        bus = Sensor.BUS.get_bus()
         if self._notifying:
             config_on = self._params.config_on_notify
-            r = lib.bt_device_start_notify(Sensor.BUS.get_bus(), self._device)
+            self._notification = _btzen.ValueChange()
+            _btzen.bt_characteristic_notify(bus, self._params.path_data, self._notification)
         else:
             config_on = self._params.config_on
 
         # enabled switched off sensor; some sensors are always on,
         # i.e. button
         if config_on:
-            r = lib.bt_device_write(
-                Sensor.BUS.get_bus(),
-                self._device.chr_conf,
-                config_on,
-                len(config_on)
-            )
+            _btzen.bt_write( bus, self._params.path_conf, config_on)
 
 
 class Temperature(Sensor):
@@ -272,9 +267,9 @@ class Temperature(Sensor):
     UUID_DATA = dev_uuid(0xaa01)
     UUID_CONF = dev_uuid(0xaa02)
     UUID_PERIOD = dev_uuid(0xaa03)
-    CONFIG_ON = [1]
-    CONFIG_ON_NOTIFY = [1]
-    CONFIG_OFF = [0]
+    CONFIG_ON = b'\x01'
+    CONFIG_ON_NOTIFY = b'\x01'
+    CONFIG_OFF = b'\x00'
 
 
 class Pressure(Sensor):
@@ -282,9 +277,9 @@ class Pressure(Sensor):
     UUID_DATA = dev_uuid(0xaa41)
     UUID_CONF = dev_uuid(0xaa42)
     UUID_PERIOD = dev_uuid(0xaa44)
-    CONFIG_ON = [1]
-    CONFIG_ON_NOTIFY = [1]
-    CONFIG_OFF = [0]
+    CONFIG_ON = b'\x01'
+    CONFIG_ON_NOTIFY = b'\x01'
+    CONFIG_OFF = b'\x00'
 
 
 class Humidity(Sensor):
@@ -292,9 +287,9 @@ class Humidity(Sensor):
     UUID_DATA = dev_uuid(0xaa21)
     UUID_CONF = dev_uuid(0xaa22)
     UUID_PERIOD = dev_uuid(0xaa23)
-    CONFIG_ON = [1]
-    CONFIG_ON_NOTIFY = [1]
-    CONFIG_OFF = [0]
+    CONFIG_ON = b'\x01'
+    CONFIG_ON_NOTIFY = b'\x01'
+    CONFIG_OFF = b'\x00'
 
 
 class Light(Sensor):
@@ -302,9 +297,9 @@ class Light(Sensor):
     UUID_DATA = dev_uuid(0xaa71)
     UUID_CONF = dev_uuid(0xaa72)
     UUID_PERIOD = dev_uuid(0xaa73)
-    CONFIG_ON = [1]
-    CONFIG_ON_NOTIFY = [1]
-    CONFIG_OFF = [0]
+    CONFIG_ON = b'\x01'
+    CONFIG_ON_NOTIFY = b'\x01'
+    CONFIG_OFF = b'\x00'
 
 
 class Accelerometer(Sensor):
@@ -319,7 +314,7 @@ class Accelerometer(Sensor):
     WAKE_ON_MOTION = 0x80
     CONFIG_ON = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z)
     CONFIG_ON_NOTIFY = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z | WAKE_ON_MOTION)
-    CONFIG_OFF = [0, 0]
+    CONFIG_OFF = '\x00\x00'
 
 
 class Button(Sensor):
@@ -343,8 +338,6 @@ class Weight(Sensor):
     CONFIG_ON_NOTIFY = None
     CONFIG_OFF = None
 
-
-@ffi.def_extern()
 def sensor_data_callback(device):
     """
     Called by C-level layer to notify about completed asynchronous call.

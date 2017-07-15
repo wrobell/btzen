@@ -247,6 +247,33 @@ def bt_property_str(Bus bus, str path, str iface, str name):
 
     return value
 
+def bt_property_bool(Bus bus, str path, str iface, str name):
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+    cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
+
+    r = sd_bus_get_property(
+        bus.bus,
+        'org.bluez',
+        path.encode(),
+        iface.encode(),
+        name.encode(),
+        &error,
+        &msg,
+        'b'
+    )
+    assert r == 0
+#    if (r < 0) {
+#        fprintf(stderr, "Failed to read Name property: %s\n", error.message);
+#        goto finish;
+#    }
+    bus_msg.c_obj = msg
+    value = msg_read_value(bus_msg, 'b')
+    sd_bus_message_unref(msg)
+    sd_bus_error_free(&error)
+
+    return value
+
 def bt_write(Bus bus, str path, bytes data):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_message *reply = NULL
@@ -272,7 +299,6 @@ def bt_write(Bus bus, str path, bytes data):
     sd_bus_message_close_container(msg)
 
     r = sd_bus_call(bus.bus, msg, 0, &error, &reply)
-    assert r >= 0
 #    if (r < 0) {
 #        fprintf(stderr, "Failed to call WriteValue: %s\n", error.message);
 #        goto finish;
@@ -281,6 +307,7 @@ def bt_write(Bus bus, str path, bytes data):
     sd_bus_error_free(&error)
     sd_bus_message_unref(msg)
     sd_bus_message_unref(reply)
+    return r
 
 def bt_characteristic_notify(Bus bus, str path, object data):
     cdef sd_bus_message *msg = NULL
