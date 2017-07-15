@@ -27,14 +27,14 @@ CC2650STK
 """
 
 import asyncio
-import functools
 import logging
 import struct
 from collections import deque, namedtuple
+from functools import partial
 
 from . import _btzen
 from .import converter
-from .bus import Bus
+from .bus import BUS
 from .error import ConfigurationError, DataReadError
 from .util import dev_uuid
 
@@ -53,8 +53,6 @@ class Sensor:
     """
     :var _system_bus: System D-Bus reference (not thread safe).
     """
-    BUS = None
-
     def __init__(self, mac, notifying=False, loop=None):
         self._mac = mac
         self._notifying = notifying
@@ -83,11 +81,9 @@ class Sensor:
         assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
         assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
 
-        if Sensor.BUS is None:
-            Sensor.BUS = Bus(self._loop)
-        self._system_bus = Sensor.BUS.get_bus()
+        self._system_bus = BUS.get_bus()
 
-        name = await Sensor.BUS.connect(self._mac)
+        name = await BUS.connect(self._mac)
         self._set_parameters(name)
         self._enable()
 
@@ -208,28 +204,17 @@ class Sensor:
             raise DataReadError('Sensor coroutine not awaited')
 
     def _set_parameters(self, name):
-        bus = Sensor.BUS
+        get_path = partial(BUS.sensor_path, self._mac)
         mac = self._mac
         self._params = params = Parameters(
             name,
-            bus.sensor_path(mac, self.UUID_DATA),
-            bus.sensor_path(mac, self.UUID_CONF),
-            bus.sensor_path(mac, self.UUID_PERIOD),
+            get_path(self.UUID_DATA),
+            get_path(self.UUID_CONF),
+            get_path(self.UUID_PERIOD),
             self.CONFIG_ON,
             self.CONFIG_ON_NOTIFY,
             self.CONFIG_OFF,
         )
-
-###       # keep reference to device data with the dictionary below
-###       self._device_ref = {
-###           'chr_data': ffi.new('char[]', params.path_data),
-###           'chr_conf': ffi.new('char[]', params.path_conf),
-###           'chr_period': ffi.new('char[]', params.path_period),
-###           'data': ffi.from_buffer(self._data),
-###           'len': self.DATA_LEN,
-###           'callback': lib.sensor_data_callback,
-###       }
-###       self._device = ffi.new('t_bt_device*', self._device_ref)
 
         # ceate data converter
         name = params.name

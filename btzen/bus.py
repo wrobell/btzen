@@ -118,4 +118,6 @@ class Bus:
         while r > 0:
             r = process(bus)
 
+BUS = Bus()
+
 # vim: sw=4:et:ai

@@ -33,7 +33,7 @@ from contextlib import contextmanager
 from functools import partial
 
 import btzen._btzen as cbtzen
-from .bus import Bus
+from .bus import BUS
 
 logger = logging.getLogger(__name__)
 
@@ -46,21 +46,17 @@ class Serial:
     UUID_TX_CREDIT = '00000004-0000-1000-8000-008025000000'
     UUID_RX_CREDIT = '00000003-0000-1000-8000-008025000000'
 
-    BUS = None
-
     def __init__(self, mac):
         self._mac = mac
         self._system_bus = None
 
     # TODO: use btzen.bus
     async def connect(self):
-        if Serial.BUS is None:
-            Serial.BUS = Bus()
-        bus = self._system_bus = Serial.BUS.get_bus()
+        bus = self._system_bus = BUS.get_bus()
 
-        await Serial.BUS.connect(self._mac)
+        await BUS.connect(self._mac)
 
-        get_path = partial(Serial.BUS.sensor_path, self._mac)
+        get_path = partial(BUS.sensor_path, self._mac)
         path = get_path(self.UUID_TX_CREDIT)
         self._tx_credit = self._add_notification(path)
 
