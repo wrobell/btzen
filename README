@@ -1,4 +1,4 @@
-Library to read data from Bluetooth Smart sensors.
+Library to asynchronously access Bluetooth Smart devices.
 
 Features
 
@@ -14,11 +14,10 @@ Features
      - buttons (CC2541DK only)
 
    - Mi Smart Scale
+   - serial devices implementing Stollmann (Telit) protocol
 
-2. Sensor data access using `asyncio` coroutines.
+2. Device access using `asyncio` coroutines.
 3. Notifications interface is supported.
-
-Please update your sensor device to its latest firmware.
 
 The library provides `btzen` script to display sensor data (scan for a
 device with `bluetoothctl` command to get MAC address of a device)::
@@ -27,7 +26,7 @@ device with `bluetoothctl` command to get MAC address of a device)::
 
 Requirements
 
-- bluez 5.41
+- bluez 5.45
 - Python 3.5
 - `sd-bus` (part of `systemd`)
 
