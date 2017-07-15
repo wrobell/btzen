@@ -21,7 +21,7 @@ import asyncio
 import logging
 import threading
 import time
-from functools import lru_cache
+from functools import lru_cache, partial
 
 from . import _btzen
 from .error import ConnectionError
@@ -68,22 +68,35 @@ class Bus:
         bus = self.get_bus()
         path = self._get_device_path(mac)
         lock = self._lock.get(mac)
+
+        get_property = partial(_btzen.bt_property_bool, bus, path, INTERFACE_DEVICE)
+
         if lock is None:
             self._lock[mac] = lock = asyncio.Lock()
 
         async with lock:
-            connected = _btzen.bt_property_bool(bus, path, INTERFACE_DEVICE, 'Connected')
+            connected = get_property('Connected')
             if not connected:
                 logger.debug('connecting to {}'.format(mac))
                 task = asyncio.get_event_loop().create_future()
                 _btzen.bt_connect(bus, path, task)
                 await task
 
-                logger.debug('resolving services of {}'.format(mac))
+            resolved = get_property('ServicesResolved')
+            if not resolved:
+                logger.debug('waiting for service resolution of {}'.format(mac))
+
                 cb = _btzen.PropertyChange('ServicesResolved')
                 _btzen.bt_wait_for(bus, path, INTERFACE_DEVICE, cb)
-                await cb.get()
-                logger.debug('services resolved')
+                # wait 30s for for services to be resolved; this part is
+                # suspectible to race condition between the check above and
+                # starting the wait, so on timeout check the status again
+                try:
+                    await asyncio.wait_for(cb.get(), 30)
+                except asyncio.TimeoutError as ex:
+                    resolved = get_property('ServicesResolved')
+                    if not resolved:
+                        raise ConnectionError('Cannot resolve services of {}'.format(mac))
 
         name = self._get_name(mac)
         logger.debug('connected to {}'.format(name))
