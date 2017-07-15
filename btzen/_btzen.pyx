@@ -366,8 +366,6 @@ def bt_characteristic(Bus bus, str path):
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
     cdef char *chr_path
     cdef char *iface
-    cdef const char *contents
-    cdef char msg_type
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
     r = sd_bus_call_method(
@@ -386,12 +384,8 @@ def bt_characteristic(Bus bus, str path):
 #        goto finish;
 #    }
 
-
     bus_msg.c_obj = msg
     data = {}
-
-    r = sd_bus_message_peek_type(msg, &msg_type, &contents)
-    assert r >= 0, r
 
     for _ in msg_container(bus_msg, 'a', '{oa{sa{sv}}}'):
         for _ in msg_container(bus_msg, 'e', 'oa{sa{sv}}'):
