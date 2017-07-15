@@ -30,14 +30,12 @@ import asyncio
 import math
 import logging
 from contextlib import contextmanager
+from functools import partial
 
 import btzen._btzen as cbtzen
+from .bus import Bus
 
 logger = logging.getLogger(__name__)
-
-# TODO: use the function from btzen.bus
-def _mac(mac):
-    return mac.replace(':', '_').upper()
 
 def credits_for(data, n):
     return min(255, math.ceil((n - len(data)) / 20))
@@ -48,35 +46,29 @@ class Serial:
     UUID_TX_CREDIT = '00000004-0000-1000-8000-008025000000'
     UUID_RX_CREDIT = '00000003-0000-1000-8000-008025000000'
 
+    BUS = None
+
     def __init__(self, mac):
         self._mac = mac
+        self._system_bus = None
 
     # TODO: use btzen.bus
     async def connect(self):
-        bus = self._bus = cbtzen.default_bus()
-        dev_iface = 'org.bluez.Device1'
+        if Serial.BUS is None:
+            Serial.BUS = Bus()
+        bus = self._system_bus = Serial.BUS.get_bus()
 
-        logger.debug('connecting to {}'.format(self._mac))
-        path = '/org/bluez/hci0/dev_{}'.format(_mac(self._mac))
-        task = asyncio.get_event_loop().create_future()
-        cbtzen.bt_connect(bus, path, task)
-        await task
+        await Serial.BUS.connect(self._mac)
 
-        logger.debug('resolving services of {}'.format(self._mac))
-        cb = cbtzen.PropertyChange('ServicesResolved')
-        cbtzen.bt_wait_for(bus, path, dev_iface, cb)
-        await cb.get()
-        logger.debug('services resolved')
+        get_path = partial(Serial.BUS.sensor_path, self._mac)
+        path = get_path(self.UUID_TX_CREDIT)
+        self._tx_credit = self._add_notification(path)
 
-        name = cbtzen.bt_property_str(bus, path, dev_iface, 'Name')
-        logger.debug('connected to {}'.format(name))
-        by_uuid = cbtzen.bt_characteristic(bus, path)
+        path = get_path(self.UUID_TX_UART)
+        self._tx_uart = self._add_notification(path)
 
-        self._tx_credit = self._add_notification(by_uuid[self.UUID_TX_CREDIT])
-        self._tx_uart = self._add_notification(by_uuid[self.UUID_TX_UART])
-
-        self._rx_credit_path = by_uuid[self.UUID_RX_CREDIT]
-        self._rx_uart_path = by_uuid[self.UUID_RX_UART]
+        self._rx_credit_path = get_path(self.UUID_RX_CREDIT)
+        self._rx_uart_path = get_path(self.UUID_RX_UART)
 
         self._rx_credits = 0
         self._add_rx_credits()
@@ -101,11 +93,11 @@ class Serial:
         assert len(data) <= 20
         if self._rx_credits < 1:
             self._add_rx_credits()
-        cbtzen.bt_write(self._bus, self._rx_uart_path, data)
+        cbtzen.bt_write(self._system_bus, self._rx_uart_path, data)
 
     def _add_notification(self, path):
         cb = cbtzen.ValueChange()
-        cbtzen.bt_characteristic_notify(self._bus, path, cb)
+        cbtzen.bt_characteristic_notify(self._system_bus, path, cb)
         return cb
 
     @contextmanager
@@ -118,7 +110,7 @@ class Serial:
             self._rx_credits -= 1
 
     def _add_rx_credits(self, n=0x20):
-        cbtzen.bt_write(self._bus, self._rx_credit_path, bytes([n]))
+        cbtzen.bt_write(self._system_bus, self._rx_credit_path, bytes([n]))
         self._rx_credits += n
         logger.debug('rx credits: {}'.format(self._rx_credits))
 

@@ -19,12 +19,13 @@
 
 from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
     Button, Weight
+from .serial import Serial
 from .error import *
 
 __all__ = [
     'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
-    'Button', 'Weight', 'Error', 'ConnectionError', 'ConfigurationError',
-    'DataReadError',
+    'Button', 'Weight', 'Serial', 'Error', 'ConnectionError',
+    'ConfigurationError', 'DataReadError',
 ]
 
 # vim: sw=4:et:ai
