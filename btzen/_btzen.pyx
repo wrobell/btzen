@@ -204,10 +204,12 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
         cb.put(name, r_value)
 
         r = sd_bus_message_exit_container(msg)  # variant
+        assert r >= 0
         r = sd_bus_message_exit_container(msg)  # dict entry
+        assert r >= 0
 
-        r = sd_bus_message_exit_container(msg)  # dict entry
     r = sd_bus_message_exit_container(msg)  # array entry
+    assert r >= 0
 
     return 1
 
