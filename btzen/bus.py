@@ -88,9 +88,10 @@ class Bus:
 
                 cb = _btzen.PropertyChange('ServicesResolved')
                 _btzen.bt_wait_for(bus, path, INTERFACE_DEVICE, cb)
-                # wait 30s for for services to be resolved; this part is
-                # suspectible to race condition between the check above and
-                # starting the wait, so on timeout check the status again
+                # wait 30s for for services resolved flag change; this part
+                # is suspectible to race condition between the check above
+                # and starting the wait, so on timeout check the status
+                # again
                 try:
                     await asyncio.wait_for(cb.get(), 30)
                 except asyncio.TimeoutError as ex:
