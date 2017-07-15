@@ -313,10 +313,4 @@ class Weight(Sensor):
     CONFIG_ON_NOTIFY = None
     CONFIG_OFF = None
 
-def sensor_data_callback(device):
-    """
-    Called by C-level layer to notify about completed asynchronous call.
-    """
-    Sensor.BUS._sensors[device]._process_event()
-
 # vim: sw=4:et:ai
