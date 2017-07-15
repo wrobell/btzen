@@ -77,10 +77,7 @@ class Sensor:
 
     async def connect(self):
         """
-        Connect to sensor Bluetooth device and register sensor on sensor
-        bus.
-
-        Method is thread safe.
+        Connect to sensor Bluetooth device.
         """
         assert isinstance(self.UUID_DATA, str)
         assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
@@ -92,7 +89,6 @@ class Sensor:
 
         name = await Sensor.BUS.connect(self._mac)
         self._set_parameters(name)
-        Sensor.BUS.register(self)
         self._enable()
 
     def set_interval(self, interval):
@@ -134,12 +130,9 @@ class Sensor:
 
     def close(self):
         """
-        Disable sensor, stop reading sensor data and unregister sensor from
-        the sensor bus.
+        Disable sensor and stop reading sensor data.
 
         Pending, asynchronous coroutines are cancelled.
-
-        Method is thread safe.
         """
         if self._notifying and self._device:
             # ignore any errors when closing sensor
@@ -159,12 +152,9 @@ class Sensor:
             ex = asyncio.CancelledError('Sensor coroutine closed')
             future.set_exception(ex)
 
-        n = Sensor.BUS.unregister(self)
-        if n == 0:
-            Sensor.BUS = None
         self._system_bus = None
 
-        logger.info('{} sensor closed'.format(self.__class__.__name__))
+        logger.info('{} sensor closed'.format(self._mac))
 
     def _process_event(self):
         """

@@ -44,7 +44,6 @@ class Bus:
         self._loop.add_reader(self._fd, self._process_event)
 
         self._lock = {}
-        self._sensors = {}
 
     @staticmethod
     def get_bus():
@@ -90,25 +89,9 @@ class Bus:
         logger.debug('connected to {}'.format(name))
         return name
 
-    def register(self, sensor):
-        """
-        Register sensor on the sensor bus.
-        """
-        self._sensors[sensor._device] = sensor
-
-    def unregister(self, sensor):
-        """
-        Unregister sensor object from the sensor bus.
-        """
-        sensors = self._sensors
-        dev = sensor._device
-        if dev in sensors:
-            del sensors[dev]
-
     def sensor_path(self, mac, uuid):
         if uuid is None:
-            return b''
-
+            return ''
         by_uuid = self._get_sensor_paths(mac)
         return by_uuid[uuid]
 
