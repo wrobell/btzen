@@ -100,7 +100,7 @@ class Sensor:
             value = int(interval * 100)
             assert value < 256
             path = self._params.path_period
-            bus = Sensor.BUS.get_bus()
+            bus = self._system_bus
             r = _btzen.bt_write(bus, path, bytes([value]))
             if r < 0:
                 msg = 'Cannot set sensor interval value: {}'.format(r)
@@ -248,7 +248,7 @@ class Sensor:
         self._converter = factory(name, None)
 
     def _enable(self):
-        bus = Sensor.BUS.get_bus()
+        bus = self._system_bus
         if self._notifying:
             config_on = self._params.config_on_notify
             self._notification = _btzen.ValueChange()
