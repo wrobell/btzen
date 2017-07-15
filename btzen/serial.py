@@ -50,7 +50,6 @@ class Serial:
         self._mac = mac
         self._system_bus = None
 
-    # TODO: use btzen.bus
     async def connect(self):
         bus = self._system_bus = BUS.get_bus()
 
