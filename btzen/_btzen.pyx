@@ -177,11 +177,11 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
         for _ in msg_container(bus_msg, 'e', 'sv'):
             r = sd_bus_message_read_basic(msg, 's', &name)
 
-            r = sd_bus_message_peek_type(msg, &msg_type, &contents)
-            assert chr(msg_type) == 'v', (name, msg_type, contents)
-
             if cb.filter and name not in cb.filter:
                 continue
+
+            r = sd_bus_message_peek_type(msg, &msg_type, &contents)
+            assert chr(msg_type) == 'v', (name, msg_type, contents)
 
             for _ in msg_container(bus_msg, 'v', contents):
                 value = msg_read_value(bus_msg, contents)
