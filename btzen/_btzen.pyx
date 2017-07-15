@@ -366,12 +366,20 @@ def bt_process(Bus bus):
     return sd_bus_process(bus.bus, &msg)
 
 def bt_characteristic(Bus bus, str path):
+    """
+    Fetch Gatt Characteristic paths relative to `path`.
+
+    Dictionary `uuid -> path` is returned.
+
+    TODO: The "relative to path" not working yet.
+    """
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
     cdef char *chr_path
     cdef char *iface
     cdef const char *contents
     cdef char msg_type
+    cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
     r = sd_bus_call_method(
         bus.bus,
@@ -389,38 +397,33 @@ def bt_characteristic(Bus bus, str path):
 #        goto finish;
 #    }
 
+
+    bus_msg.c_obj = msg
+
     r = sd_bus_message_peek_type(msg, &msg_type, &contents)
     assert r >= 0, r
 
-    r = sd_bus_message_enter_container(msg, 'a', '{oa{sa{sv}}}')
-    assert r >= 0, r
-#    if (r < 0) {
-#        fprintf(stderr, "GetManagedObjects interface error\n");
-#        goto finish;
-#    }
-
-    data = {}
-    while sd_bus_message_enter_container(msg, 'e', 'oa{sa{sv}}') > 0:
-        r = sd_bus_message_read(msg, 'o', &chr_path)
-        assert r > 0
-        r = sd_bus_message_enter_container(msg, 'a', '{sa{sv}}')
-        assert r > 0
-
-        while sd_bus_message_enter_container(msg, 'e', 'sa{sv}') > 0:
-            r = sd_bus_message_read(msg, "s", &iface);
-            assert r > 0
-            r = sd_bus_message_skip(msg, "a{sv}")
+    with msg_container(bus_msg, 'a', '{oa{sa{sv}}}'):
+        data = {}
+        while sd_bus_message_enter_container(msg, 'e', 'oa{sa{sv}}') > 0:
+            r = sd_bus_message_read(msg, 'o', &chr_path)
             assert r > 0
 
-            if <bytes>iface == b'org.bluez.GattCharacteristic1':
-                uuid = bt_property_str(bus, chr_path, 'org.bluez.GattCharacteristic1', 'UUID')
-                data[uuid] = chr_path
+            with msg_container(bus_msg, 'a', '{sa{sv}}'):
+                while sd_bus_message_enter_container(msg, 'e', 'sa{sv}') > 0:
+                    r = sd_bus_message_read(msg, "s", &iface);
+                    assert r > 0
+                    r = sd_bus_message_skip(msg, "a{sv}")
+                    assert r > 0
 
-            sd_bus_message_exit_container(msg)
-        sd_bus_message_exit_container(msg)  # array
-        sd_bus_message_exit_container(msg)  # dict entry
+                    if <bytes>iface == b'org.bluez.GattCharacteristic1':
+                        uuid = bt_property_str(bus, chr_path, 'org.bluez.GattCharacteristic1', 'UUID')
+                        data[uuid] = chr_path
 
-    sd_bus_message_exit_container(msg)  # array
+                    r = sd_bus_message_exit_container(msg)
+                    assert r == 1
+
+            r = sd_bus_message_exit_container(msg)  # dict entry
 
 #finish:
     sd_bus_message_unref(msg)
