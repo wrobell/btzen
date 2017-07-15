@@ -163,7 +163,6 @@ def bt_connect(Bus bus, str path, task):
 
 cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object cb = <object>user_data
-    cdef char *name
     cdef const char *contents
     cdef char msg_type
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
@@ -175,7 +174,7 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
 
     for _ in msg_container(bus_msg, 'a', '{sv}'):
         for _ in msg_container(bus_msg, 'e', 'sv'):
-            r = sd_bus_message_read_basic(msg, 's', &name)
+            name = msg_read_value(bus_msg, 's')
 
             if cb.filter and name not in cb.filter:
                 continue
