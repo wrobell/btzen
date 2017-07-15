@@ -28,6 +28,7 @@ from cpython.bytes cimport PyBytes_FromStringAndSize
 
 import asyncio
 import logging
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,12 @@ cdef class Bus:
     @property
     def fileno(self):
         return self._fd_no
+
+cdef class BusMessage:
+    """
+    Python level wrapper around SD bus message structure.
+    """
+    cdef sd_bus_message *c_obj
 
 class PropertyChange:
     def __init__(self, *args):
@@ -164,52 +171,54 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
     cdef char msg_type
     cdef const void *buff
     cdef size_t buff_size
+    cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
+
+    bus_msg.c_obj = msg
 
     r = sd_bus_message_skip(msg, 's')
-    r = sd_bus_message_enter_container(msg, 'a', '{sv}')
-    while sd_bus_message_enter_container(msg, 'e', 'sv') > 0:
-        r = sd_bus_message_read_basic(msg, 's', &name)
+    assert r == 1
 
-        r = sd_bus_message_peek_type(msg, &msg_type, &contents)
-        assert chr(msg_type) == 'v', (name, msg_type, contents)
+    with msg_container(bus_msg, 'a', '{sv}'):
+        while sd_bus_message_enter_container(msg, 'e', 'sv') > 0:
+            r = sd_bus_message_read_basic(msg, 's', &name)
 
-        if cb.filter and name not in cb.filter:
-            continue
+            r = sd_bus_message_peek_type(msg, &msg_type, &contents)
+            assert chr(msg_type) == 'v', (name, msg_type, contents)
 
-        r = sd_bus_message_peek_type(msg, &msg_type, &contents)
-        assert r >= 0 and msg_type == 118  # 'v'
-        r = sd_bus_message_enter_container(msg, 'v', contents)
-        assert r >= 0
+            if cb.filter and name not in cb.filter:
+                continue
 
-        if <bytes>contents == b'b':
-            r = sd_bus_message_read_basic(msg, 'b', &value)
-            assert r >= 0
-            r_value = value == 1
-
-        elif <bytes>contents == b'n':
-            r = sd_bus_message_read_basic(msg, 'n', &value_short)
-            assert r >= 0
-            r_value = value_short
-
-        elif <bytes>contents == b'ay':
-            r = sd_bus_message_read_array(msg, 'y', &buff, &buff_size)
+            r = sd_bus_message_peek_type(msg, &msg_type, &contents)
+            assert r >= 0 and msg_type == 118  # 'v'
+            r = sd_bus_message_enter_container(msg, 'v', contents)
             assert r >= 0
 
-            r_value = PyBytes_FromStringAndSize(<char*>buff, buff_size)
-            logger.debug('array value of size {}'.format(buff_size))
-        else:
-            # FIXME: add support for other types
-            assert False, 'unsupported type {}'.format(contents)
+            if <bytes>contents == b'b':
+                r = sd_bus_message_read_basic(msg, 'b', &value)
+                assert r >= 0
+                r_value = value == 1
 
-        cb.put(name, r_value)
+            elif <bytes>contents == b'n':
+                r = sd_bus_message_read_basic(msg, 'n', &value_short)
+                assert r >= 0
+                r_value = value_short
 
-        r = sd_bus_message_exit_container(msg)  # variant
-        assert r >= 0
-        r = sd_bus_message_exit_container(msg)  # dict entry
-        assert r >= 0
+            elif <bytes>contents == b'ay':
+                r = sd_bus_message_read_array(msg, 'y', &buff, &buff_size)
+                assert r >= 0
 
-    r = sd_bus_message_exit_container(msg)  # array entry
-    assert r >= 0
+                r_value = PyBytes_FromStringAndSize(<char*>buff, buff_size)
+                logger.debug('array value of size {}'.format(buff_size))
+            else:
+                # FIXME: add support for other types
+                assert False, 'unsupported type {}'.format(contents)
+
+            cb.put(name, r_value)
+
+            r = sd_bus_message_exit_container(msg)  # variant
+            assert r >= 0
+            r = sd_bus_message_exit_container(msg)  # dict entry
+            assert r >= 0
 
     return 1
 
@@ -417,5 +426,16 @@ def bt_characteristic(Bus bus, str path):
     sd_bus_message_unref(msg)
     sd_bus_error_free(&error)
     return data
+
+@contextmanager
+def msg_container(BusMessage msg, str type, str contents):
+    """
+    Parse SD bus message container entry.
+    """
+    r = sd_bus_message_enter_container(msg.c_obj, ord(type), contents.encode())
+    assert r == 1
+    yield
+    r = sd_bus_message_exit_container(msg.c_obj)
+    assert r == 1
 
 # vim: sw=4:et:ai
