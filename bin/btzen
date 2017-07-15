@@ -53,12 +53,18 @@ async def read_button(reader):
         t2 = loop.time()
         print('button: {} ({:.4f}s)'.format(value, t2 - t1))
 
-
-logging.basicConfig(level=logging.DEBUG)
-
 parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--verbose', default=False, action='store_true',
+    help='show debug log'
+)
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
+
+if args.verbose:
+    logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(level=logging.INFO)
 
 print('connecting to {}...'.format(args.device))
 

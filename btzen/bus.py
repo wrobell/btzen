@@ -77,14 +77,14 @@ class Bus:
         async with lock:
             connected = get_property('Connected')
             if not connected:
-                logger.debug('connecting to {}'.format(mac))
+                logger.info('connecting to {}'.format(mac))
                 task = asyncio.get_event_loop().create_future()
                 _btzen.bt_connect(bus, path, task)
                 await task
 
             resolved = get_property('ServicesResolved')
             if not resolved:
-                logger.debug('waiting for service resolution of {}'.format(mac))
+                logger.info('waiting for service resolution of {}'.format(mac))
 
                 cb = _btzen.PropertyChange('ServicesResolved')
                 _btzen.bt_wait_for(bus, path, INTERFACE_DEVICE, cb)
@@ -100,7 +100,7 @@ class Bus:
                         raise ConnectionError('Cannot resolve services of {}'.format(mac))
 
         name = self._get_name(mac)
-        logger.debug('connected to {}'.format(name))
+        logger.info('connected to {}'.format(name))
         return name
 
     def sensor_path(self, mac, uuid):
