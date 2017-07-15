@@ -224,7 +224,7 @@ arg0='{}'""".format(path, iface)
 def bt_property_str(Bus bus, str path, str iface, str name):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
-    cdef char *value
+    cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
     r = sd_bus_get_property(
         bus.bus,
@@ -241,10 +241,8 @@ def bt_property_str(Bus bus, str path, str iface, str name):
 #        fprintf(stderr, "Failed to read Name property: %s\n", error.message);
 #        goto finish;
 #    }
-    r = sd_bus_message_read(msg, 's', &value)
-    assert r > 0
-    #if (r < 0)
-    #    fprintf(stderr, "Failed to get Name property data\n");
+    bus_msg.c_obj = msg
+    value = msg_read_value(bus_msg, 's')
     sd_bus_message_unref(msg)
     sd_bus_error_free(&error)
 
@@ -341,8 +339,6 @@ def bt_characteristic(Bus bus, str path):
     """
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
-    cdef char *chr_path
-    cdef char *iface
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
     r = sd_bus_call_method(
@@ -366,17 +362,15 @@ def bt_characteristic(Bus bus, str path):
 
     for _ in msg_container(bus_msg, 'a', '{oa{sa{sv}}}'):
         for _ in msg_container(bus_msg, 'e', 'oa{sa{sv}}'):
-            r = sd_bus_message_read(msg, 'o', &chr_path)
-            assert r > 0
-
+            chr_path = msg_read_value(bus_msg, 'o')
             for _ in msg_container(bus_msg, 'a', '{sa{sv}}'):
                 for _ in msg_container(bus_msg, 'e', 'sa{sv}'):
-                    r = sd_bus_message_read(msg, "s", &iface);
-                    assert r > 0
+                    iface = msg_read_value(bus_msg, 's')
+
                     r = sd_bus_message_skip(msg, "a{sv}")
                     assert r > 0
 
-                    if <bytes>iface == b'org.bluez.GattCharacteristic1':
+                    if iface == 'org.bluez.GattCharacteristic1':
                         uuid = bt_property_str(bus, chr_path, 'org.bluez.GattCharacteristic1', 'UUID')
                         data[uuid] = chr_path
 #finish:
@@ -399,10 +393,12 @@ def msg_container(BusMessage bus_msg, str type, str contents):
 def msg_read_value(BusMessage bus_msg, str type):
     cdef sd_bus_message *msg = bus_msg.c_obj
 
+    cdef bytes value_str
     cdef int value
     cdef signed short value_short
     cdef const void *buff
     cdef size_t buff_size
+    cdef char *buff_str
 
     msg_type = type.encode()
 
@@ -421,7 +417,12 @@ def msg_read_value(BusMessage bus_msg, str type):
         assert r >= 0
 
         r_value = PyBytes_FromStringAndSize(<char*>buff, buff_size)
-        logger.debug('array value of size {}'.format(buff_size))
+        logger.debug('array value of size: {}'.format(buff_size))
+    elif msg_type == b's' or msg_type == b'o':
+        r = sd_bus_message_read(msg, msg_type, &buff_str)
+        assert r >= 0
+        r_value = <str>buff_str
+        logger.debug('string value: {} of size {}'.format(r_value, len(r_value)))
     else:
         # FIXME: add support for other types
         assert False, 'unsupported type {}'.format(type)
