@@ -54,6 +54,7 @@ class Serial:
     # TODO: use btzen.bus
     async def connect(self):
         bus = self._bus = cbtzen.default_bus()
+        dev_iface = 'org.bluez.Device1'
 
         logger.debug('connecting to {}'.format(self._mac))
         path = '/org/bluez/hci0/dev_{}'.format(_mac(self._mac))
@@ -63,10 +64,12 @@ class Serial:
 
         logger.debug('resolving services of {}'.format(self._mac))
         cb = cbtzen.PropertyChange('ServicesResolved')
-        cbtzen.bt_wait_for(bus, path, 'org.bluez.Device1', cb)
+        cbtzen.bt_wait_for(bus, path, dev_iface, cb)
         await cb.get()
+        logger.debug('services resolved')
 
-        logger.debug('connected to {}'.format(self._mac))
+        name = cbtzen.bt_property_str(bus, path, dev_iface, 'Name')
+        logger.debug('connected to {}'.format(name))
         by_uuid = cbtzen.bt_characteristic(bus, path)
 
         self._tx_credit = self._add_notification(by_uuid[self.UUID_TX_CREDIT])
