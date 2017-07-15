@@ -164,12 +164,8 @@ def bt_connect(Bus bus, str path, task):
 cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object cb = <object>user_data
     cdef char *name
-    cdef int value
-    cdef signed short value_short
     cdef const char *contents
     cdef char msg_type
-    cdef const void *buff
-    cdef size_t buff_size
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
     bus_msg.c_obj = msg
@@ -188,27 +184,8 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
                 continue
 
             for _ in msg_container(bus_msg, 'v', contents):
-                if <bytes>contents == b'b':
-                    r = sd_bus_message_read_basic(msg, 'b', &value)
-                    assert r >= 0
-                    r_value = value == 1
-
-                elif <bytes>contents == b'n':
-                    r = sd_bus_message_read_basic(msg, 'n', &value_short)
-                    assert r >= 0
-                    r_value = value_short
-
-                elif <bytes>contents == b'ay':
-                    r = sd_bus_message_read_array(msg, 'y', &buff, &buff_size)
-                    assert r >= 0
-
-                    r_value = PyBytes_FromStringAndSize(<char*>buff, buff_size)
-                    logger.debug('array value of size {}'.format(buff_size))
-                else:
-                    # FIXME: add support for other types
-                    assert False, 'unsupported type {}'.format(contents)
-
-                cb.put(name, r_value)
+                value = msg_read_value(bus_msg, contents)
+                cb.put(name, value)
     return 1
 
 def bt_wait_for(Bus bus, str path, str iface, object data):
@@ -418,5 +395,37 @@ def msg_container(BusMessage bus_msg, str type, str contents):
         yield
         r = sd_bus_message_exit_container(msg)
         assert r == 1
+
+def msg_read_value(BusMessage bus_msg, str type):
+    cdef sd_bus_message *msg = bus_msg.c_obj
+
+    cdef int value
+    cdef signed short value_short
+    cdef const void *buff
+    cdef size_t buff_size
+
+    msg_type = type.encode()
+
+    if msg_type == b'b':
+        r = sd_bus_message_read_basic(msg, 'b', &value)
+        assert r >= 0
+        r_value = value == 1
+
+    elif msg_type == b'n':
+        r = sd_bus_message_read_basic(msg, 'n', &value_short)
+        assert r >= 0
+        r_value = value_short
+
+    elif msg_type == b'ay':
+        r = sd_bus_message_read_array(msg, 'y', &buff, &buff_size)
+        assert r >= 0
+
+        r_value = PyBytes_FromStringAndSize(<char*>buff, buff_size)
+        logger.debug('array value of size {}'.format(buff_size))
+    else:
+        # FIXME: add support for other types
+        assert False, 'unsupported type {}'.format(type)
+
+    return r_value
 
 # vim: sw=4:et:ai
