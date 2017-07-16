@@ -332,7 +332,7 @@ def bt_write(Bus bus, str path, bytes data):
     sd_bus_message_unref(reply)
     return r
 
-def bt_characteristic_notify(Bus bus, str path, object data):
+def bt_notify(Bus bus, str path, object task):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 
@@ -350,9 +350,9 @@ def bt_characteristic_notify(Bus bus, str path, object data):
         NULL
     )
     assert r >= 0, (path, iface)
-    bt_wait_for(bus, path, iface, data)
+    bt_wait_for(bus, path, iface, task)
 
-def bt_characteristic_notify_stop(Bus bus, str path):
+def bt_notify_stop(Bus bus, str path):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 

@@ -92,7 +92,7 @@ class Serial:
 
     def _add_notification(self, path):
         cb = cbtzen.ValueChange()
-        cbtzen.bt_characteristic_notify(self._system_bus, path, cb)
+        cbtzen.bt_notify(self._system_bus, path, cb)
         return cb
 
     @contextmanager

@@ -225,7 +225,7 @@ class Sensor:
         if self._notifying:
             config_on = self._params.config_on_notify
             self._notification = _btzen.ValueChange()
-            _btzen.bt_characteristic_notify(bus, self._params.path_data, self._notification)
+            _btzen.bt_notify(bus, self._params.path_data, self._notification)
         else:
             config_on = self._params.config_on
 
