@@ -87,12 +87,6 @@ cdef class Bus:
     def fileno(self):
         return self._fd_no
 
-cdef class BusMessage:
-    """
-    Python level wrapper around SD bus message structure.
-    """
-    cdef sd_bus_message *c_obj
-
 class PropertyChange:
     def __init__(self, *args):
         self._queue = asyncio.Queue()
@@ -433,6 +427,15 @@ def bt_characteristic(Bus bus, str path):
     sd_bus_error_free(&error)
     return data
 
+#
+# sd-bus message parsing
+#
+cdef class BusMessage:
+    """
+    Python level wrapper around SD bus message structure.
+    """
+    cdef sd_bus_message *c_obj
+
 def msg_container(BusMessage bus_msg, str type, str contents):
     """
     Parse SD bus message container entry.
@@ -446,6 +449,16 @@ def msg_container(BusMessage bus_msg, str type, str contents):
         assert r == 1
 
 def msg_read_value(BusMessage bus_msg, str type):
+    """
+    Read a value from a sd-bus message of given type.
+
+    Supported values
+
+    - boolean
+    - signed short int
+    - string
+    - byte array
+    """
     cdef sd_bus_message *msg = bus_msg.c_obj
 
     cdef bytes value_str
