@@ -58,20 +58,10 @@ class Sensor:
         self._notifying = notifying
         self._loop = loop if loop else asyncio.get_event_loop()
         self._future = None
-        self._error = None
-
-        if self._notifying:
-            self._buffer = deque([], maxlen=BUFFER_LEN)
-        else:
-            self._buffer = None
+        self._notification = None
 
         self._params = None
-        self._data = bytearray(self.DATA_LEN)
-        self._device_ref = None
-        self._device = None
         self._system_bus = None
-
-        self._notification = None
 
     async def connect(self):
         """
@@ -149,57 +139,6 @@ class Sensor:
         self._system_bus = None
 
         logger.info('{} sensor closed'.format(self._mac))
-
-    def _process_event(self):
-        """
-        Set sensor data as result of current asynchronous call.
-
-        .. seealso:: :py:meth:`Sensor.read_async`
-        """
-        buffer = self._buffer
-        future = self._future
-        awaited  = future and not future.done()
-
-        r = lib.bt_device_async_error_no()
-        if r < 0:
-            ex = DataReadError('Sensor data read error: {}'.format(r))
-            if awaited:
-                future.set_exception(ex)
-            elif self._notifying:
-                self._error = ex
-            else:
-                raise ex
-            return
-
-        value = self._converter(self._data)
-
-        if self._notifying:
-            # if buffer is non-empty, process data through buffer
-            if awaited and buffer:
-                # pop item first, so we do not add value to already full
-                # buffer
-                item = buffer.popleft()
-                buffer.append(value)
-                future.set_result(item)
-            elif awaited and not buffer:
-                # no data in buffer, so put value as result of awaited
-                # future immediately
-                future.set_result(value)
-            elif len(buffer) == BUFFER_LEN:
-                assert not awaited
-                self._error = DataReadError('Data buffer full')
-            else:
-                assert not awaited
-                buffer.append(value)
-        elif awaited:
-            future.set_result(value)
-        else:
-            assert not awaited and not self._notifying
-            # for non-notifying sensors _process_event method should be
-            # called only after lib.bt_device_read_async is executed; if
-            # current future is not ready, then it looks like internal
-            # programming error and we can only raise an exception
-            raise DataReadError('Sensor coroutine not awaited')
 
     def _set_parameters(self, name):
         get_path = partial(BUS.sensor_path, self._mac)
