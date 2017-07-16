@@ -74,7 +74,7 @@ async def read_data(mac):
         # also filter unused headers
         items = (bytes(v) for v in items if v[-1] != 0xff)
         items = (parse_header(v) for v in items)
-        items = itz.tail(5, items)
+        items = itz.tail(20, items)
         items = reversed(items)
 
         for k, header in enumerate(items, 1):
