@@ -67,10 +67,9 @@ class Bus:
         """
         bus = self.get_bus()
         path = self._get_device_path(mac)
-        lock = self._lock.get(mac)
-
         get_property = partial(_btzen.bt_property_bool, bus, path, INTERFACE_DEVICE)
 
+        lock = self._lock.get(mac)
         if lock is None:
             self._lock[mac] = lock = asyncio.Lock()
 
