@@ -118,11 +118,9 @@ class Sensor:
         if self._notifying:
             task = self._notification.get()
         else:
-            r = lib.bt_device_read_async(self._system_bus, self._device)
-            if r < 0:
-                raise DataReadError('Sensor data read error: {}'.format(r))
-
-        return (await task)
+            task = self._loop.create_future()
+            _btzen.bt_read(self._system_bus, self._params.path_data, task)
+        return self._converter(await task)
 
     def close(self):
         """

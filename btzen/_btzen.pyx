@@ -135,7 +135,7 @@ def default_bus():
 
     return bus
 
-cdef int task_callback(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+cdef int task_cb_connect(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object task = <object>user_data
     cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
 
@@ -153,7 +153,7 @@ def bt_connect(Bus bus, str path, task):
         path.encode(),
         'org.bluez.Device1',
         'Connect',
-        task_callback,
+        task_cb_connect,
         <void*>task,
         NULL,
         NULL
@@ -161,7 +161,36 @@ def bt_connect(Bus bus, str path, task):
     if r < 0:
         raise FatalError('Failed to issue connection call for {}'.format(path))
 
-cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+    cdef object task = <object>user_data
+    cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
+    cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
+
+    if error and error.message:
+        task.set_exception(BtRuntimeError(error.message))
+    else:
+        bus_msg.c_obj = msg
+        value = msg_read_value(bus_msg, 'y')
+        task.set_result(value)
+    return 1
+
+def bt_read(Bus bus, str path, task):
+    r = sd_bus_call_method_async(
+        bus.bus,
+        NULL,
+        'org.bluez',
+        path.encode(),
+        'org.bluez.GattCharacteristic1',
+        'ReadValue',
+        task_cb_read,
+        <void*>task,
+        'a{sv}',
+        NULL
+    )
+    if r < 0:
+        raise FatalError('Failed to issue read call for {}'.format(path))
+
+cdef int task_cb_wait_for(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object cb = <object>user_data
     cdef const char *contents
     cdef char msg_type
@@ -187,7 +216,7 @@ cdef int bt_wait_for_callback(sd_bus_message *msg, void *user_data, sd_bus_error
                 cb.put(name, value)
     return 1
 
-def bt_wait_for(Bus bus, str path, str iface, object data):
+def bt_wait_for(Bus bus, str path, str iface, object task):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 
@@ -197,7 +226,7 @@ sender='org.bluez',\
 interface='org.freedesktop.DBus.Properties',\
 member='PropertiesChanged',\
 path='{}',\
-arg0='{}'""".format(path, iface)
+arg0='{}'""".format(path, iface).encode()
 
 #   r = sd_bus_call_method(
 #       bus.bus,
@@ -215,7 +244,7 @@ arg0='{}'""".format(path, iface)
 #        fprintf(stderr, "Failed to issue StartNotify call: %s\n", error.message);
 #        goto finish;
 #    }
-    r = sd_bus_add_match(bus.bus, NULL, rule.encode(), bt_wait_for_callback, <void*>data)
+    r = sd_bus_add_match(bus.bus, NULL, rule, task_cb_wait_for, <void*>task)
 #    if (r < 0)
 #        fprintf(stderr, "Failed to add match rule: %s\n", strerror(-r));
 #
@@ -438,7 +467,7 @@ def msg_read_value(BusMessage bus_msg, str type):
         assert r >= 0
         r_value = value_short
 
-    elif msg_type == b'ay':
+    elif msg_type == b'ay' or msg_type == b'y':
         r = sd_bus_message_read_array(msg, 'y', &buff, &buff_size)
         assert r >= 0
 

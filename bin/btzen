@@ -72,15 +72,13 @@ names = ['pressure', 'temperature', 'humidity', 'light']
 classes = [
     btzen.Pressure, btzen.Temperature, btzen.Humidity, btzen.Light,
 ]
-readers = {}
-#readers = ((n, c(args.device)) for c, n in zip(classes, names))
-#readers = {n: r for n, r in readers if r is not None}
+readers = ((n, c(args.device)) for c, n in zip(classes, names))
+readers = {n: r for n, r in readers if r is not None}
 print('sensors initialized')
 
 loop = asyncio.get_event_loop()
-#sensors = sorted([(n, r) for n, r in readers.items() if r])
-tasks = []
-#tasks = [read_sensor(n, r) for n, r in sensors]
+sensors = sorted([(n, r) for n, r in readers.items() if r])
+tasks = [read_sensor(n, r) for n, r in sensors]
 
 reader = readers['accelerometer'] = btzen.Accelerometer(args.device, notifying=True)
 tasks.append(read_accelerometer(reader))
