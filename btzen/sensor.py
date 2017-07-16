@@ -51,13 +51,14 @@ Parameters = namedtuple('Parameters', [
 
 class Sensor:
     """
+    :var _task: Current asynchronous task.
     :var _system_bus: System D-Bus reference (not thread safe).
     """
     def __init__(self, mac, notifying=False, loop=None):
         self._mac = mac
         self._notifying = notifying
         self._loop = loop if loop else asyncio.get_event_loop()
-        self._future = None
+        self._task = None
         self._notification = None
 
         self._params = None
@@ -95,11 +96,14 @@ class Sensor:
         This method is an asynchronous coroutine and is *not* thread safe.
         """
         if self._notifying:
-            task = self._notification.get()
+            task = self._loop.create_task(self._notification.get())
         else:
             task = self._loop.create_future()
             _btzen.bt_read(self._system_bus, self._params.path_data, task)
-        return self._converter(await task)
+        self._task = task
+        value = self._converter(await task)
+        self._task = None
+        return value
 
     def close(self):
         """
@@ -107,27 +111,32 @@ class Sensor:
 
         Pending, asynchronous coroutines are cancelled.
         """
-        if self._notifying and self._device:
-            # ignore any errors when closing sensor
-            lib.bt_device_stop_notify(Sensor.BUS.get_bus(), self._device)
+        # ignore any errors when closing sensor
+        try:
+            bus = self._system_bus
+            params = self._params
+            if not params:
+                return
 
-        # disable switched on sensor; some sensors stay always on,
-        # i.e. button
-        if self._params and self._params.config_off and self._device:
-            r = lib.bt_device_write(
-                Sensor.BUS.get_bus(),
-                self._device.chr_conf,
-                self._params.config_off,
-                len(self._params.config_off)
-            )
-        future = self._future
-        if future and not future.done():
-            ex = asyncio.CancelledError('Sensor coroutine closed')
-            future.set_exception(ex)
+            if self._notifying:
+                _btzen.bt_notify_stop(bus, params.path_data)
 
-        self._system_bus = None
+            # disable switched on sensor; some sensors stay always on,
+            # i.e. button
+            if params.config_off:
+                _btzen.bt_write(bus, params.path_conf, params.config_off)
 
-        logger.info('{} sensor closed'.format(self._mac))
+            task = self._task
+            if task and not task.done():
+                ex = asyncio.CancelledError('Sensor coroutine closed')
+                task.set_exception(ex)
+
+        except Exception as ex:
+            logger.warn('error when closing sensor: {}'.format(ex))
+        finally:
+            self._task = None
+            self._system_bus = None
+            logger.info('{} sensor closed'.format(self._mac))
 
     def _set_parameters(self, name):
         get_path = partial(BUS.sensor_path, self._mac)
@@ -150,17 +159,18 @@ class Sensor:
 
     def _enable(self):
         bus = self._system_bus
+        params = self._params
         if self._notifying:
-            config_on = self._params.config_on_notify
+            config_on = params.config_on_notify
             self._notification = _btzen.ValueChange()
-            _btzen.bt_notify(bus, self._params.path_data, self._notification)
+            _btzen.bt_notify(bus, params.path_data, self._notification)
         else:
-            config_on = self._params.config_on
+            config_on = params.config_on
 
         # enabled switched off sensor; some sensors are always on,
         # i.e. button
         if config_on:
-            _btzen.bt_write( bus, self._params.path_conf, config_on)
+            _btzen.bt_write(bus, params.path_conf, config_on)
 
 
 class Temperature(Sensor):
@@ -215,7 +225,7 @@ class Accelerometer(Sensor):
     WAKE_ON_MOTION = 0x80
     CONFIG_ON = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z)
     CONFIG_ON_NOTIFY = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z | WAKE_ON_MOTION)
-    CONFIG_OFF = '\x00\x00'
+    CONFIG_OFF = b'\x00\x00'
 
 
 class Button(Sensor):
