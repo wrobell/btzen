@@ -22,6 +22,11 @@ class Error(Exception):
     Base, abstract BTZen exception.
     """
 
+class CallError(Error):
+    """
+    Error when starting an asynchronous call is not possible.
+    """
+
 class ConnectionError(Error):
     """
     Connection error.

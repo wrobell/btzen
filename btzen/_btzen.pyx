@@ -29,6 +29,8 @@ from cpython.bytes cimport PyBytes_FromStringAndSize
 import asyncio
 import logging
 
+from .error import *
+
 logger = logging.getLogger(__name__)
 
 cdef extern from "<systemd/sd-bus.h>":
@@ -109,17 +111,15 @@ class ValueChange:
     async def get(self):
         return (await self._queue.get())
 
-class BtError(Exception):
-    pass
-
-class FatalError(BtError):
-    pass
-
-class BtRuntimeError(BtError):
-    pass
-
-class ConnectionError(BtRuntimeError):
-    pass
+def check_call(msg_err, code):
+    """
+    Raise call error if a D-Bus call has failed.
+    """
+    if code < 0:
+        msg_err = 'Call failed - {}: {} ({})'.format(
+            msg_err, strerror(-code), code
+        )
+        raise CallError(msg_err)
 
 def default_bus():
     cdef Bus bus = Bus.__new__(Bus)
@@ -152,8 +152,7 @@ def bt_connect(Bus bus, str path, task):
         NULL,
         NULL
     )
-    if r < 0:
-        raise FatalError('Failed to issue connection call for {}'.format(path))
+    check_call('connect to {}'.format(path), r)
 
 cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object task = <object>user_data
@@ -161,7 +160,7 @@ cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_er
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
     if error and error.message:
-        task.set_exception(BtRuntimeError(error.message))
+        task.set_exception(DataReadError(error.message))
     else:
         bus_msg.c_obj = msg
         value = msg_read_value(bus_msg, 'y')
@@ -181,8 +180,7 @@ def bt_read(Bus bus, str path, task):
         'a{sv}',
         NULL
     )
-    if r < 0:
-        raise FatalError('Failed to issue read call for {}'.format(path))
+    check_call('read data from {}'.format(path), r)
 
 cdef int task_cb_wait_for(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object cb = <object>user_data
@@ -211,9 +209,6 @@ cdef int task_cb_wait_for(sd_bus_message *msg, void *user_data, sd_bus_error *re
     return 1
 
 def bt_wait_for(Bus bus, str path, str iface, object task):
-    cdef sd_bus_message *msg = NULL
-    cdef sd_bus_error error = SD_BUS_ERROR_NULL
-
     rule = """\
 type='signal',\
 sender='org.bluez',\
@@ -222,26 +217,8 @@ member='PropertiesChanged',\
 path='{}',\
 arg0='{}'""".format(path, iface).encode()
 
-#   r = sd_bus_call_method(
-#       bus.bus,
-#       'org.bluez',
-#       path.encode(),
-#       iface.encode(),
-#       'StartNotify',
-#       &error,
-#       &msg,
-#       NULL,
-#       NULL
-#   )
-#   print('match start', r)
-#    if (r < 0) {
-#        fprintf(stderr, "Failed to issue StartNotify call: %s\n", error.message);
-#        goto finish;
-#    }
     r = sd_bus_add_match(bus.bus, NULL, rule, task_cb_wait_for, <void*>task)
-#    if (r < 0)
-#        fprintf(stderr, "Failed to add match rule: %s\n", strerror(-r));
-#
+    check_call('bus match rule', r)
 
 def bt_property_str(Bus bus, str path, str iface, str name):
     cdef sd_bus_message *msg = NULL
@@ -349,30 +326,29 @@ def bt_notify(Bus bus, str path, object task):
         NULL,
         NULL
     )
-    assert r >= 0, (path, iface)
+    check_call('start notification', r)
     bt_wait_for(bus, path, iface, task)
 
 def bt_notify_stop(Bus bus, str path):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 
-    r = sd_bus_call_method(
-        bus.bus,
-        'org.bluez',
-        path.encode(),
-        'org.bluez.GattCharacteristic1',
-        'StopNotify',
-        &error,
-        &msg,
-        NULL,
-        NULL
-    )
-    assert r >= 0
-#    if (r < 0)
-#        fprintf(stderr, "Failed to issue StopNotify call: %s\n", error.message);
-
-    sd_bus_error_free(&error)
-    sd_bus_message_unref(msg)
+    try:
+        r = sd_bus_call_method(
+            bus.bus,
+            'org.bluez',
+            path.encode(),
+            'org.bluez.GattCharacteristic1',
+            'StopNotify',
+            &error,
+            &msg,
+            NULL,
+            NULL
+        )
+        check_call('stop notification', r)
+    finally:
+        sd_bus_error_free(&error)
+        sd_bus_message_unref(msg)
 
 def bt_process(Bus bus):
     cdef sd_bus_message *msg
