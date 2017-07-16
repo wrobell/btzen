@@ -29,7 +29,7 @@ async def read_sensor(name, reader):
     await reader.connect()
     while True:
         t1 = loop.time()
-        value = await reader.read_async()
+        value = await reader.read()
         value = '{:.1f}'.format(value)
         t2 = loop.time()
         print('{}: {} ({:.4f}s)'.format(name, value, t2 - t1))
@@ -40,7 +40,7 @@ async def read_accelerometer(reader):
     reader.set_interval(0.1)
     while True:
         t1 = loop.time()
-        values = await reader.read_async()
+        values = await reader.read()
         values = ', '.join('{:.4f}'.format(v) for v in values)
         t2 = loop.time()
         print('accelerometer: {} ({:.4f}s)'.format(values, t2 - t1))
@@ -49,7 +49,7 @@ async def read_button(reader):
     await reader.connect()
     while True:
         t1 = loop.time()
-        value = await reader.read_async()
+        value = await reader.read()
         t2 = loop.time()
         print('button: {} ({:.4f}s)'.format(value, t2 - t1))
 

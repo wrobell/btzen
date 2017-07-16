@@ -88,22 +88,11 @@ class Sensor:
                 msg = 'Cannot set sensor interval value: {}'.format(r)
                 raise ConfigurationError(msg)
 
-    def read(self):
+    async def read(self):
         """
         Read and return sensor data.
 
-        Method is thread safe.
-        """
-        r = lib.bt_device_read(Sensor.BUS.get_bus(), self._device, ffi.from_buffer(self._data))
-        if r < 0:
-            raise DataReadError('Sensor data read error: {}'.format(r))
-        return self._converter(self._data)
-
-    async def read_async(self):
-        """
-        Read and return sensor data.
-
-        This method is a coroutine and is *not* thread safe.
+        This method is an asynchronous coroutine and is *not* thread safe.
         """
         if self._notifying:
             task = self._notification.get()
