@@ -31,7 +31,7 @@ import math
 import logging
 from functools import partial
 
-import btzen._btzen as cbtzen
+from btzen import _btzen
 from .bus import BUS
 from .util import contextmanager
 
@@ -92,8 +92,8 @@ class Serial:
         await self._write(self._rx_uart_path, data)
 
     def _add_notification(self, path):
-        cb = cbtzen.ValueChange()
-        cbtzen.bt_notify(self._system_bus, path, cb)
+        cb = _btzen.ValueChange()
+        _btzen.bt_notify(self._system_bus, path, cb)
         return cb
 
     @contextmanager
@@ -112,7 +112,7 @@ class Serial:
 
     async def _write(self, path, data):
         task = self._loop.create_future()
-        cbtzen.bt_write(self._system_bus, path, data, task)
+        _btzen.bt_write(self._system_bus, path, data, task)
         await task
 
 # vim: sw=4:et:ai
