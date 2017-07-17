@@ -49,20 +49,31 @@ def parse_header(item):
     values = (p(v) for p, v in values)
     return DiveHeader._make(values)
 
-async def read_data(mac):
-    dev = Serial(mac)
-    await dev.connect()
-
+async def start(dev):
     await dev.write(b'\xbb')
     value = await dev.read(2)
     assert value == b'\xbb\x4d'
 
+async def stop(dev):
+    await dev.write(b'\xff')
+    logger.debug('closing ostc connection')
+
+async def display(dev, msg):
+    msg = '{:16.16}'.format(msg).encode()
+
     await dev.write(b'\x6e')
     value = await dev.read(1)
     assert value == b'\x6e'
-    await dev.write(b'BTZen Connected ')
+    await dev.write(msg)
     value = await dev.read(1)
     assert value == b'\x4d'
+
+async def read_data(mac):
+    dev = Serial(mac)
+    await dev.connect()
+
+    await start(dev)
+    await display(dev, 'BTZen Connected')
 
     try:
         await dev.write(b'\x6d')
@@ -82,8 +93,7 @@ async def read_data(mac):
             fmt = '{:3d}: {:%Y-%m-%d %H:%M} {:5.1f}m {:5.1f}\''.format
             print(fmt(k, header.datetime, header.depth, header.duration))
     finally:
-        await dev.write(b'\xff')
-        logger.debug('closing ostc connection')
+        await stop(dev)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
