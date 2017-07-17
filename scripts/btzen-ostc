@@ -52,19 +52,19 @@ async def read_data(mac):
     dev = Serial(mac)
     await dev.connect()
 
-    dev.write(b'\xbb')
+    await dev.write(b'\xbb')
     value = await dev.read(2)
     assert value == b'\xbb\x4d'
 
-    dev.write(b'\x6e')
+    await dev.write(b'\x6e')
     value = await dev.read(1)
     assert value == b'\x6e'
-    dev.write(b'BTZen Connected ')
+    await dev.write(b'BTZen Connected ')
     value = await dev.read(1)
     assert value == b'\x4d'
 
     try:
-        dev.write(b'\x6d')
+        await dev.write(b'\x6d')
         headers = await dev.read(4098)
         headers = headers[1:-1]
 
@@ -81,7 +81,7 @@ async def read_data(mac):
             fmt = '{:3d}: {} {:.1f}m {:x}'.format
             print(fmt(k, header.datetime, header.depth, header.version))
     finally:
-        dev.write(b'\xff')
+        await dev.write(b'\xff')
         logger.debug('closing ostc connection')
 
 parser = argparse.ArgumentParser()

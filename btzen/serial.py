@@ -29,11 +29,11 @@ Tested with HeinrichsWeikamp OSTC 2 dive computer.
 import asyncio
 import math
 import logging
-from contextlib import contextmanager
 from functools import partial
 
 import btzen._btzen as cbtzen
 from .bus import BUS
+from .util import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ class Serial:
     def __init__(self, mac):
         self._mac = mac
         self._system_bus = None
+        self._loop = asyncio.get_event_loop()
 
     async def connect(self):
         bus = self._system_bus = BUS.get_bus()
@@ -66,7 +67,7 @@ class Serial:
         self._rx_uart_path = get_path(self.UUID_RX_UART)
 
         self._rx_credits = 0
-        self._add_rx_credits()
+        await self._add_rx_credits()
 
         logger.debug('requesting tx credits')
         value = await self._tx_credit.get()
@@ -77,18 +78,18 @@ class Serial:
 
         data = bytearray()
         while len(data) < n:
-            with self._rx_credits_mgr(data, n):
+            async with self._rx_credits_mgr(data, n):
                 item = await tx.get()
                 data.extend(item)
 
         assert len(data) == n
         return data
 
-    def write(self, data):
+    async def write(self, data):
         assert len(data) <= 20
         if self._rx_credits < 1:
-            self._add_rx_credits()
-        cbtzen.bt_write(self._system_bus, self._rx_uart_path, data)
+            await self._add_rx_credits()
+        await self._write(self._rx_uart_path, data)
 
     def _add_notification(self, path):
         cb = cbtzen.ValueChange()
@@ -96,17 +97,22 @@ class Serial:
         return cb
 
     @contextmanager
-    def _rx_credits_mgr(self, data, n):
+    async def _rx_credits_mgr(self, data, n):
         if self._rx_credits < 1:
-            self._add_rx_credits(credits_for(data, n))
+            await self._add_rx_credits(credits_for(data, n))
         try:
             yield
         finally:
             self._rx_credits -= 1
 
-    def _add_rx_credits(self, n=0x20):
-        cbtzen.bt_write(self._system_bus, self._rx_credit_path, bytes([n]))
+    async def _add_rx_credits(self, n=0x20):
+        await self._write(self._rx_credit_path, bytes([n]))
         self._rx_credits += n
         logger.debug('rx credits: {}'.format(self._rx_credits))
+
+    async def _write(self, path, data):
+        task = self._loop.create_future()
+        cbtzen.bt_write(self._system_bus, path, data, task)
+        await task
 
 # vim: sw=4:et:ai
