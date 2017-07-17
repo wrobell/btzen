@@ -34,12 +34,17 @@ class ConnectionError(Error):
 
 class ConfigurationError(Error):
     """
-    Sensor configuration error.
+    Device configuration error.
     """
 
 class DataReadError(Error):
     """
-    Sensor data reading error.
+    Device data reading error.
+    """
+
+class DataWriteError(Error):
+    """
+    Device data wrte error.
     """
 
 # vim: sw=4:et:ai

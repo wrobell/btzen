@@ -35,7 +35,7 @@ from functools import partial
 from . import _btzen
 from .import converter
 from .bus import BUS
-from .error import ConfigurationError, DataReadError
+from .error import ConfigurationError, DataReadError, DataWriteError
 from .util import dev_uuid
 
 # default length of buffer for notifying sensors
@@ -76,7 +76,7 @@ class Sensor:
 
         name = await BUS.connect(self._mac)
         self._set_parameters(name)
-        self._enable()
+        await self._enable()
 
     def set_interval(self, interval):
         if self._params.path_period:
@@ -84,8 +84,10 @@ class Sensor:
             assert value < 256
             path = self._params.path_period
             bus = self._system_bus
-            r = _btzen.bt_write(bus, path, bytes([value]))
-            if r < 0:
+            try:
+                self._write_sync(path, bytes([value]))
+            except DataWriteError as ex:
+                logger.exception(ex)
                 msg = 'Cannot set sensor interval value: {}'.format(r)
                 raise ConfigurationError(msg)
 
@@ -124,7 +126,7 @@ class Sensor:
             # disable switched on sensor; some sensors stay always on,
             # i.e. button
             if params.config_off:
-                _btzen.bt_write(bus, params.path_conf, params.config_off)
+                self._write_sync(params.path_conf, params.config_off)
 
             task = self._task
             if task and not task.done():
@@ -157,7 +159,30 @@ class Sensor:
         # TODO: fix for CC2541DK
         self._converter = factory(name, None)
 
-    def _enable(self):
+    async def _write(self, path, data):
+        """
+        Write data to Bluetooth device.
+
+        The method is an asynchronous coroutine.
+
+        :param path: Gatt characteristic path of the device.
+        :param data: Data to write.
+        """
+        task = self._loop.create_future()
+        _btzen.bt_write(self._system_bus, path, data, task)
+        await task
+
+    def _write_sync(self, path, data):
+        """
+        Write data to Bluetooth device.
+
+        :param path: Gatt characteristic path of the device.
+        :param data: Data to write.
+        """
+        task = self._write(path, data)
+        next(asyncio.as_completed([task]))
+
+    async def _enable(self):
         bus = self._system_bus
         params = self._params
         if self._notifying:
@@ -170,7 +195,7 @@ class Sensor:
         # enabled switched off sensor; some sensors are always on,
         # i.e. button
         if config_on:
-            _btzen.bt_write(bus, params.path_conf, config_on)
+            await self._write(params.path_conf, config_on)
 
 
 class Temperature(Sensor):

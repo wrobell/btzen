@@ -60,6 +60,8 @@ cdef extern from "<systemd/sd-bus.h>":
     int sd_bus_message_open_container(sd_bus_message*, char, const char*)
     int sd_bus_message_close_container(sd_bus_message*)
     int sd_bus_call(sd_bus*, sd_bus_message*, long, sd_bus_error*, sd_bus_message**)
+    int sd_bus_call_async(sd_bus*, sd_bus_slot*, sd_bus_message*, sd_bus_message_handler_t, void*, uint64_t)
+
 
     int sd_bus_get_property(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, sd_bus_message**, const char*)
 
@@ -182,6 +184,58 @@ def bt_read(Bus bus, str path, task):
     )
     check_call('read data from {}'.format(path), r)
 
+cdef int task_cb_write(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+    """
+    Data write callback used by `bt_write` function.
+    """
+    cdef object task = <object>user_data
+    cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
+
+    if error and error.message:
+        task.set_exception(DataWriteError(error.message))
+    else:
+        task.set_result(None)
+    return 1
+
+def bt_write(Bus bus, str path, bytes data, task):
+    """
+    Write data to Bluetooth device.
+
+    Use task coroutine to wait for the call to be finished.
+
+    :param bus: D-Bus reference.
+    :param path: Gatt characteristic path of the device.
+    :param data: Data to write.
+    :param task: Asyncio coroutine.
+    """
+    cdef sd_bus_message *msg = NULL
+    cdef char* buff = data
+
+    try:
+        r = sd_bus_message_new_method_call(
+            bus.bus,
+            &msg,
+            'org.bluez',
+            path.encode(),
+            'org.bluez.GattCharacteristic1',
+            'WriteValue'
+        )
+        check_call('write data to {}'.format(path), r)
+
+        r = sd_bus_message_append_array(msg, 'y', buff, len(data))
+        check_call('write data to {}'.format(path), r)
+
+        r = sd_bus_message_open_container(msg, 'a', '{sv}')
+        check_call('write data to {}'.format(path), r)
+
+        r = sd_bus_message_close_container(msg)
+        check_call('write data to {}'.format(path), r)
+
+        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb_write, <void*>task, 0)
+        check_call('write data to {}'.format(path), r)
+    finally:
+        sd_bus_message_unref(msg)
+
 cdef int task_cb_wait_for(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object cb = <object>user_data
     cdef const char *contents
@@ -273,41 +327,6 @@ def bt_property_bool(Bus bus, str path, str iface, str name):
     sd_bus_error_free(&error)
 
     return value
-
-def bt_write(Bus bus, str path, bytes data):
-    cdef sd_bus_message *msg = NULL
-    cdef sd_bus_message *reply = NULL
-    cdef sd_bus_error error = SD_BUS_ERROR_NULL
-    cdef char* buff = data
-
-    r = sd_bus_message_new_method_call(
-        bus.bus,
-        &msg,
-        'org.bluez',
-        path.encode(),
-        'org.bluez.GattCharacteristic1',
-        'WriteValue'
-    )
-    assert r >= 0
-    #if (r < 0) {
-    #    fprintf(stderr, "Failed to create call to WriteValue\n");
-    #    goto finish;
-    #}
-
-    sd_bus_message_append_array(msg, 'y', buff, len(data))
-    sd_bus_message_open_container(msg, 'a', '{sv}')
-    sd_bus_message_close_container(msg)
-
-    r = sd_bus_call(bus.bus, msg, 0, &error, &reply)
-#    if (r < 0) {
-#        fprintf(stderr, "Failed to call WriteValue: %s\n", error.message);
-#        goto finish;
-#    }
-#finish:
-    sd_bus_error_free(&error)
-    sd_bus_message_unref(msg)
-    sd_bus_message_unref(reply)
-    return r
 
 def bt_notify(Bus bus, str path, object task):
     cdef sd_bus_message *msg = NULL
