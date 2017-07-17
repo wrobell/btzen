@@ -29,6 +29,7 @@ Tested with HeinrichsWeikamp OSTC 2 dive computer.
 import asyncio
 import math
 import logging
+from binascii import hexlify
 from functools import partial
 
 from btzen import _btzen
@@ -81,6 +82,8 @@ class Serial:
             async with self._rx_credits_mgr(data, n):
                 item = await tx.get()
                 data.extend(item)
+                if __debug__:
+                    logger.debug('bytes read {}, last {}'.format(len(data), hexlify(data[-5:])))
 
         assert len(data) == n
         return data
