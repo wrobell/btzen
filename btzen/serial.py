@@ -84,6 +84,7 @@ class Serial:
             async with self._rx_credits_mgr(n - len(data)):
                 item = await tx.get()
                 data.extend(item)
+
                 if __debug__:
                     logger.debug(
                         'bytes read {}, last {}, tx credits queue len {}'
