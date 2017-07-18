@@ -440,7 +440,7 @@ def msg_container(BusMessage bus_msg, str type, str contents):
     while sd_bus_message_enter_container(msg, msg_type, contents.encode()) > 0:
         yield
         r = sd_bus_message_exit_container(msg)
-        assert r == 1
+        assert r == 1, r
 
 def msg_read_value(BusMessage bus_msg, str type):
     """
