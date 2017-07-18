@@ -102,16 +102,15 @@ class PropertyChange:
     async def get(self):
         return (await self._queue.get())
 
-class ValueChange:
+    def __len__(self):
+        return self._queue.qsize()
+
+class ValueChange(PropertyChange):
     def __init__(self):
-        self._queue = asyncio.Queue()
-        self.filter = {'Value'}
+        super().__init__('Value')
 
     def put(self, name, value):
         self._queue.put_nowait(value)
-
-    async def get(self):
-        return (await self._queue.get())
 
 def check_call(msg_err, code):
     """
