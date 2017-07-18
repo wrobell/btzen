@@ -106,7 +106,7 @@ async def read_data(mac):
             # header + profile
             size = 256 + header.size - 1
             total += size
-            print('dive {}/{}, read {} bytes'.format(k, count, size))
+            print('dive {}/{}, read {} bytes'.format(k, count - 1, size))
 
             await dev.write(bytes([0x66, k]))
             data = await dev.read(size)
