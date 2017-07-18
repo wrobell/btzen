@@ -27,6 +27,6 @@ device with `bluetoothctl` command to get MAC address of a device)::
 Requirements
 
 - bluez 5.45
-- Python 3.5
+- Python 3.6
 - `sd-bus` (part of `systemd`)
 
