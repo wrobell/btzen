@@ -108,11 +108,16 @@ async def read_data(mac):
             total += size
             print('dive {}/{}, read {} bytes'.format(k, count - 1, size))
 
-            await dev.write(bytes([0x66, k]))
-            data = await dev.read(size)
-            assert data[:3] == b'\x66\xfa\xfa' \
+            # follow ostc protocol stricly, get echo byte first then send
+            # the dive number or occasionally transfer will hang
+            await dev.write(b'\x66')
+            value = await dev.read(1)
+            assert value == b'\x66'
+            await dev.write(bytes([k]))
+            data = await dev.read(size - 1)
+            assert data[:2] == b'\xfa\xfa' \
                 and data[-3:] == b'\xfd\xfd\x4d', \
-                'start={}, end={}'.format(hexlify(data[:3]), hexlify(data[-3:]))
+                'start={}, end={}'.format(hexlify(data[:2]), hexlify(data[-3:]))
 
         await display(dev, 'BTZen: done')
         print('done, {} bytes read, time {:.1f}s'.format(total, time.monotonic() - start_at))
