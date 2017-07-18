@@ -38,8 +38,11 @@ from .util import contextmanager
 
 logger = logging.getLogger(__name__)
 
-def credits_for(data, n):
-    return min(255, math.ceil((n - len(data)) / 20))
+def credits_for(n):
+    """
+    Calculate number of required credits to send `n` number of bytes.
+    """
+    return min(255, math.ceil(n / 20))
 
 class Serial:
     UUID_RX_UART = '00000001-0000-1000-8000-008025000000'
@@ -78,7 +81,7 @@ class Serial:
 
         data = bytearray()
         while len(data) < n:
-            async with self._rx_credits_mgr(data, n):
+            async with self._rx_credits_mgr(n - len(data)):
                 item = await tx.get()
                 data.extend(item)
                 if __debug__:
@@ -109,9 +112,9 @@ class Serial:
         return cb
 
     @contextmanager
-    async def _rx_credits_mgr(self, data, n):
+    async def _rx_credits_mgr(self, n):
         if self._rx_credits < 1:
-            await self._add_rx_credits(credits_for(data, n))
+            await self._add_rx_credits(credits_for(n))
         try:
             yield
         finally:
