@@ -74,29 +74,29 @@ class Bus:
             self._lock[mac] = lock = asyncio.Lock()
 
         async with lock:
-            connected = get_property('Connected')
-            if not connected:
-                logger.info('connecting to {}'.format(mac))
-                task = asyncio.get_event_loop().create_future()
-                _btzen.bt_connect(bus, path, task)
-                await task
+            # create "service resolved" notification first
+            cb = _btzen.PropertyChange('ServicesResolved')
+            _btzen.bt_wait_for(bus, path, INTERFACE_DEVICE, cb)
 
+            # if services resolved, then device is connected
             resolved = get_property('ServicesResolved')
             if not resolved:
-                logger.info('waiting for service resolution of {}'.format(mac))
-
-                cb = _btzen.PropertyChange('ServicesResolved')
-                _btzen.bt_wait_for(bus, path, INTERFACE_DEVICE, cb)
-                # wait 30s for for services resolved flag change; this part
-                # is suspectible to race condition between the check above
-                # and starting the wait, so on timeout check the status
-                # again
                 try:
-                    await asyncio.wait_for(cb.get(), 30)
-                except asyncio.TimeoutError as ex:
-                    resolved = get_property('ServicesResolved')
-                    if not resolved:
-                        raise ConnectionError('Cannot resolve services of {}'.format(mac))
+                    task = asyncio.get_event_loop().create_future()
+                    logger.info('connecting to {}'.format(mac))
+                    _btzen.bt_connect(bus, path, task)
+                    await task
+                except Exception as ex:
+                    # exception can be raised when device is already
+                    # connected
+                    logger.debug('Connection error: {}'.format(ex))
+                    connected = get_property('Connected')
+                    if not connected:
+                        raise
+
+                value = await cb.get()
+                # TODO: destroy "service resolved" notification"
+                logger.info('{} services resolved {}'.format(mac, value))
 
         name = self._get_name(mac)
         logger.info('connected to {}'.format(name))
