@@ -103,21 +103,28 @@ async def read_data(mac):
 
             await display(dev, 'BTZen: dive {}'.format(k))
 
-            # header + profile
-            size = 256 + header.size - 1
-            total += size
-            print('dive {}/{}, read {} bytes'.format(k, count - 1, size))
+            print('dive {}/{}, read {} bytes'.format(k, count - 1, 256 + header.size))
 
             # follow ostc protocol stricly, get echo byte first then send
             # the dive number or occasionally transfer will hang
             await dev.write(b'\x66')
             value = await dev.read(1)
             assert value == b'\x66'
+
             await dev.write(bytes([k]))
-            data = await dev.read(size - 1)
-            assert data[:2] == b'\xfa\xfa' \
-                and data[-3:] == b'\xfd\xfd\x4d', \
-                'start={}, end={}'.format(hexlify(data[:2]), hexlify(data[-3:]))
+            data = await dev.read(256 + header.size - 2)
+
+            profile_head = data[:256]
+            profile = data[256:-1]
+            marker = data[-1] # 0x4d byte
+
+            total += len(data)
+
+            assert profile_head[:2] == b'\xfa\xfa', profile_head[:2]
+            assert profile_head[-2:] == b'\xfb\xfb', profile_head[-2:]
+            assert header.size == to_int(profile[:3])
+            assert profile[-2:] == b'\xfd\xfd', profile[-2:]
+            assert marker == 0x4d, marker
 
         await display(dev, 'BTZen: done')
         print('done, {} bytes read, time {:.1f}s'.format(total, time.monotonic() - start_at))
