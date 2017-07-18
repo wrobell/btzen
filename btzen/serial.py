@@ -69,7 +69,6 @@ class Serial:
 
         self._rx_credits = 0
         await self._add_rx_credits()
-
         logger.debug('requesting tx credits')
         value = await self._tx_credit.get()
         logger.debug('got tx credits: {}'.format(value))
@@ -83,15 +82,25 @@ class Serial:
                 item = await tx.get()
                 data.extend(item)
                 if __debug__:
-                    logger.debug('bytes read {}, last {}'.format(len(data), hexlify(data[-5:])))
+                    logger.debug(
+                        'bytes read {}, last {}, tx credits queue len {}'
+                        .format(len(data), hexlify(data[-5:]), len(self._tx_credit))
+                    )
 
         assert len(data) == n
         return data
 
     async def write(self, data):
         assert len(data) <= 20
+
         if self._rx_credits < 1:
             await self._add_rx_credits()
+
+        if len(self._tx_credit):
+            logger.debug('requesting tx credits')
+            value = await self._tx_credit.get()
+            logger.debug('got tx credits: {}'.format(value))
+
         await self._write(self._rx_uart_path, data)
 
     def _add_notification(self, path):
