@@ -244,13 +244,15 @@ cdef int task_cb_wait_for(sd_bus_message *msg, void *user_data, sd_bus_error *re
     bus_msg.c_obj = msg
 
     r = sd_bus_message_skip(msg, 's')
-    assert r == 1
+    assert r == 1, strerror(-r)
 
     for _ in msg_container(bus_msg, 'a', '{sv}'):
         for _ in msg_container(bus_msg, 'e', 'sv'):
             name = msg_read_value(bus_msg, 's')
 
             if cb.filter and name not in cb.filter:
+                r = sd_bus_message_skip(msg, 'v')
+                assert r == 1, strerror(-r)
                 continue
 
             r = sd_bus_message_peek_type(msg, &msg_type, &contents)
@@ -440,7 +442,7 @@ def msg_container(BusMessage bus_msg, str type, str contents):
     while sd_bus_message_enter_container(msg, msg_type, contents.encode()) > 0:
         yield
         r = sd_bus_message_exit_container(msg)
-        assert r == 1, r
+        assert r == 1, strerror(-r)
 
 def msg_read_value(BusMessage bus_msg, str type):
     """
