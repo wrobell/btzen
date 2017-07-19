@@ -75,8 +75,7 @@ class Bus:
 
         async with lock:
             # create "service resolved" notification first
-            cb = _btzen.PropertyChange('ServicesResolved')
-            _btzen.bt_wait_for(bus, path, INTERFACE_DEVICE, cb)
+            task_resolved = _btzen.bt_wait_for(bus, path, INTERFACE_DEVICE, 'ServicesResolved')
 
             # if services resolved, then device is connected
             resolved = get_property('ServicesResolved')
@@ -94,7 +93,7 @@ class Bus:
                     if not connected:
                         raise
 
-                value = await cb.get()
+                value = await task_resolved
                 # TODO: destroy "service resolved" notification"
                 logger.info('{} services resolved {}'.format(mac, value))
 

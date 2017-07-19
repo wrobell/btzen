@@ -100,7 +100,7 @@ cdef class Bus:
     def fileno(self):
         return self._fd_no
 
-class PropertyChange:
+class PropertyChangeTask:
     def __init__(self, *args):
         self._queue = asyncio.Queue()
         self.filter = set(args)
@@ -108,13 +108,13 @@ class PropertyChange:
     def put(self, name, value):
         self._queue.put_nowait((name, value))
 
-    async def get(self):
-        return (await self._queue.get())
+    def __await__(self):
+        return (yield from self._queue.get())
 
     def __len__(self):
         return self._queue.qsize()
 
-class ValueChange(PropertyChange):
+class ValueChange(PropertyChangeTask):
     def __init__(self):
         super().__init__('Value')
 
@@ -249,7 +249,7 @@ def bt_write(Bus bus, str path, bytes data, task):
     finally:
         sd_bus_message_unref(msg)
 
-cdef int task_cb_wait_for(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object cb = <object>user_data
     cdef const char *contents
     cdef char msg_type
@@ -277,10 +277,22 @@ cdef int task_cb_wait_for(sd_bus_message *msg, void *user_data, sd_bus_error *re
                 cb.put(name, value)
     return 1
 
-def bt_wait_for(Bus bus, str path, str iface, object task):
+def bt_property_monitor(Bus bus, str path, str iface, *properties):
+    """
+    Create asynchronous task to detect value changes of properties.
+
+    Asynchronous task it returned.
+
+    :param bus: D-Bus reference.
+    :param path: Gatt characteristic path of the device.
+    :param iface: Device interface.
+    bparam *properties: Property names to watch.
+    """
     rule = fmt_rule(path, iface)
-    r = sd_bus_add_match(bus.bus, NULL, rule, task_cb_wait_for, <void*>task)
+    task = PropertyChangeTask(*properties)
+    r = sd_bus_add_match(bus.bus, NULL, rule, task_cb_property_monitor, <void*>task)
     check_call('bus match rule', r)
+    return task
 
 def bt_property_str(Bus bus, str path, str iface, str name):
     cdef sd_bus_message *msg = NULL
