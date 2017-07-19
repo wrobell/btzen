@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+#
+# BTZen - Bluetooh Smart sensor reading library.
+#
+# Copyright (C) 2015-2017 by Artur Wroblewski <wrobell@riseup.net>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+"""
+Monitor a device for RSSI change.
+
+The script demonstrates use of BTZen low-level interface for monitoring
+property changes of a Bluetooh device.
+"""
+
+import argparse
+import asyncio
+import logging
+
+from btzen import _btzen
+from btzen.bus import BUS
+
+async def monitor(mac):
+    path = BUS._get_device_path(mac)
+    task = _btzen.bt_property_monitor(BUS.get_bus(), path, 'org.bluez.Device1', 'RSSI')
+    while True:
+        name, value = await task
+        assert name == 'RSSI', 'expected RSSI, got {}'.format(name)
+        print('rssi', value)
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--verbose', default=False, action='store_true',
+    help='show debug log'
+)
+parser.add_argument('device', help='MAC address of device')
+args = parser.parse_args()
+
+if args.verbose:
+    logging.basicConfig(level=logging.DEBUG)
+
+loop = asyncio.get_event_loop()
+loop.run_until_complete(monitor(args.device))
+
+# vim: sw=4:et:ai
