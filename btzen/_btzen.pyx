@@ -33,6 +33,15 @@ from .error import *
 
 logger = logging.getLogger(__name__)
 
+FMT_RULE = """
+type='signal',
+sender='org.bluez',
+interface='org.freedesktop.DBus.Properties',
+member='PropertiesChanged',
+path='{}',
+arg0='{}'
+"""
+
 cdef extern from "<systemd/sd-bus.h>":
     ctypedef struct sd_bus:
         pass
@@ -111,6 +120,11 @@ class ValueChange(PropertyChange):
 
     def put(self, name, value):
         self._queue.put_nowait(value)
+
+def fmt_rule(path, iface):
+    rule = FMT_RULE.format(path, iface)
+    rule = rule.strip().replace('\n', '')
+    return rule.encode()
 
 def check_call(msg_err, code):
     """
@@ -264,14 +278,7 @@ cdef int task_cb_wait_for(sd_bus_message *msg, void *user_data, sd_bus_error *re
     return 1
 
 def bt_wait_for(Bus bus, str path, str iface, object task):
-    rule = """\
-type='signal',\
-sender='org.bluez',\
-interface='org.freedesktop.DBus.Properties',\
-member='PropertiesChanged',\
-path='{}',\
-arg0='{}'""".format(path, iface).encode()
-
+    rule = fmt_rule(path, iface)
     r = sd_bus_add_match(bus.bus, NULL, rule, task_cb_wait_for, <void*>task)
     check_call('bus match rule', r)
 
