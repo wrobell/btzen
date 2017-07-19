@@ -104,9 +104,16 @@ class PropertyChangeTask:
     def __init__(self, *args):
         self._queue = asyncio.Queue()
         self.filter = set(args)
+        self._loop = asyncio.get_event_loop()
 
     def put(self, name, value):
         self._queue.put_nowait((name, value))
+
+    def send(self):
+        pass
+
+    def throw(self, typ, val=None, tb=None):
+        pass
 
     def __await__(self):
         return (yield from self._queue.get())
@@ -114,7 +121,7 @@ class PropertyChangeTask:
     def __len__(self):
         return self._queue.qsize()
 
-class ValueChange(PropertyChangeTask):
+class ValueChangeTask(PropertyChangeTask):
     def __init__(self):
         super().__init__('Value')
 
@@ -217,7 +224,7 @@ def bt_write(Bus bus, str path, bytes data, task):
     Use task coroutine to wait for the call to be finished.
 
     :param bus: D-Bus reference.
-    :param path: Gatt characteristic path of the device.
+    :param path: GATT characteristics path of the device.
     :param data: Data to write.
     :param task: Asyncio coroutine.
     """
@@ -277,21 +284,34 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
                 cb.put(name, value)
     return 1
 
+def _bt_property_monitor(Bus bus, str path, str iface, object task):
+    """
+    Start detection of value changes of Bluetooth device property via an
+    asynchronous task.
+
+    :param bus: D-Bus reference.
+    :param path: GATT characteristics path of the device.
+    :param iface: Device interface.
+    :param task: Asynchronous task for property value changes.
+    """
+    rule = fmt_rule(path, iface)
+    r = sd_bus_add_match(bus.bus, NULL, rule, task_cb_property_monitor, <void*>task)
+    check_call('bus match rule', r)
+
 def bt_property_monitor(Bus bus, str path, str iface, *properties):
     """
-    Create asynchronous task to detect value changes of properties.
+    Create asynchronous task to detect value changes of Bluetooth device
+    property.
 
     Asynchronous task it returned.
 
     :param bus: D-Bus reference.
-    :param path: Gatt characteristic path of the device.
+    :param path: GATT characteristics path of the device.
     :param iface: Device interface.
-    bparam *properties: Property names to watch.
+    :param *properties: Property names to watch.
     """
-    rule = fmt_rule(path, iface)
     task = PropertyChangeTask(*properties)
-    r = sd_bus_add_match(bus.bus, NULL, rule, task_cb_property_monitor, <void*>task)
-    check_call('bus match rule', r)
+    _bt_property_monitor(bus, path, iface, task)
     return task
 
 def bt_property_str(Bus bus, str path, str iface, str name):
@@ -348,7 +368,16 @@ def bt_property_bool(Bus bus, str path, str iface, str name):
 
     return value
 
-def bt_notify(Bus bus, str path, object task):
+def bt_notify(Bus bus, str path):
+    """
+    Start monitoring of value changes of a device identified by GATT
+    characteristics path.
+
+    Asynchronous task is returned.
+
+    :param bus: D-Bus reference.
+    :param path: GATT characteristics path of the device.
+    """
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 
@@ -366,7 +395,10 @@ def bt_notify(Bus bus, str path, object task):
         NULL
     )
     check_call('start notification', r)
-    bt_wait_for(bus, path, iface, task)
+
+    task = ValueChangeTask()
+    _bt_property_monitor(bus, path, iface, task)
+    return task
 
 def bt_notify_stop(Bus bus, str path):
     cdef sd_bus_message *msg = NULL

@@ -98,7 +98,7 @@ class Sensor:
         This method is an asynchronous coroutine and is *not* thread safe.
         """
         if self._notifying:
-            task = self._loop.create_task(self._notification.get())
+            task = self._notification
         else:
             task = self._loop.create_future()
             _btzen.bt_read(self._system_bus, self._params.path_data, task)
@@ -187,8 +187,7 @@ class Sensor:
         params = self._params
         if self._notifying:
             config_on = params.config_on_notify
-            self._notification = _btzen.ValueChange()
-            _btzen.bt_notify(bus, params.path_data, self._notification)
+            self._notification = _btzen.bt_notify(bus, params.path_data)
         else:
             config_on = params.config_on
 

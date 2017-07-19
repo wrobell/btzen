@@ -57,23 +57,20 @@ class Serial:
 
     async def connect(self):
         bus = self._system_bus = BUS.get_bus()
+        get_path = partial(BUS.sensor_path, self._mac)
+        bt_notify = partial(_btzen.bt_notify, bus)
 
         await BUS.connect(self._mac)
 
-        get_path = partial(BUS.sensor_path, self._mac)
-        path = get_path(self.UUID_TX_CREDIT)
-        self._tx_credit = self._add_notification(path)
-
-        path = get_path(self.UUID_TX_UART)
-        self._tx_uart = self._add_notification(path)
-
+        self._tx_credit = bt_notify(get_path(self.UUID_TX_CREDIT))
+        self._tx_uart = bt_notify(get_path(self.UUID_TX_UART))
         self._rx_credit_path = get_path(self.UUID_RX_CREDIT)
         self._rx_uart_path = get_path(self.UUID_RX_UART)
 
         self._rx_credits = 0
         await self._add_rx_credits()
         logger.debug('requesting tx credits')
-        value = await self._tx_credit.get()
+        value = await self._tx_credit
         logger.debug('got tx credits: {}'.format(value))
 
     async def read(self, n):
@@ -82,7 +79,7 @@ class Serial:
         data = bytearray()
         while len(data) < n:
             async with self._rx_credits_mgr(n - len(data)):
-                item = await tx.get()
+                item = await tx
                 data.extend(item)
 
                 if __debug__:
@@ -102,15 +99,10 @@ class Serial:
 
         if len(self._tx_credit):
             logger.debug('requesting tx credits')
-            value = await self._tx_credit.get()
+            value = await self._tx_credit
             logger.debug('got tx credits: {}'.format(value))
 
         await self._write(self._rx_uart_path, data)
-
-    def _add_notification(self, path):
-        cb = _btzen.ValueChange()
-        _btzen.bt_notify(self._system_bus, path, cb)
-        return cb
 
     @contextmanager
     async def _rx_credits_mgr(self, n):
