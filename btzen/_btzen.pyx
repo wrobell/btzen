@@ -264,6 +264,7 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
 
     bus_msg.c_obj = msg
 
+    # skip interface name
     r = sd_bus_message_skip(msg, 's')
     assert r == 1, strerror(-r)
 
