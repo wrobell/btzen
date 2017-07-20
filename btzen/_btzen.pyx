@@ -66,6 +66,7 @@ cdef extern from "<systemd/sd-bus.h>":
     int sd_bus_call_method_async(sd_bus*, sd_bus_slot**, const char*, const char*, const char*, const char*, sd_bus_message_handler_t, void*, const char*, ...)
     int sd_bus_message_new_method_call(sd_bus*, sd_bus_message**, const char*, const char*, const char*, const char*)
     int sd_bus_message_append_array(sd_bus_message*, char, const void*, size_t)
+    int sd_bus_message_append_basic(sd_bus_message*, char, const void*)
     int sd_bus_message_open_container(sd_bus_message*, char, const char*)
     int sd_bus_message_close_container(sd_bus_message*)
     int sd_bus_call(sd_bus*, sd_bus_message*, long, sd_bus_error*, sd_bus_message**)
@@ -272,17 +273,13 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
         for _ in msg_container(bus_msg, 'e', 'sv'):
             name = msg_read_value(bus_msg, 's')
 
-            if cb.filter and name not in cb.filter:
+            if cb.filter and name in cb.filter:
+                value = msg_read_value(bus_msg, 'v')
+                cb.put(name, value)
+            else:
                 r = sd_bus_message_skip(msg, 'v')
                 assert r == 1, strerror(-r)
                 continue
-
-            r = sd_bus_message_peek_type(msg, &msg_type, &contents)
-            assert chr(msg_type) == 'v', (name, msg_type, contents)
-
-            for _ in msg_container(bus_msg, 'v', contents):
-                value = msg_read_value(bus_msg, contents)
-                cb.put(name, value)
     return 1
 
 def _bt_property_monitor(Bus bus, str path, str iface, object task):
@@ -330,11 +327,8 @@ def bt_property_str(Bus bus, str path, str iface, str name):
         &msg,
         's'
     )
-    assert r == 0
-#    if (r < 0) {
-#        fprintf(stderr, "Failed to read Name property: %s\n", error.message);
-#        goto finish;
-#    }
+    assert r == 0, strerror(-r)
+
     bus_msg.c_obj = msg
     value = msg_read_value(bus_msg, 's')
     sd_bus_message_unref(msg)
@@ -357,11 +351,8 @@ def bt_property_bool(Bus bus, str path, str iface, str name):
         &msg,
         'b'
     )
-    assert r == 0
-#    if (r < 0) {
-#        fprintf(stderr, "Failed to read Name property: %s\n", error.message);
-#        goto finish;
-#    }
+    assert r == 0, strerror(-r)
+
     bus_msg.c_obj = msg
     value = msg_read_value(bus_msg, 'b')
     sd_bus_message_unref(msg)
@@ -431,8 +422,6 @@ def bt_characteristic(Bus bus, str path):
     Fetch Gatt Characteristic paths relative to `path`.
 
     Dictionary `uuid -> path` is returned.
-
-    TODO: The "relative to path" not working yet.
     """
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
@@ -448,29 +437,40 @@ def bt_characteristic(Bus bus, str path):
         &msg,
         NULL
     )
-    assert r >= 0
-#    if (r < 0) {
-#        fprintf(stderr, "Failed to issue method call: %s\n", error.message);
-#        goto finish;
-#    }
+    assert r >= 0, strerror(-r)
 
     bus_msg.c_obj = msg
-    data = {}
 
+    data = {}
     for _ in msg_container(bus_msg, 'a', '{oa{sa{sv}}}'):
         for _ in msg_container(bus_msg, 'e', 'oa{sa{sv}}'):
             chr_path = msg_read_value(bus_msg, 'o')
+
+            if not chr_path.startswith(path):
+                 r = sd_bus_message_skip(msg, 'a{sa{sv}}')
+                 assert r > 0, strerror(-r)
+                 continue
+
             for _ in msg_container(bus_msg, 'a', '{sa{sv}}'):
                 for _ in msg_container(bus_msg, 'e', 'sa{sv}'):
                     iface = msg_read_value(bus_msg, 's')
 
-                    r = sd_bus_message_skip(msg, "a{sv}")
-                    assert r > 0
+                    if iface != 'org.bluez.GattCharacteristic1':
+                        r = sd_bus_message_skip(msg, "a{sv}")
+                        assert r > 0, strerror(-r)
+                        continue
 
-                    if iface == 'org.bluez.GattCharacteristic1':
-                        uuid = bt_property_str(bus, chr_path, 'org.bluez.GattCharacteristic1', 'UUID')
-                        data[uuid] = chr_path
+                    for _ in msg_container(bus_msg, 'a', '{sv}'):
+                        for _ in msg_container(bus_msg, 'e', 'sv'):
+                            name = msg_read_value(bus_msg, 's')
+                            if name == 'UUID':
+                                uuid = msg_read_value(bus_msg, 'v')
+                                data[uuid] = chr_path
+                            else:
+                                r = sd_bus_message_skip(msg, "v")
+                                assert r > 0, strerror(-r)
 #finish:
+
     sd_bus_message_unref(msg)
     sd_bus_error_free(&error)
     return data
@@ -491,8 +491,16 @@ def msg_container(BusMessage bus_msg, str type, str contents):
     cdef char msg_type = ord(type)
     cdef sd_bus_message *msg = bus_msg.c_obj
 
-    while sd_bus_message_enter_container(msg, msg_type, contents.encode()) > 0:
+    while True:
+        r = sd_bus_message_enter_container(msg, msg_type, contents.encode())
+        # FIXME: assert r >= 0, strerror(-r)
+        if r == 0:
+            break
+        elif r < 0:  # FIXME: handle the errors
+            break
+
         yield
+
         r = sd_bus_message_exit_container(msg)
         assert r == 1, strerror(-r)
 
@@ -506,6 +514,7 @@ def msg_read_value(BusMessage bus_msg, str type):
     - signed short int
     - string
     - byte array
+    - variant
     """
     cdef sd_bus_message *msg = bus_msg.c_obj
 
@@ -515,30 +524,46 @@ def msg_read_value(BusMessage bus_msg, str type):
     cdef const void *buff
     cdef size_t buff_size
     cdef char *buff_str
+    cdef const char *contents
+    cdef char msg_type_v
 
     msg_type = type.encode()
 
     if msg_type == b'b':
         r = sd_bus_message_read_basic(msg, 'b', &value)
-        assert r >= 0
+        assert r >= 0, strerror(-r)
         r_value = value == 1
 
     elif msg_type == b'n':
         r = sd_bus_message_read_basic(msg, 'n', &value_short)
-        assert r >= 0
+        assert r >= 0, strerror(-r)
         r_value = value_short
 
     elif msg_type == b'ay' or msg_type == b'y':
         r = sd_bus_message_read_array(msg, 'y', &buff, &buff_size)
-        assert r >= 0
+        assert r >= 0, strerror(-r)
 
         r_value = PyBytes_FromStringAndSize(<char*>buff, buff_size)
         logger.debug('array value of size: {}'.format(buff_size))
+
     elif msg_type == b's' or msg_type == b'o':
         r = sd_bus_message_read(msg, msg_type, &buff_str)
-        assert r >= 0
+        assert r >= 0, strerror(-r)
         r_value = <str>buff_str
         logger.debug('string value: {} of size {}'.format(r_value, len(r_value)))
+
+    elif msg_type == b'v':
+        r = sd_bus_message_peek_type(msg, &msg_type_v, &contents)
+        assert r >= 0, strerror(-r)
+        assert chr(msg_type_v) == 'v', (msg_type, contents)
+
+        r = sd_bus_message_enter_container(msg, msg_type_v, contents.encode())
+        assert r >= 0, strerror(-r)
+
+        r_value = msg_read_value(bus_msg, contents)
+
+        r = sd_bus_message_exit_container(msg)
+        assert r == 1, strerror(-r)
     else:
         # FIXME: add support for other types
         assert False, 'unsupported type {}'.format(type)
