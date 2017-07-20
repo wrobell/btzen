@@ -130,6 +130,7 @@ async def read_data(mac):
         print('done, {} bytes read, time {:.1f}s'.format(total, time.monotonic() - start_at))
     finally:
         await stop(dev)
+        dev.close()
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

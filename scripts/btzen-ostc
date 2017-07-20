@@ -94,6 +94,7 @@ async def read_data(mac):
             print(fmt(k, header.datetime, header.depth, header.duration))
     finally:
         await stop(dev)
+        dev.close()
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

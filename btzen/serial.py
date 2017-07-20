@@ -62,10 +62,13 @@ class Serial:
 
         await BUS.connect(self._mac)
 
-        self._tx_credit = bt_notify(get_path(self.UUID_TX_CREDIT))
-        self._tx_uart = bt_notify(get_path(self.UUID_TX_UART))
+        self._tx_credit_path = get_path(self.UUID_TX_CREDIT)
+        self._tx_uart_path = get_path(self.UUID_TX_UART)
         self._rx_credit_path = get_path(self.UUID_RX_CREDIT)
         self._rx_uart_path = get_path(self.UUID_RX_UART)
+
+        self._tx_credit = bt_notify(self._tx_credit_path)
+        self._tx_uart = bt_notify(self._tx_uart_path)
 
         self._rx_credits = 0
         await self._add_rx_credits()
@@ -103,6 +106,14 @@ class Serial:
             logger.debug('got tx credits: {}'.format(value))
 
         await self._write(self._rx_uart_path, data)
+
+    def close(self):
+        """
+        Close serial device.
+        """
+        bt_notify_stop = partial(_btzen.bt_notify_stop, self._system_bus)
+        bt_notify_stop(self._tx_credit_path)
+        bt_notify_stop(self._tx_uart_path)
 
     @contextmanager
     async def _rx_credits_mgr(self, n):
