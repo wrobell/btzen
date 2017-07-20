@@ -427,19 +427,35 @@ def bt_characteristic(Bus bus, str path):
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
-    r = sd_bus_call_method(
-        bus.bus,
-        'org.bluez',
-        '/',
-        'org.freedesktop.DBus.ObjectManager',
-        'GetManagedObjects',
-        &error,
-        &msg,
-        NULL
-    )
-    assert r >= 0, strerror(-r)
+    try:
+        r = sd_bus_call_method(
+            bus.bus,
+            'org.bluez',
+            '/',
+            'org.freedesktop.DBus.ObjectManager',
+            'GetManagedObjects',
+            &error,
+            &msg,
+            NULL
+        )
+        if r < 0:
+            raise ConfigurationError(
+                'Failed to get GATT characteristics paths: {}'
+                .format(strerror(-r))
+            )
 
-    bus_msg.c_obj = msg
+        bus_msg.c_obj = msg
+
+        data = _parse_characteristics(bus_msg, path)
+
+    finally:
+        sd_bus_message_unref(msg)
+        sd_bus_error_free(&error)
+
+    return data
+
+def _parse_characteristics(BusMessage bus_msg, str path):
+    cdef sd_bus_message *msg = bus_msg.c_obj
 
     data = {}
     for _ in msg_container_dict(bus_msg, '{oa{sa{sv}}}'):
@@ -466,10 +482,6 @@ def bt_characteristic(Bus bus, str path):
                 else:
                     r = sd_bus_message_skip(msg, "v")
                     assert r > 0, strerror(-r)
-#finish:
-
-    sd_bus_message_unref(msg)
-    sd_bus_error_free(&error)
     return data
 
 #
