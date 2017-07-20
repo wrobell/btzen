@@ -28,6 +28,7 @@ from cpython.bytes cimport PyBytes_FromStringAndSize
 
 import asyncio
 import logging
+from contextlib import contextmanager
 
 from .error import *
 
@@ -269,17 +270,16 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
     r = sd_bus_message_skip(msg, 's')
     assert r == 1, strerror(-r)
 
-    for _ in msg_container(bus_msg, 'a', '{sv}'):
-        for _ in msg_container(bus_msg, 'e', 'sv'):
-            name = msg_read_value(bus_msg, 's')
+    for _ in msg_container_dict(bus_msg, '{sv}'):
+        name = msg_read_value(bus_msg, 's')
 
-            if cb.filter and name in cb.filter:
-                value = msg_read_value(bus_msg, 'v')
-                cb.put(name, value)
-            else:
-                r = sd_bus_message_skip(msg, 'v')
-                assert r == 1, strerror(-r)
-                continue
+        if cb.filter and name in cb.filter:
+            value = msg_read_value(bus_msg, 'v')
+            cb.put(name, value)
+        else:
+            r = sd_bus_message_skip(msg, 'v')
+            assert r == 1, strerror(-r)
+            continue
     return 1
 
 def _bt_property_monitor(Bus bus, str path, str iface, object task):
@@ -442,33 +442,30 @@ def bt_characteristic(Bus bus, str path):
     bus_msg.c_obj = msg
 
     data = {}
-    for _ in msg_container(bus_msg, 'a', '{oa{sa{sv}}}'):
-        for _ in msg_container(bus_msg, 'e', 'oa{sa{sv}}'):
-            chr_path = msg_read_value(bus_msg, 'o')
+    for _ in msg_container_dict(bus_msg, '{oa{sa{sv}}}'):
+        chr_path = msg_read_value(bus_msg, 'o')
 
-            if not chr_path.startswith(path):
-                 r = sd_bus_message_skip(msg, 'a{sa{sv}}')
-                 assert r > 0, strerror(-r)
-                 continue
+        if not chr_path.startswith(path):
+             r = sd_bus_message_skip(msg, 'a{sa{sv}}')
+             assert r > 0, strerror(-r)
+             continue
 
-            for _ in msg_container(bus_msg, 'a', '{sa{sv}}'):
-                for _ in msg_container(bus_msg, 'e', 'sa{sv}'):
-                    iface = msg_read_value(bus_msg, 's')
+        for _ in msg_container_dict(bus_msg, '{sa{sv}}'):
+            iface = msg_read_value(bus_msg, 's')
 
-                    if iface != 'org.bluez.GattCharacteristic1':
-                        r = sd_bus_message_skip(msg, "a{sv}")
-                        assert r > 0, strerror(-r)
-                        continue
+            if iface != 'org.bluez.GattCharacteristic1':
+                r = sd_bus_message_skip(msg, "a{sv}")
+                assert r > 0, strerror(-r)
+                continue
 
-                    for _ in msg_container(bus_msg, 'a', '{sv}'):
-                        for _ in msg_container(bus_msg, 'e', 'sv'):
-                            name = msg_read_value(bus_msg, 's')
-                            if name == 'UUID':
-                                uuid = msg_read_value(bus_msg, 'v')
-                                data[uuid] = chr_path
-                            else:
-                                r = sd_bus_message_skip(msg, "v")
-                                assert r > 0, strerror(-r)
+            for _ in msg_container_dict(bus_msg, '{sv}'):
+                name = msg_read_value(bus_msg, 's')
+                if name == 'UUID':
+                    uuid = msg_read_value(bus_msg, 'v')
+                    data[uuid] = chr_path
+                else:
+                    r = sd_bus_message_skip(msg, "v")
+                    assert r > 0, strerror(-r)
 #finish:
 
     sd_bus_message_unref(msg)
@@ -484,19 +481,43 @@ cdef class BusMessage:
     """
     cdef sd_bus_message *c_obj
 
+@contextmanager
 def msg_container(BusMessage bus_msg, str type, str contents):
     """
-    Parse SD bus message container entry.
+    Parse single D-Bus container entry of given type and contents.
+    """
+    cdef char msg_type = ord(type)
+    cdef sd_bus_message *msg = bus_msg.c_obj
+
+    r = sd_bus_message_enter_container(msg, msg_type, contents.encode())
+    assert r == 1, strerror(-r)
+
+    yield
+
+    r = sd_bus_message_exit_container(msg)
+    assert r == 1, strerror(-r)
+
+def msg_container_dict(BusMessage bus_msg, str contents):
+    """
+    Loop over items of D-Bus message dictionary container.
+    """
+    with msg_container(bus_msg, 'a', contents):
+        for _ in msg_container_loop(bus_msg, 'e', contents[1:-1]):
+            yield
+
+def msg_container_loop(BusMessage bus_msg, str type, str contents):
+    """
+    Loop over items of D-Bus message container.
+
+    For dictionary containers use `msg_container_dict`.
     """
     cdef char msg_type = ord(type)
     cdef sd_bus_message *msg = bus_msg.c_obj
 
     while True:
         r = sd_bus_message_enter_container(msg, msg_type, contents.encode())
-        # FIXME: assert r >= 0, strerror(-r)
+        assert r >= 0, (msg_type, contents, strerror(-r))
         if r == 0:
-            break
-        elif r < 0:  # FIXME: handle the errors
             break
 
         yield
@@ -557,13 +578,8 @@ def msg_read_value(BusMessage bus_msg, str type):
         assert r >= 0, strerror(-r)
         assert chr(msg_type_v) == 'v', (msg_type, contents)
 
-        r = sd_bus_message_enter_container(msg, msg_type_v, contents.encode())
-        assert r >= 0, strerror(-r)
-
-        r_value = msg_read_value(bus_msg, contents)
-
-        r = sd_bus_message_exit_container(msg)
-        assert r == 1, strerror(-r)
+        with msg_container(bus_msg, type, contents):
+            r_value = msg_read_value(bus_msg, contents)
     else:
         # FIXME: add support for other types
         assert False, 'unsupported type {}'.format(type)
