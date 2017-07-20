@@ -104,13 +104,13 @@ cdef class Bus:
 
 cdef class PropertyChangeTask:
     cdef public object _queue
-    cdef public object filter
     cdef public object _loop
+    cdef public object properties
 
-    def __init__(self, *args):
+    def __init__(self, *properties):
         self._queue = asyncio.Queue()
-        self.filter = set(args)
         self._loop = asyncio.get_event_loop()
+        self.properties = set(properties)
 
     def put(self, name, value):
         self._queue.put_nowait((name, value))
@@ -276,7 +276,7 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
     for _ in msg_container_dict(bus_msg, '{sv}'):
         name = msg_read_value(bus_msg, 's')
 
-        if cb.filter and name in cb.filter:
+        if cb.properties and name in cb.properties:
             value = msg_read_value(bus_msg, 'v')
             cb.put(name, value)
         else:
