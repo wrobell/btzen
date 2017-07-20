@@ -267,8 +267,7 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
     bus_msg.c_obj = msg
 
     # skip interface name
-    r = sd_bus_message_skip(msg, 's')
-    assert r == 1, strerror(-r)
+    msg_skip(bus_msg, 's')
 
     for _ in msg_container_dict(bus_msg, '{sv}'):
         name = msg_read_value(bus_msg, 's')
@@ -277,8 +276,7 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
             value = msg_read_value(bus_msg, 'v')
             cb.put(name, value)
         else:
-            r = sd_bus_message_skip(msg, 'v')
-            assert r == 1, strerror(-r)
+            msg_skip(bus_msg, 'v')
             continue
     return 1
 
@@ -455,23 +453,19 @@ def bt_characteristic(Bus bus, str path):
     return data
 
 def _parse_characteristics(BusMessage bus_msg, str path):
-    cdef sd_bus_message *msg = bus_msg.c_obj
-
     data = {}
     for _ in msg_container_dict(bus_msg, '{oa{sa{sv}}}'):
         chr_path = msg_read_value(bus_msg, 'o')
 
         if not chr_path.startswith(path):
-             r = sd_bus_message_skip(msg, 'a{sa{sv}}')
-             assert r > 0, strerror(-r)
+             msg_skip(bus_msg, 'a{sa{sv}}')
              continue
 
         for _ in msg_container_dict(bus_msg, '{sa{sv}}'):
             iface = msg_read_value(bus_msg, 's')
 
             if iface != 'org.bluez.GattCharacteristic1':
-                r = sd_bus_message_skip(msg, "a{sv}")
-                assert r > 0, strerror(-r)
+                msg_skip(bus_msg, 'a{sv}')
                 continue
 
             for _ in msg_container_dict(bus_msg, '{sv}'):
@@ -480,8 +474,7 @@ def _parse_characteristics(BusMessage bus_msg, str path):
                     uuid = msg_read_value(bus_msg, 'v')
                     data[uuid] = chr_path
                 else:
-                    r = sd_bus_message_skip(msg, "v")
-                    assert r > 0, strerror(-r)
+                    msg_skip(bus_msg, 'v')
     return data
 
 #
@@ -493,6 +486,17 @@ cdef class BusMessage:
     """
     cdef sd_bus_message *c_obj
 
+class BusMessageError(Error):
+    """
+    Bus message parsing error.
+    """
+
+def check_msg_error(r):
+    if r < 0:
+        raise BusMessageError(
+            'D-Bus message parsing error: {}'.format(strerror(-r))
+        )
+
 @contextmanager
 def msg_container(BusMessage bus_msg, str type, str contents):
     """
@@ -502,12 +506,12 @@ def msg_container(BusMessage bus_msg, str type, str contents):
     cdef sd_bus_message *msg = bus_msg.c_obj
 
     r = sd_bus_message_enter_container(msg, msg_type, contents.encode())
-    assert r == 1, strerror(-r)
+    check_msg_error(r)
 
     yield
 
     r = sd_bus_message_exit_container(msg)
-    assert r == 1, strerror(-r)
+    check_msg_error(r)
 
 def msg_container_dict(BusMessage bus_msg, str contents):
     """
@@ -528,14 +532,14 @@ def msg_container_loop(BusMessage bus_msg, str type, str contents):
 
     while True:
         r = sd_bus_message_enter_container(msg, msg_type, contents.encode())
-        assert r >= 0, (msg_type, contents, strerror(-r))
+        check_msg_error(r)
         if r == 0:
             break
 
         yield
 
         r = sd_bus_message_exit_container(msg)
-        assert r == 1, strerror(-r)
+        check_msg_error(r)
 
 def msg_read_value(BusMessage bus_msg, str type):
     """
@@ -564,38 +568,45 @@ def msg_read_value(BusMessage bus_msg, str type):
 
     if msg_type == b'b':
         r = sd_bus_message_read_basic(msg, 'b', &value)
-        assert r >= 0, strerror(-r)
+        check_msg_error(r)
         r_value = value == 1
 
     elif msg_type == b'n':
         r = sd_bus_message_read_basic(msg, 'n', &value_short)
-        assert r >= 0, strerror(-r)
+        check_msg_error(r)
         r_value = value_short
 
     elif msg_type == b'ay' or msg_type == b'y':
         r = sd_bus_message_read_array(msg, 'y', &buff, &buff_size)
-        assert r >= 0, strerror(-r)
+        check_msg_error(r)
 
         r_value = PyBytes_FromStringAndSize(<char*>buff, buff_size)
         logger.debug('array value of size: {}'.format(buff_size))
 
     elif msg_type == b's' or msg_type == b'o':
         r = sd_bus_message_read(msg, msg_type, &buff_str)
-        assert r >= 0, strerror(-r)
+        check_msg_error(r)
         r_value = <str>buff_str
         logger.debug('string value: {} of size {}'.format(r_value, len(r_value)))
 
     elif msg_type == b'v':
         r = sd_bus_message_peek_type(msg, &msg_type_v, &contents)
-        assert r >= 0, strerror(-r)
+        check_msg_error(r)
         assert chr(msg_type_v) == 'v', (msg_type, contents)
 
         with msg_container(bus_msg, type, contents):
             r_value = msg_read_value(bus_msg, contents)
     else:
         # FIXME: add support for other types
-        assert False, 'unsupported type {}'.format(type)
+        raise BusMessageError('Unknown message type: {}'.format(type))
 
     return r_value
+
+def msg_skip(BusMessage bus_msg, str type):
+    """
+    Skip D-Bus message entry of given type.
+    """
+    r = sd_bus_message_skip(bus_msg.c_obj, type.encode())
+    check_msg_error(r)
 
 # vim: sw=4:et:ai
