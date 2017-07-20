@@ -67,7 +67,6 @@ class Bus:
         """
         bus = self.get_bus()
         path = self._get_device_path(mac)
-        get_property = partial(_btzen.bt_property_bool, bus, path, INTERFACE_DEVICE)
 
         lock = self._lock.get(mac)
         if lock is None:
@@ -77,35 +76,46 @@ class Bus:
             # create "service resolved" notification first
             task_sr = _btzen.bt_property_monitor(bus, path, INTERFACE_DEVICE, 'ServicesResolved')
 
-            # if services resolved, then device is connected
-            resolved = get_property('ServicesResolved')
-            if not resolved:
-                try:
-                    task = asyncio.get_event_loop().create_future()
+            try:
+                # if services resolved, then device is connected
+                resolved = self._property_bool(path, 'ServicesResolved')
+                if not resolved:
                     logger.info('connecting to {}'.format(mac))
-                    _btzen.bt_connect(bus, path, task)
-                    await task
-                except Exception as ex:
-                    # exception can be raised when device is already
-                    # connected
-                    logger.debug('Connection error: {}'.format(ex))
-                    connected = get_property('Connected')
-                    if not connected:
-                        raise
+                    await self._connect(bus, path)
 
-                value = await task_sr
-                # TODO: destroy "service resolved" notification"
-                logger.info('{} services resolved {}'.format(mac, value))
+                    value = await task_sr
+                    # TODO: destroy "service resolved" notification"
+                    logger.info('{} services resolved {}'.format(mac, value))
+            finally:
+                task_sr.close()
 
         name = self._get_name(mac)
         logger.info('connected to {}'.format(name))
         return name
+
+    def _property_bool(self, path, name):
+        bus = self.get_bus()
+        value = _btzen.bt_property_bool(bus, path, INTERFACE_DEVICE, name)
+        return value
 
     def sensor_path(self, mac, uuid):
         if uuid is None:
             return ''
         by_uuid = self._get_sensor_paths(mac)
         return by_uuid[uuid]
+
+    async def _connect(self, bus, path):
+        try:
+            task = asyncio.get_event_loop().create_future()
+            _btzen.bt_connect(bus, path, task)
+            await task
+        except Exception as ex:
+            # exception can be raised when device is already
+            # connected
+            logger.debug('Connection error: {}'.format(ex))
+            connected = self._property_bool(path, 'Connected')
+            if not connected:
+                raise
 
     @lru_cache()
     def _get_sensor_paths(self, mac):

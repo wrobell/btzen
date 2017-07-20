@@ -91,6 +91,7 @@ cdef extern from "<systemd/sd-bus.h>":
     sd_bus *sd_bus_unref(sd_bus*)
     sd_bus_message *sd_bus_message_unref(sd_bus_message*)
     void sd_bus_error_free(sd_bus_error*)
+    sd_bus_slot* sd_bus_slot_unref(sd_bus_slot*)
 
 cdef sd_bus_error SD_BUS_ERROR_NULL = sd_bus_error(NULL, NULL, 0)
 
@@ -103,6 +104,7 @@ cdef class Bus:
         return self._fd_no
 
 cdef class PropertyChangeTask:
+    cdef sd_bus_slot *slot
     cdef public object _queue
     cdef public object _loop
     cdef public object properties
@@ -118,8 +120,12 @@ cdef class PropertyChangeTask:
     def send(self):
         pass
 
-    def throw(self, typ, val=None, tb=None):
+    def throw(self, type, value=None, tb=None):
         pass
+
+    def close(self):
+        sd_bus_slot_unref(self.slot)
+        self.slot = NULL
 
     def __await__(self):
         return (yield from self._queue.get())
@@ -284,7 +290,7 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
             continue
     return 1
 
-def _bt_property_monitor(Bus bus, str path, str iface, object task):
+def _bt_property_monitor(Bus bus, str path, str iface, PropertyChangeTask task):
     """
     Start detection of value changes of Bluetooth device property via an
     asynchronous task.
@@ -294,9 +300,12 @@ def _bt_property_monitor(Bus bus, str path, str iface, object task):
     :param iface: Device interface.
     :param task: Asynchronous task for property value changes.
     """
+    cdef sd_bus_slot *slot
     rule = fmt_rule(path, iface)
-    r = sd_bus_add_match(bus.bus, NULL, rule, task_cb_property_monitor, <void*>task)
+    r = sd_bus_add_match(bus.bus, &slot, rule, task_cb_property_monitor, <void*>task)
     check_call('bus match rule', r)
+
+    task.slot = slot
 
 def bt_property_monitor(Bus bus, str path, str iface, *properties):
     """
