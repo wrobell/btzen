@@ -102,7 +102,11 @@ cdef class Bus:
     def fileno(self):
         return self._fd_no
 
-class PropertyChangeTask:
+cdef class PropertyChangeTask:
+    cdef public object _queue
+    cdef public object filter
+    cdef public object _loop
+
     def __init__(self, *args):
         self._queue = asyncio.Queue()
         self.filter = set(args)
@@ -123,7 +127,7 @@ class PropertyChangeTask:
     def __len__(self):
         return self._queue.qsize()
 
-class ValueChangeTask(PropertyChangeTask):
+cdef class ValueChangeTask(PropertyChangeTask):
     def __init__(self):
         super().__init__('Value')
 
@@ -602,7 +606,7 @@ def msg_read_value(BusMessage bus_msg, str type):
 
     return r_value
 
-def msg_skip(BusMessage bus_msg, str type):
+cdef void msg_skip(BusMessage bus_msg, str type) except *:
     """
     Skip D-Bus message entry of given type.
     """
