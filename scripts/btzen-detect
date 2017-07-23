@@ -35,10 +35,13 @@ from btzen.bus import BUS
 async def monitor(mac):
     path = BUS._get_device_path(mac)
     task = _btzen.bt_property_monitor(BUS.get_bus(), path, 'org.bluez.Device1', 'RSSI')
-    while True:
-        name, value = await task
-        assert name == 'RSSI', 'expected RSSI, got {}'.format(name)
-        print('rssi', value)
+    try:
+        while True:
+            name, value = await task
+            assert name == 'RSSI', 'expected RSSI, got {}'.format(name)
+            print('rssi', value)
+    finally:
+        task.close()
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
