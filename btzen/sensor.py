@@ -79,10 +79,10 @@ class Sensor:
         await self._enable()
 
     def set_interval(self, interval):
-        if self._params.path_period:
+        path = self._params.path_period
+        if path:
             value = int(interval * 100)
             assert value < 256
-            path = self._params.path_period
             bus = self._system_bus
             try:
                 self._write_sync(path, bytes([value]))
