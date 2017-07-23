@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# BTZen - Bluetooh Smart sensor reading library.
+# BTZen - Bluetooth Smart sensor reading library.
 #
 # Copyright (C) 2015-2017 by Artur Wroblewski <wrobell@riseup.net>
 #
@@ -22,7 +22,7 @@
 Monitor a device for RSSI change.
 
 The script demonstrates use of BTZen low-level interface for monitoring
-property changes of a Bluetooh device.
+property changes of a Bluetooth device.
 """
 
 import argparse
