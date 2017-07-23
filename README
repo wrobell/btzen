@@ -19,10 +19,9 @@ Features
 2. Device access using `asyncio` coroutines.
 3. Notifications interface is supported.
 
-The library provides `btzen` script to display sensor data (scan for a
-device with `bluetoothctl` command to get MAC address of a device)::
-
-    $ btzen <MAC>
+The scripts in `scripts` directory demonstrate reading data from various
+Bluetooth Smart devices, i.e. Sensor Tag, Mi Smart Scale or OSTC dive
+computer.
 
 Requirements
 
