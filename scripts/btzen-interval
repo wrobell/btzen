@@ -18,6 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 import argparse
 import logging
 import time
@@ -26,29 +27,34 @@ import btzen
 
 logging.basicConfig(level=logging.DEBUG)
 
+async def check_interval(sensor):
+    await sensor.connect()
+
+    # not many pressure value changes
+    sensor.set_interval(1)
+    start = time.monotonic()
+    for i in range(15):
+        value = await sensor.read()
+        print(value)
+        time.sleep(0.1)
+    print('elapsed {:.4f}'.format(time.monotonic() - start))
+
+    # expected more pressure value changes
+    sensor.set_interval(0.1)
+    start = time.monotonic()
+    for i in range(15):
+        value = await sensor.read()
+        print(value)
+        time.sleep(0.1)
+    print('elapsed {:.4f}'.format(time.monotonic() - start))
+
 parser = argparse.ArgumentParser()
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
-print('connecting to {}...'.format(args.device))
 sensor = btzen.Pressure(args.device)
-sensor.connect()
-
-# not many pressure value changes
-start = time.monotonic()
-for i in range(10):
-    print(sensor.read())
-    time.sleep(0.1)
-print('elapsed {:.4f}'.format(time.monotonic() - start))
-
-# expected more pressure value changes
-sensor.set_interval(0.1)
-start = time.monotonic()
-for i in range(10):
-    print(sensor.read())
-    time.sleep(0.1)
-print('elapsed {:.4f}'.format(time.monotonic() - start))
-
+loop = asyncio.get_event_loop()
+loop.run_until_complete(check_interval(sensor))
 sensor.close()
 
 # vim: sw=4:et:ai
