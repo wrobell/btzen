@@ -105,30 +105,43 @@ cdef class Bus:
 
 cdef class PropertyChangeTask:
     cdef sd_bus_slot *slot
-    cdef public object _queue
-    cdef public object _loop
+    cdef object _loop
+    cdef object _queue
+    cdef object _task
     cdef public object properties
 
     def __init__(self, *properties):
         self._queue = asyncio.Queue()
         self._loop = asyncio.get_event_loop()
         self.properties = set(properties)
+        self._task = None
 
     def put(self, name, value):
         self._queue.put_nowait((name, value))
 
-    def send(self):
+    def send(self, value):
         pass
 
     def throw(self, type, value=None, tb=None):
         pass
 
     def close(self):
+        """
+        Close property change task.
+        """
         sd_bus_slot_unref(self.slot)
         self.slot = NULL
+        task = self._task
+        if task is not None:
+            task.close()
 
     def __await__(self):
-        return (yield from self._queue.get())
+        self._task = self._queue.get()
+        try:
+            value = yield from self._task
+        finally:
+            self._task = None
+        return value
 
     def __len__(self):
         return self._queue.qsize()
