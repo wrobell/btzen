@@ -74,7 +74,9 @@ class Bus:
 
         async with lock:
             # create "service resolved" notification first
-            task_sr = _btzen.bt_property_monitor(bus, path, INTERFACE_DEVICE, 'ServicesResolved')
+            task_sr = _btzen.bt_property_monitor(
+                bus, path, INTERFACE_DEVICE, 'ServicesResolved'
+            )
 
             try:
                 # if services resolved, then device is connected
@@ -106,13 +108,13 @@ class Bus:
 
     async def _connect(self, bus, path):
         try:
-            task = asyncio.get_event_loop().create_future()
+            task = self._loop.create_future()
             _btzen.bt_connect(bus, path, task)
             await task
         except Exception as ex:
-            # exception can be raised when device is already
+            # exception might be raised when device is already
             # connected
-            logger.debug('Connection error: {}'.format(ex))
+            logger.debug('connection error: {}'.format(ex))
             connected = self._property_bool(path, 'Connected')
             if not connected:
                 raise
