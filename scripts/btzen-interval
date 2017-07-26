@@ -27,26 +27,27 @@ import btzen
 
 logging.basicConfig(level=logging.DEBUG)
 
+async def read_values(sensor):
+    for i in range(15):
+        value = await sensor.read()
+        yield value
+        time.sleep(0.1)
+
+async def measure_reading(sensor):
+    start = time.monotonic()
+    values = sorted({v async for v in read_values(sensor)})
+    print('elapsed {:.4f}, got: {}'.format(time.monotonic() - start, values))
+
 async def check_interval(sensor):
     await sensor.connect()
 
     # not many pressure value changes
     sensor.set_interval(1)
-    start = time.monotonic()
-    for i in range(15):
-        value = await sensor.read()
-        print(value)
-        time.sleep(0.1)
-    print('elapsed {:.4f}'.format(time.monotonic() - start))
+    await measure_reading(sensor)
 
     # expected more pressure value changes
     sensor.set_interval(0.1)
-    start = time.monotonic()
-    for i in range(15):
-        value = await sensor.read()
-        print(value)
-        time.sleep(0.1)
-    print('elapsed {:.4f}'.format(time.monotonic() - start))
+    await measure_reading(sensor)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('device', help='MAC address of device')
