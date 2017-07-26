@@ -37,8 +37,7 @@ def _mac(mac):
 class Bus:
     THREAD_LOCAL = threading.local()
 
-    # TODO: get rid of loop parameter
-    def __init__(self, loop=None):
+    def __init__(self):
         self._loop = asyncio.get_event_loop()
 
         self._fd = self.get_bus().fileno
