@@ -22,6 +22,7 @@ import logging
 import threading
 import time
 from functools import lru_cache, partial
+from weakref import WeakValueDictionary
 
 from . import _btzen
 from .error import ConnectionError
@@ -43,7 +44,10 @@ class Bus:
         self._fd = self.get_bus().fileno
         self._loop.add_reader(self._fd, self._process_event)
 
-        self._lock = {}
+        # use lock to perform single connection to a given bluetooth
+        # device; once a lock is deleted, it will be removed from the
+        # dictionary
+        self._lock = WeakValueDictionary()
 
     @staticmethod
     def get_bus():
@@ -90,9 +94,13 @@ class Bus:
                     logger.info('{} services resolved {}'.format(mac, value))
             finally:
                 task_sr.close()
+                del lock
+
+        logger.debug('number of connection locks: {}'.format(len(self._lock)))
 
         name = self._get_name(mac)
         logger.info('connected to {}'.format(name))
+
         return name
 
     def _property_bool(self, path, name):
