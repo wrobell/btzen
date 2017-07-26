@@ -47,6 +47,32 @@ setup(
     packages=find_packages('.'),
     scripts=('bin/btzen',),
     include_package_data=True,
+    long_description="""\
+Library to asynchronously access Bluetooth Smart devices.
+
+Features
+
+1. Devices and sensor readings
+
+   - SensorTag (CC2541DK, CC2650STK)
+
+     - temperature
+     - pressure
+     - humidity
+     - light (CC2541DK only)
+     - accelerometer (CC2541DK only)
+     - buttons (CC2541DK only)
+
+   - Mi Smart Scale
+   - serial devices implementing Stollmann (Telit) protocol
+
+2. Device access using `asyncio` coroutines.
+3. Notifications interface is supported.
+
+The scripts in `scripts` directory demonstrate reading data from various
+Bluetooth Smart devices, i.e. Sensor Tag, Mi Smart Scale or OSTC dive
+computer.
+"""
 )
 
 # vim: sw=4:et:ai
