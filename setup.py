@@ -28,7 +28,7 @@ from Cython.Build import cythonize
 
 setup(
     name='btzen',
-    version='0.2.0',
+    version='0.2.1',
     author='Artur Wroblewski',
     author_email='wrobell@riseup.net',
     url='https://github.com/wrobell/btzen',
@@ -45,7 +45,6 @@ setup(
         Extension('btzen._btzen', ['btzen/_btzen.pyx'], libraries=['systemd'])
     ]),
     packages=find_packages('.'),
-    scripts=('bin/btzen',),
     include_package_data=True,
     long_description="""\
 Library to asynchronously access Bluetooth Smart devices.
