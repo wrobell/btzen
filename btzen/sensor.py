@@ -38,9 +38,6 @@ from .bus import BUS
 from .error import ConfigurationError, DataReadError, DataWriteError
 from .util import dev_uuid
 
-# default length of buffer for notifying sensors
-BUFFER_LEN = 100
-
 logger = logging.getLogger(__name__)
 
 Parameters = namedtuple('Parameters', [
