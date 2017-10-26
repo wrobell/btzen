@@ -22,6 +22,8 @@ from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
 from .serial import Serial
 from .error import *
 
+__version__ = '0.2.2'
+
 __all__ = [
     'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
     'Button', 'Weight', 'Serial', 'Error', 'ConnectionError',
