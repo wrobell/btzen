@@ -54,6 +54,7 @@ class Serial:
         self._mac = mac
         self._system_bus = None
         self._loop = asyncio.get_event_loop()
+        self._buffer = bytearray()
 
     async def connect(self):
         bus = self._system_bus = BUS.get_bus()
@@ -79,7 +80,7 @@ class Serial:
     async def read(self, n):
         tx = self._tx_uart
 
-        data = bytearray()
+        data = bytearray(self._buffer)
         while len(data) < n:
             async with self._rx_credits_mgr(n - len(data)):
                 item = await tx
@@ -91,8 +92,11 @@ class Serial:
                         .format(len(data), hexlify(data[-5:]), len(self._tx_credit))
                     )
 
-        assert len(data) == n
-        return data
+        assert len(data) >= n
+
+        # keep extra data in buffer, return only requested number of bytes
+        self._buffer = data[n:]
+        return data[:n]
 
     async def write(self, data):
         assert len(data) <= 20
