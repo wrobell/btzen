@@ -20,6 +20,10 @@
 
 """
 Connect to OSTC dive computer and show last 20 dives.
+
+See also
+
+    http://git.savannah.nongnu.org/cgit/kenozooid.git/tree/kenozooid/driver/hwos
 """
 
 import argparse
@@ -28,7 +32,9 @@ import logging
 import struct
 from collections import namedtuple
 from cytoolz import itertoolz as itz
+from cytoolz.functoolz import identity
 from datetime import datetime
+from functools import partial
 
 import btzen._btzen as cbtzen
 from btzen import Serial
@@ -36,12 +42,11 @@ from btzen import Serial
 logger = logging.getLogger(__name__)
 
 DiveHeader = namedtuple('DiveHeader', ['size', 'datetime', 'depth', 'duration', 'dive_number', 'version'])
-to_int = lambda value: sum(v << (s * 8) for v, s in zip(value, range(len(value))))
+to_int = partial(int.from_bytes, byteorder='little', signed=False)
 to_timestamp = lambda value: datetime(value[0] + 2000, *value[1:])
-to_self = lambda value: value
 to_depth = lambda v: v * 9.80665 / 1000
 to_duration = lambda v: (to_int(v[:2]) * 60 + int(v[2])) / 60
-header_parsers = (to_int, to_timestamp, to_depth, to_duration) + (to_self,) * 2
+header_parsers = (to_int, to_timestamp, to_depth, to_duration) + (identity,) * 2
 
 def parse_header(item):
     item = struct.unpack('<3s5sH3sHB', item)
