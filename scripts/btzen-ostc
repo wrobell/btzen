@@ -19,7 +19,7 @@
 #
 
 """
-Connect to OSTC dive computer and show last five dives.
+Connect to OSTC dive computer and show last 20 dives.
 """
 
 import argparse
@@ -80,7 +80,7 @@ async def read_data(mac):
         headers = await dev.read(4098)
         headers = headers[1:-1]
 
-        # get 5 latests dives
+        # get 20 latests dives
         items = itz.partition(16, headers)
         # convert back to bytes, see https://github.com/pytoolz/cytoolz/issues/102
         # also filter unused headers
