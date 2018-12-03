@@ -138,7 +138,7 @@ cdef class PropertyChangeTask:
     def __await__(self):
         self._task = self._queue.get()
         try:
-            value = yield from self._task
+            value = yield from self._task.__await__()
         finally:
             self._task = None
         return value
