@@ -22,7 +22,7 @@ from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
 from .serial import Serial
 from .error import *
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 
 __all__ = [
     'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',

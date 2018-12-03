@@ -28,7 +28,7 @@ from Cython.Build import cythonize
 
 setup(
     name='btzen',
-    version='0.2.3',
+    version='0.2.4',
     author='Artur Wroblewski',
     author_email='wrobell@riseup.net',
     url='https://github.com/wrobell/btzen',
