@@ -2,7 +2,7 @@
 #
 # BTZen - Bluetooth Smart sensor reading library.
 #
-# Copyright (C) 2015-2017 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015-2018 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
