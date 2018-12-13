@@ -96,26 +96,24 @@ class Bus:
         return by_uuid[uuid]
 
     async def _connect_and_resolve(self, bus, path):
-        # create "service resolved" notification first
+        logger.info('connecting to {}'.format(path))
+        await self._connect(bus, path)
+
+        # first create task
         task_sr = _btzen.bt_property_monitor(
             bus, path, INTERFACE_DEVICE, 'ServicesResolved'
         )
-
-        try:
-            # if services resolved, then device is connected
-            resolved = self._property_bool(path, 'ServicesResolved')
-            if not resolved:
-
-                # but if not connected, then try to connect
-                logger.info('connecting to {}'.format(path))
-                await self._connect(bus, path)
-
+        # then check the property
+        resolved = self._property_bool(path, 'ServicesResolved')
+        if not resolved:
+            try:
+                logger.info('resolving services for {}'.format(path))
                 # and wait for services to be resolved
                 value = await task_sr
                 logger.info('{} services resolved {}'.format(path, value))
-        finally:
-            # destroy the notification
-            task_sr.close()
+            finally:
+                # destroy the notification
+                task_sr.close()
 
     async def _connect(self, bus, path):
         try:
