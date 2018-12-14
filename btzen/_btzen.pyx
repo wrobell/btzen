@@ -399,7 +399,7 @@ def bt_property_bool(Bus bus, str path, str iface, str name):
 
 def bt_notify(Bus bus, str path):
     """
-    Start monitoring of value changes of a device identified by GATT
+    Start monitoring value changes of a device identified by GATT
     characteristics path.
 
     Asynchronous task is returned.
