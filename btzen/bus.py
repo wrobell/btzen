@@ -20,7 +20,6 @@
 import asyncio
 import logging
 import threading
-import time
 from functools import lru_cache, partial
 from weakref import WeakValueDictionary
 
@@ -33,6 +32,9 @@ INTERFACE_DEVICE = 'org.bluez.Device1'
 
 def _mac(mac):
     return mac.replace(':', '_').upper()
+
+def _device_path(mac):
+    return '/org/bluez/hci0/dev_{}'.format(_mac(mac))
 
 class Bus:
     THREAD_LOCAL = threading.local()
@@ -69,7 +71,7 @@ class Bus:
         :param mac: MAC address of Bluetooth device.
         """
         bus = self.get_bus()
-        path = self._get_device_path(mac)
+        path = _device_path(mac)
 
         lock = self._lock.get(mac)
         if lock is None:
@@ -95,14 +97,23 @@ class Bus:
         by_uuid = self._get_sensor_paths(mac)
         return by_uuid[uuid]
 
+    async def _property_monitor(self, path, property):
+        task = _btzen.bt_property_monitor(
+            self.get_bus(),
+            path,
+            INTERFACE_DEVICE,
+            'ServicesResolved'
+        )
+        value = await task
+        assert isinstance(value, tuple) and len(value) == 2
+        return value[1]
+
     async def _connect_and_resolve(self, bus, path):
         logger.info('connecting to {}'.format(path))
         await self._connect(bus, path)
 
         # first create task
-        task_sr = _btzen.bt_property_monitor(
-            bus, path, INTERFACE_DEVICE, 'ServicesResolved'
-        )
+        task_sr = self._property_monitor(path, 'ServicesResolved')
         # then check the property
         resolved = self._property_bool(path, 'ServicesResolved')
         if not resolved:
@@ -135,19 +146,15 @@ class Bus:
 
     @lru_cache()
     def _get_sensor_paths(self, mac):
-        path = self._get_device_path(mac)
+        path = _device_path(mac)
         by_uuid = _btzen.bt_characteristic(self.get_bus(), path)
         return by_uuid
 
     @lru_cache()
     def _get_name(self, mac):
-        path = self._get_device_path(mac)
+        path = _device_path(mac)
         bus = self.get_bus()
         return _btzen.bt_property_str(bus, path, INTERFACE_DEVICE, 'Name')
-
-    def _get_device_path(self, mac):
-        path = '/org/bluez/hci0/dev_{}'.format(_mac(mac))
-        return path
 
     def _process_event(self):
         bus = self.get_bus()
