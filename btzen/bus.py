@@ -116,15 +116,15 @@ class Bus:
         task_sr = self._property_monitor(path, 'ServicesResolved')
         # then check the property
         resolved = self._property_bool(path, 'ServicesResolved')
-        if not resolved:
-            try:
+        try:
+            if not resolved:
                 logger.info('resolving services for {}'.format(path))
                 # and wait for services to be resolved
                 value = await task_sr
                 logger.info('{} services resolved {}'.format(path, value))
-            finally:
-                # destroy the notification
-                task_sr.close()
+        finally:
+            # destroy the notification
+            task_sr.close()
 
     async def _connect(self, bus, path):
         try:
