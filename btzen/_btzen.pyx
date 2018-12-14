@@ -187,6 +187,8 @@ cdef int task_cb_connect(sd_bus_message *msg, void *user_data, sd_bus_error *ret
     return 1
 
 def bt_connect(Bus bus, str path, task):
+    assert bus is not None
+
     r = sd_bus_call_method_async(
         bus.bus,
         NULL,
@@ -215,6 +217,8 @@ cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_er
     return 1
 
 def bt_read(Bus bus, str path, task):
+    assert bus is not None
+
     r = sd_bus_call_method_async(
         bus.bus,
         NULL,
@@ -253,6 +257,8 @@ def bt_write(Bus bus, str path, bytes data, task):
     :param data: Data to write.
     :param task: Asyncio coroutine.
     """
+    assert bus is not None
+
     cdef sd_bus_message *msg = NULL
     cdef char* buff = data
 
@@ -313,6 +319,8 @@ def _bt_property_monitor(Bus bus, str path, str iface, PropertyChangeTask task):
     :param iface: Device interface.
     :param task: Asynchronous task for property value changes.
     """
+    assert bus is not None
+
     cdef sd_bus_slot *slot
     rule = fmt_rule(path, iface)
     r = sd_bus_add_match(bus.bus, &slot, rule, task_cb_property_monitor, <void*>task)
@@ -332,11 +340,14 @@ def bt_property_monitor(Bus bus, str path, str iface, *properties):
     :param iface: Device interface.
     :param *properties: Property names to watch.
     """
+    assert bus is not None
     task = PropertyChangeTask(*properties)
     _bt_property_monitor(bus, path, iface, task)
     return task
 
 def bt_property_str(Bus bus, str path, str iface, str name):
+    assert bus is not None
+
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
@@ -361,6 +372,8 @@ def bt_property_str(Bus bus, str path, str iface, str name):
     return value
 
 def bt_property_bool(Bus bus, str path, str iface, str name):
+    assert bus is not None
+
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
@@ -394,6 +407,8 @@ def bt_notify(Bus bus, str path):
     :param bus: D-Bus reference.
     :param path: GATT characteristics path of the device.
     """
+    assert bus is not None
+
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 
@@ -417,6 +432,8 @@ def bt_notify(Bus bus, str path):
     return task
 
 def bt_notify_stop(Bus bus, str path):
+    assert bus is not None
+
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 
@@ -438,6 +455,8 @@ def bt_notify_stop(Bus bus, str path):
         sd_bus_message_unref(msg)
 
 def bt_process(Bus bus):
+    assert bus is not None
+
     cdef sd_bus_message *msg
     return sd_bus_process(bus.bus, &msg)
 
@@ -447,6 +466,8 @@ def bt_characteristic(Bus bus, str path):
 
     Dictionary `uuid -> path` is returned.
     """
+    assert bus is not None
+
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
