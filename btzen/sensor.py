@@ -152,15 +152,6 @@ class Sensor:
         _btzen.bt_write(self._system_bus, path, data, task)
         await task
 
-    def _write_sync(self, path, data):
-        """
-        Write data to Bluetooth device.
-
-        :param path: Gatt characteristic path of the device.
-        :param data: Data to write.
-        """
-        task = self._write(path, data)
-        next(asyncio.as_completed([task]))
 
     async def _enable(self):
         """
