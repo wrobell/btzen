@@ -29,10 +29,14 @@ import logging
 import btzen
 
 async def read_weight(reader):
-    await reader.connect()
     while True:
         t1 = loop.time()
-        value = await reader.read()
+
+        try:
+            value = await reader.read()
+        except asyncio.CancelledError as ex:
+            pass
+
         t2 = loop.time()
         print('weight: {} ({:.4f}s)'.format(value, t2 - t1))
 
@@ -45,10 +49,14 @@ args = parser.parse_args()
 sensor = btzen.Weight(args.device, notifying=True)
 task = read_weight(sensor)
 
+# create connection manager
+manager = btzen.ConnectionManager()
+manager.add(sensor)
+
 loop = asyncio.get_event_loop()
 try:
-    loop.run_until_complete(task)
+    loop.run_until_complete(asyncio.gather(task, manager))
 finally:
-    sensor.close()
+    manager.close()
 
 # vim: sw=4:et:ai
