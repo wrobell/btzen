@@ -51,15 +51,16 @@ class Sensor:
     :var _task: Current asynchronous task.
     :var _system_bus: System D-Bus reference (not thread safe).
     """
-    def __init__(self, mac, notifying=False, loop=None):
+    def __init__(self, mac, notifying=False):
         self._mac = mac
         self._notifying = notifying
-        self._loop = loop if loop else asyncio.get_event_loop()
+        self._loop = asyncio.get_event_loop()
         self._task = None
         self._notification = None
 
         self._params = None
-        self._system_bus = None
+        self._system_bus = BUS.get_bus()
+        self._conn_event = asyncio.Event()
 
     async def connect(self):
         """
@@ -69,24 +70,22 @@ class Sensor:
         assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
         assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
 
-        self._system_bus = BUS.get_bus()
-
         name = await BUS.connect(self._mac)
         self._set_parameters(name)
         await self._enable()
 
-    def set_interval(self, interval):
+    async def set_interval(self, interval):
+        await self._conn_event.wait()
         path = self._params.path_period
         if path:
             value = int(interval * 100)
             assert value < 256
             bus = self._system_bus
             try:
-                self._write_sync(path, bytes([value]))
+                await self._write(path, bytes([value]))
             except DataWriteError as ex:
-                logger.exception(ex)
                 msg = 'Cannot set sensor interval value: {}'.format(r)
-                raise ConfigurationError(msg)
+                raise ConfigurationError(msg) from ex
 
     async def read(self):
         """
@@ -94,15 +93,22 @@ class Sensor:
 
         This method is an asynchronous coroutine and is *not* thread safe.
         """
-        if self._notifying:
-            task = self._notification
+        try:
+            await self._conn_event.wait()
+
+            if self._notifying:
+                task = self._notification
+            else:
+                task = self._loop.create_future()
+                _btzen.bt_read(self._system_bus, self._params.path_data, task)
+
+            self._task = task
+            value = self._converter(await task)
+        except Exception as ex:
+            raise asyncio.CancelledError('Read error') from ex
         else:
-            task = self._loop.create_future()
-            _btzen.bt_read(self._system_bus, self._params.path_data, task)
-        self._task = task
-        value = self._converter(await task)
-        self._task = None
-        return value
+            self._task = None
+            return value
 
     def close(self):
         """
@@ -110,32 +116,9 @@ class Sensor:
 
         Pending, asynchronous coroutines are cancelled.
         """
-        # ignore any errors when closing sensor
-        try:
-            bus = self._system_bus
-            params = self._params
-            if not params:
-                return
-
-            if self._notifying:
-                _btzen.bt_notify_stop(bus, params.path_data)
-
-            # disable switched on sensor; some sensors stay always on,
-            # i.e. button
-            if params.config_off:
-                self._write_sync(params.path_conf, params.config_off)
-
-            task = self._task
-            if task and not task.done():
-                ex = asyncio.CancelledError('Sensor coroutine closed')
-                task.set_exception(ex)
-
-        except Exception as ex:
-            logger.warn('error when closing sensor: {}'.format(ex))
-        finally:
-            self._task = None
-            self._system_bus = None
-            logger.info('{} sensor closed'.format(self._mac))
+        self._cancel()
+        self._loop.run_until_complete(self._stop())
+        logger.info('Sensor {} stopped'.format(self._mac))
 
     def _set_parameters(self, name):
         get_path = partial(BUS.sensor_path, self._mac)
@@ -180,6 +163,9 @@ class Sensor:
         next(asyncio.as_completed([task]))
 
     async def _enable(self):
+        """
+        Switch on and enable the sensor.
+        """
         bus = self._system_bus
         params = self._params
         if self._notifying:
@@ -188,10 +174,49 @@ class Sensor:
         else:
             config_on = params.config_on
 
-        # enabled switched off sensor; some sensors are always on,
-        # i.e. button
+        # enable sensor; some sensors are always on, i.e. button
         if config_on:
             await self._write(params.path_conf, config_on)
+        self._conn_event.set()
+        logger.info('enabled device: {}'.format(self._mac))
+
+    async def _disable(self):
+        """
+        Disable and switch off the sensor.
+        """
+        self._conn_event.clear()
+        self._cancel()
+        await self._stop()
+        logger.info('disabled device: {}'.format(self._mac))
+
+    async def _stop(self):
+        """
+        Stop sensor notifications and switch the sensor off.
+        """
+        params = self._params
+        if not params:
+            return
+
+        if self._notifying:
+            try:
+                # TODO: make it asynchronous
+                _btzen.bt_notify_stop(self._system_bus, params.path_data)
+            except Exception as ex:
+                logger.warning('Cannot stop notifications: {}'.format(ex))
+
+        # disable switched on sensor; some sensors stay always on,
+        # i.e. button
+        if params.config_off:
+            try:
+                await self._write(params.path_conf, params.config_off)
+            except Exception as ex:
+                logger.warning('Cannot switch sensor off: {}'.format(ex))
+
+    def _cancel(self):
+        task = self._task
+        if task is not None:
+            task.cancel()
+        self._task = None
 
 
 class Temperature(Sensor):

@@ -24,34 +24,35 @@ import logging
 
 import btzen
 
+async def read(name, reader):
+    t1 = loop.time()
+    while True:
+        try:
+            value = await reader.read()
+            break
+        except asyncio.CancelledError as ex:
+            pass
+    t2 = loop.time()
+    return (t2 - t1), value
 
 async def read_sensor(name, reader):
-    await reader.connect()
     while True:
-        t1 = loop.time()
-        value = await reader.read()
+        t, value = await read(name, reader)
         value = '{:.1f}'.format(value)
-        t2 = loop.time()
-        print('{}: {} ({:.4f}s)'.format(name, value, t2 - t1))
+        print('{}: {} ({:.4f}s)'.format(name, value, t))
         await asyncio.sleep(-loop.time() % 1)
 
-async def read_accelerometer(reader):
-    await reader.connect()
-    reader.set_interval(0.1)
+async def read_accelerometer(name, reader):
+    await reader.set_interval(0.1)
     while True:
-        t1 = loop.time()
-        values = await reader.read()
+        t, values = await read(name, reader)
         values = ', '.join('{:.4f}'.format(v) for v in values)
-        t2 = loop.time()
-        print('accelerometer: {} ({:.4f}s)'.format(values, t2 - t1))
+        print('accelerometer: {} ({:.4f}s)'.format(values, t))
 
-async def read_button(reader):
-    await reader.connect()
+async def read_button(name, reader):
     while True:
-        t1 = loop.time()
-        value = await reader.read()
-        t2 = loop.time()
-        print('button: {} ({:.4f}s)'.format(value, t2 - t1))
+        t, value = await read(name, reader)
+        print('button: {} ({:.4f}s)'.format(value, t))
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -68,28 +69,37 @@ else:
 
 print('connecting to {}...'.format(args.device))
 
-names = ['pressure', 'temperature', 'humidity', 'light']
-classes = [
-    btzen.Pressure, btzen.Temperature, btzen.Humidity, btzen.Light,
+sensor_def = [
+    ('pressure', btzen.Pressure, False, read_sensor),
+    ('temperature', btzen.Temperature, False, read_sensor),
+    ('humidity', btzen.Humidity, False, read_sensor),
+    ('light', btzen.Light, False, read_sensor),
+    # notifying readers
+    ('button', btzen.Button, True, read_button),
+    ('accelerometer', btzen.Accelerometer, True, read_accelerometer),
 ]
-readers = ((n, c(args.device)) for c, n in zip(classes, names))
-readers = {n: r for n, r in readers if r is not None}
+
+# initialize all Sensor Tag sensors
+items = [
+    (name, reader, cls(args.device, notifying=notifying))
+    for name, cls, notifying, reader in sensor_def
+]
+sensors =  [sensor for _, _, sensor in items]
+
+# create tasks reading the sensor data
+tasks = [reader(name, sensor) for name, reader, sensor in items]
+
+# create connection manager
+manager = btzen.ConnectionManager()
+manager.add(*sensors)
+tasks.append(manager)
+
 print('sensors initialized')
-
 loop = asyncio.get_event_loop()
-sensors = sorted([(n, r) for n, r in readers.items() if r])
-tasks = [read_sensor(n, r) for n, r in sensors]
-
-reader = readers['accelerometer'] = btzen.Accelerometer(args.device, notifying=True)
-tasks.append(read_accelerometer(reader))
-
-reader = readers['button'] = btzen.Button(args.device, notifying=True)
-tasks.append(read_button(readers['button']))
-
 try:
     loop.run_until_complete(asyncio.gather(*tasks))
 finally:
-    for r in readers.values():
-        r.close()
+    # connection manager closes all sensors
+    manager.close()
 
 # vim: sw=4:et:ai

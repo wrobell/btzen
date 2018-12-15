@@ -125,9 +125,9 @@ cdef class PropertyChangeTask:
     def throw(self, type, value=None, tb=None):
         pass
 
-    def close(self):
+    def cancel(self):
         """
-        Close property change task.
+        Cancel property change task.
         """
         sd_bus_slot_unref(self.slot)
         self.slot = NULL
@@ -142,9 +142,6 @@ cdef class PropertyChangeTask:
         finally:
             self._task = None
         return value
-
-    def __len__(self):
-        return self._queue.qsize()
 
 cdef class ValueChangeTask(PropertyChangeTask):
     def __init__(self):
