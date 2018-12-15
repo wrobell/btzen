@@ -25,7 +25,7 @@ import struct
 from collections import namedtuple
 from .util import dev_uuid
 
-Weight = namedtuple('Weight', 'weight stabilized')
+Weight = namedtuple('Weight', 'weight stabilized load_removed')
 
 SHT21_TEMP = 175.72 / 65536
 SHT21_HUMIDITY = 125 / 65536
@@ -78,7 +78,8 @@ def converter_epcos_t5400_pressure(dev, p_conf):
 def mi_weight_scale(data):
     status, weight = struct.unpack('<BH', data[0:3])
     stabilized = (status & 0x20) == 0x20
-    return Weight(weight * 0.005, stabilized)
+    load_removed = (status & 0x80) == 0x80
+    return Weight(weight * 0.005, stabilized, load_removed)
 
 # (sensor name, sensor id): data converter
 DATA_CONVERTER = {
