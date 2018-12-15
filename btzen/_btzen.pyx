@@ -71,7 +71,7 @@ cdef extern from "<systemd/sd-bus.h>":
     int sd_bus_message_open_container(sd_bus_message*, char, const char*)
     int sd_bus_message_close_container(sd_bus_message*)
     int sd_bus_call(sd_bus*, sd_bus_message*, long, sd_bus_error*, sd_bus_message**)
-    int sd_bus_call_async(sd_bus*, sd_bus_slot*, sd_bus_message*, sd_bus_message_handler_t, void*, uint64_t)
+    int sd_bus_call_async(sd_bus*, sd_bus_slot*, sd_bus_message*, sd_bus_message_handler_t, void*, long)
 
 
     int sd_bus_get_property(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, sd_bus_message**, const char*)
