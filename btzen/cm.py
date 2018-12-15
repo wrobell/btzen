@@ -31,7 +31,7 @@ flatten = chain.from_iterable
 logger = logging.getLogger(__name__)
 
 ENABLE = attrgetter('_enable')
-DISABLE = attrgetter('_disable')
+HOLD = attrgetter('_hold')
 
 class ConnectionManager:
     def __init__(self):
@@ -41,7 +41,7 @@ class ConnectionManager:
         self._tasks = []
 
         self._enable = partial(self._exec, ENABLE)
-        self._disable = partial(self._exec, DISABLE)
+        self._hold = partial(self._exec, HOLD)
 
     def add(self, *devices):
         for dev in devices:
@@ -60,29 +60,39 @@ class ConnectionManager:
         yield from asyncio.wait(self._tasks).__await__()
 
     async def _reconnect(self, mac, devices):
-        self._process = True
-        while self._process:
-            await self._connect(devices)
-            break
-
-        while self._process:
-            await self._restart(mac, devices)
-
-    async def _restart(self, mac, devices):
         path = _device_path(mac)
-        resolved = await BUS._property_monitor(path, 'ServicesResolved')
-        f = self._enable if resolved else self._disable
-        await f(devices)
+
+        self._process = True
+        # run reconnection in the loop; this loop shall rarely restart as
+        # `self._restart` is the main loop reacting to reconnections;
+        # therefore if there is an error, sleep for 5 seconds to avoid cpu
+        # hogging
+        while self._process:
+            try:
+                await BUS.connect(mac)
+                await self._enable(devices)
+                await self._restart(path, devices)
+            except Exception as ex:
+                logger.warning(
+                    'cannot connect to {} due to {}, waiting 5s'
+                    .format(mac, ex)
+                )
+                # TODO: make it configurable
+                await asyncio.sleep(5)
+
+    async def _restart(self, path, devices):
+        # renable or hold device when services resolved property changes;
+        # no exception handling as it is done by `self._reconnect`; here we
+        # assume everything works without any errors
+        while self._process:
+            resolved = await BUS._property_monitor(path, 'ServicesResolved')
+            # enable if services resolved, otherwise no point of disabling
+            # or disconnecting the device, so just hold
+            f = self._enable if resolved else self._hold
+            await f(devices)
 
     async def _exec(self, f_get, devices):
         tasks = [f_get(dev)() for dev in devices]
         await asyncio.wait(tasks)
-
-    async def _connect(self, devices):
-        try:
-            for dev in devices:
-                await dev.connect()
-        except Exception as ex:
-            logger.warning('cannot connect due to: {}'.format(ex))
 
 # vim: sw=4:et:ai

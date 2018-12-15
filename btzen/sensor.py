@@ -66,12 +66,7 @@ class Sensor:
         """
         Connect to sensor Bluetooth device.
         """
-        assert isinstance(self.UUID_DATA, str)
-        assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
-        assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
-
-        name = await BUS.connect(self._mac)
-        self._set_parameters(name)
+        await BUS.connect(self._mac)
         await self._enable()
 
     async def set_interval(self, interval):
@@ -120,9 +115,15 @@ class Sensor:
         self._loop.run_until_complete(self._stop())
         logger.info('Sensor {} stopped'.format(self._mac))
 
-    def _set_parameters(self, name):
+    def _set_parameters(self):
+        assert isinstance(self.UUID_DATA, str)
+        assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
+        assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
+
         get_path = partial(BUS.sensor_path, self._mac)
         mac = self._mac
+        name = BUS._get_name(mac)
+
         self._params = params = Parameters(
             name,
             get_path(self.UUID_DATA),
@@ -157,6 +158,8 @@ class Sensor:
         """
         Switch on and enable the sensor.
         """
+        self._set_parameters()
+
         bus = self._system_bus
         params = self._params
         if self._notifying:
@@ -175,10 +178,14 @@ class Sensor:
         """
         Disable and switch off the sensor.
         """
-        self._conn_event.clear()
-        self._cancel()
+        await self._hold()
         await self._stop()
         logger.info('disabled device: {}'.format(self._mac))
+
+    async def _hold(self):
+        self._conn_event.clear()
+        self._cancel()
+        logger.info('device {} on hold'.format(self._mac))
 
     async def _stop(self):
         """
