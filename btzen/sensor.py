@@ -101,8 +101,8 @@ class Sensor:
 
         Pending, asynchronous coroutines are closed.
         """
+        self._stop()
         self._close_task()
-        self._stop_sync()
         logger.info('sensor {} closed'.format(self))
 
     def _set_parameters(self):
@@ -156,30 +156,7 @@ class Sensor:
         self._close_task()
         logger.info('device {} on hold'.format(self))
 
-    async def _stop(self):
-        """
-        Stop sensor notifications and switch the sensor off.
-        """
-        params = self._params
-        if not params:
-            return
-
-        if self._notifying:
-            try:
-                # TODO: make it asynchronous
-                BUS._gatt_stop(params.path_data)
-            except Exception as ex:
-                logger.warning('Cannot stop notifications: {}'.format(ex))
-
-        # disable switched on sensor; some sensors stay always on,
-        # i.e. button
-        if params.config_off:
-            try:
-                await self._write(params.path_conf, params.config_off)
-            except Exception as ex:
-                logger.warning('Cannot switch sensor off: {}'.format(ex))
-
-    def _stop_sync(self):
+    def _stop(self):
         """
         Stop sensor notifications and switch the sensor off.
         """
