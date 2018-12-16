@@ -99,9 +99,9 @@ class Sensor:
         """
         Disable sensor and stop reading sensor data.
 
-        Pending, asynchronous coroutines are cancelled.
+        Pending, asynchronous coroutines are closed.
         """
-        self._cancel()
+        self._close_task()
         self._loop.run_until_complete(self._stop())
         logger.info('sensor {} closed'.format(self._mac))
 
@@ -161,7 +161,7 @@ class Sensor:
 
     async def _hold(self):
         self._conn_event.clear()
-        self._cancel()
+        self._close_task()
         logger.info('device {} on hold'.format(self._mac))
 
     async def _stop(self):
@@ -187,11 +187,14 @@ class Sensor:
             except Exception as ex:
                 logger.warning('Cannot switch sensor off: {}'.format(ex))
 
-    def _cancel(self):
+    def _close_task(self):
+        """
+        Close current asynchronous task.
+        """
         task = self._task
         if task is not None:
             task.close()
-        self._task = None
+            self._task = None
 
 
 class Temperature(Sensor):
