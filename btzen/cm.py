@@ -81,12 +81,16 @@ class ConnectionManager:
         # renable or hold device when services resolved property changes;
         # no exception handling as it is done by `self._reconnect`; here we
         # assume everything works without any errors
-        while self._process:
-            resolved = await BUS._property_monitor(path, 'ServicesResolved')
-            # enable if services resolved, otherwise no point of disabling
-            # or disconnecting the device, so just hold
-            f = self._enable if resolved else self._hold
-            await f(devices)
+        BUS._dev_property_start(path, 'ServicesResolved')
+        try:
+            while self._process:
+                resolved = await BUS._dev_property_get(path, 'ServicesResolved')
+                # enable if services resolved, otherwise no point of disabling
+                # or disconnecting the device, so just hold
+                f = self._enable if resolved else self._hold
+                await f(devices)
+        finally:
+            BUS._dev_property_stop(path, 'ServicesResolved')
 
     async def _exec(self, f_get, devices):
         tasks = [f_get(dev)() for dev in devices]

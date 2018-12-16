@@ -31,7 +31,7 @@ async def read(name, reader):
             value = await reader.read()
             break
         except asyncio.CancelledError as ex:
-            print('error: {}: {}'.format(ex, ex.__cause__))
+            print('error for {}: {}: {}'.format(name, ex, ex.__cause__))
     t2 = loop.time()
     return (t2 - t1), value
 

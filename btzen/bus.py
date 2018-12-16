@@ -29,6 +29,7 @@ from .error import ConnectionError
 logger = logging.getLogger(__name__)
 
 INTERFACE_DEVICE = 'org.bluez.Device1'
+INTERFACE_GATT_CHR = 'org.bluez.GattCharacteristic1'
 
 def _mac(mac):
     return mac.replace(':', '_').upper()
@@ -49,6 +50,7 @@ class Bus:
         # connection to a given bluetooth device; once a lock is deleted,
         # it will be removed from the dictionary
         self._lock = WeakValueDictionary()
+        self._notifications = Notifications(self)
 
     @staticmethod
     def get_bus():
@@ -97,23 +99,41 @@ class Bus:
         by_uuid = self._get_sensor_paths(mac)
         return by_uuid[uuid]
 
-    async def _property_monitor(self, path, property):
-        task = _btzen.bt_property_monitor(
-            self.get_bus(),
-            path,
-            INTERFACE_DEVICE,
-            'ServicesResolved'
-        )
-        value = await task
-        assert isinstance(value, tuple) and len(value) == 2
-        return value[1]
+    def _gatt_start(self, path):
+        self._notifications.start(path, INTERFACE_GATT_CHR, 'Value')
+        _btzen.bt_notify_start(self.get_bus(), path)
+
+    async def _gatt_get(self, path):
+        task = self._notifications.get(path, INTERFACE_GATT_CHR, 'Value')
+        return (await task)
+
+    def _gatt_stop(self, path):
+        _btzen.bt_notify_stop(self.get_bus(), path)
+        self._notifications.stop(path, INTERFACE_GATT_CHR)
+
+    def _dev_property_start(self, path, name):
+        self._notifications.start(path, INTERFACE_DEVICE, name)
+
+    async def _dev_property_get(self, path, name):
+        value = await self._notifications.get(path, INTERFACE_DEVICE, name)
+        return value
+
+    def _dev_property_stop(self, path, name):
+        self._notifications.stop(path, INTERFACE_DEVICE)
+
+    async def _dev_property(self, path, name):
+        self._dev_property_start(path, name)
+        try:
+            return (await self._dev_property_get(path, name))
+        finally:
+            self._dev_property_stop(path, name)
 
     async def _connect_and_resolve(self, bus, path):
         logger.info('connecting to {}'.format(path))
         await self._connect(bus, path)
 
         # first create task
-        task_sr = self._property_monitor(path, 'ServicesResolved')
+        task_sr = self._dev_property(path, 'ServicesResolved')
         # then check the property
         resolved = self._property_bool(path, 'ServicesResolved')
         try:
@@ -128,8 +148,7 @@ class Bus:
 
     async def _connect(self, bus, path):
         try:
-            task = self._loop.create_future()
-            _btzen.bt_connect(bus, path, task)
+            task = _btzen.bt_connect(bus, path)
             await task
         except Exception as ex:
             # exception might be raised if device is already connected, so
@@ -162,6 +181,34 @@ class Bus:
         r = process(bus)
         while r > 0:
             r = process(bus)
+
+class Notifications:
+    def __init__(self, bus):
+        self._data = {}
+        self._bus = bus
+
+    def start(self, path, iface, name):
+        key = path, iface
+        data = self._data.get(key)
+        if data is None:
+            bus = self._bus.get_bus()
+            data = _btzen.bt_property_monitor_start(bus, path, iface)
+            self._data[key] = data
+
+        assert key in self._data
+        if not data.is_registered(name):
+            data.register(name)
+
+    async def get(self, path, iface, name):
+        key = path, iface
+        data = self._data[key]
+        return (await data.get(name))
+
+    def stop(self, path, iface):
+        # TODO: add name and call PropertyNotification.stop when no
+        # properties monitored
+        key = path, iface
+        data = self._data[key].stop()
 
 BUS = Bus()
 

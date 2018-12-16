@@ -56,11 +56,14 @@ class Sensor:
         self._notifying = notifying
         self._loop = asyncio.get_event_loop()
         self._task = None
-        self._notification = None
 
         self._params = None
         self._system_bus = BUS.get_bus()
         self._conn_event = asyncio.Event()
+
+        read = partial(_btzen.bt_read, self._system_bus)
+        self._read_data = BUS._gatt_get if notifying else read
+        self._write = partial(_btzen.bt_write, self._system_bus)
 
     async def connect(self):
         """
@@ -90,15 +93,8 @@ class Sensor:
         """
         try:
             await self._conn_event.wait()
-
-            if self._notifying:
-                task = self._notification
-            else:
-                task = self._loop.create_future()
-                _btzen.bt_read(self._system_bus, self._params.path_data, task)
-
-            self._task = task
-            value = self._converter(await task)
+            self._task = self._read_data(self._params.path_data)
+            value = self._converter(await self._task)
         except Exception as ex:
             raise asyncio.CancelledError('Read error') from ex
         else:
@@ -113,7 +109,7 @@ class Sensor:
         """
         self._cancel()
         self._loop.run_until_complete(self._stop())
-        logger.info('Sensor {} stopped'.format(self._mac))
+        logger.info('sensor {} closed'.format(self._mac))
 
     def _set_parameters(self):
         assert isinstance(self.UUID_DATA, str)
@@ -140,20 +136,6 @@ class Sensor:
         # TODO: fix for CC2541DK
         self._converter = factory(name, None)
 
-    async def _write(self, path, data):
-        """
-        Write data to Bluetooth device.
-
-        The method is an asynchronous coroutine.
-
-        :param path: Gatt characteristic path of the device.
-        :param data: Data to write.
-        """
-        task = self._loop.create_future()
-        _btzen.bt_write(self._system_bus, path, data, task)
-        await task
-
-
     async def _enable(self):
         """
         Switch on and enable the sensor.
@@ -162,15 +144,16 @@ class Sensor:
 
         bus = self._system_bus
         params = self._params
-        if self._notifying:
-            config_on = params.config_on_notify
-            self._notification = _btzen.bt_notify(bus, params.path_data)
-        else:
-            config_on = params.config_on
+        notify = self._notifying
+
+        config_on = params.config_on_notify if notify else params.config_on
 
         # enable sensor; some sensors are always on, i.e. button
         if config_on:
             await self._write(params.path_conf, config_on)
+
+        if notify:
+            BUS._gatt_start(params.path_data)
         self._conn_event.set()
         logger.info('enabled device: {}'.format(self._mac))
 
@@ -198,7 +181,7 @@ class Sensor:
         if self._notifying:
             try:
                 # TODO: make it asynchronous
-                _btzen.bt_notify_stop(self._system_bus, params.path_data)
+                BUS._gatt_stop(params.path_data)
             except Exception as ex:
                 logger.warning('Cannot stop notifications: {}'.format(ex))
 
@@ -213,7 +196,7 @@ class Sensor:
     def _cancel(self):
         task = self._task
         if task is not None:
-            task.cancel()
+            task.close()
         self._task = None
 
 

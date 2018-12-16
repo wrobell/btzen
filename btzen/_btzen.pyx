@@ -103,52 +103,34 @@ cdef class Bus:
     def fileno(self):
         return self._fd_no
 
-cdef class PropertyChangeTask:
+cdef class PropertyNotification:
     cdef sd_bus_slot *slot
-    cdef object _loop
-    cdef object _queue
-    cdef object _task
-    cdef public object properties
+    cdef public object queues
 
-    def __init__(self, *properties):
-        self._queue = asyncio.Queue()
-        self._loop = asyncio.get_event_loop()
-        self.properties = set(properties)
-        self._task = None
-
-    def put(self, name, value):
-        self._queue.put_nowait((name, value))
-
-    def send(self, value):
-        pass
-
-    def throw(self, type, value=None, tb=None):
-        pass
-
-    def cancel(self):
-        """
-        Cancel property change task.
-        """
-        sd_bus_slot_unref(self.slot)
-        self.slot = NULL
-        task = self._task
-        if task is not None:
-            task.close()
-
-    def __await__(self):
-        self._task = self._queue.get()
-        try:
-            value = yield from self._task.__await__()
-        finally:
-            self._task = None
-        return value
-
-cdef class ValueChangeTask(PropertyChangeTask):
     def __init__(self):
-        super().__init__('Value')
+        self.queues = {}
+
+    def register(self, name):
+        assert name not in self.queues
+        assert self.slot is not NULL
+        self.queues[name] = asyncio.Queue()
+
+    def is_registered(self, name):
+        return name in self.queues
 
     def put(self, name, value):
-        self._queue.put_nowait(value)
+        assert name in self.queues
+        assert self.slot is not NULL
+        self.queues[name].put_nowait(value)
+
+    async def get(self, name):
+        assert name in self.queues
+        assert self.slot is not NULL
+        return (await self.queues[name].get())
+
+    def stop(self):
+        self.queues.clear()
+        sd_bus_slot_unref(self.slot)
 
 def fmt_rule(path, iface):
     rule = FMT_RULE.format(path, iface)
@@ -183,9 +165,16 @@ cdef int task_cb_connect(sd_bus_message *msg, void *user_data, sd_bus_error *ret
         task.set_result(None)
     return 1
 
-def bt_connect(Bus bus, str path, task):
+async def bt_connect(Bus bus, str path):
+    """
+    Connect to Bluetooth device.
+
+    :param bus: D-Bus reference.
+    :param path: D-Bus device path.
+    """
     assert bus is not None
 
+    task = asyncio.get_event_loop().create_future()
     r = sd_bus_call_method_async(
         bus.bus,
         NULL,
@@ -199,6 +188,7 @@ def bt_connect(Bus bus, str path, task):
         NULL
     )
     check_call('connect to {}'.format(path), r)
+    await task
 
 cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object task = <object>user_data
@@ -213,8 +203,10 @@ cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_er
         task.set_result(value)
     return 1
 
-def bt_read(Bus bus, str path, task):
+async def bt_read(Bus bus, str path):
     assert bus is not None
+
+    task = asyncio.get_event_loop().create_future()
 
     r = sd_bus_call_method_async(
         bus.bus,
@@ -230,20 +222,21 @@ def bt_read(Bus bus, str path, task):
     )
     check_call('read data from {}'.format(path), r)
 
+    return (await task)
+
 cdef int task_cb_write(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     """
     Data write callback used by `bt_write` function.
     """
     cdef object task = <object>user_data
     cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
-
     if error and error.message:
         task.set_exception(DataWriteError(error.message))
     else:
         task.set_result(None)
     return 1
 
-def bt_write(Bus bus, str path, bytes data, task):
+async def bt_write(Bus bus, str path, bytes data):
     """
     Write data to Bluetooth device.
 
@@ -252,13 +245,13 @@ def bt_write(Bus bus, str path, bytes data, task):
     :param bus: D-Bus reference.
     :param path: GATT characteristics path of the device.
     :param data: Data to write.
-    :param task: Asyncio coroutine.
     """
     assert bus is not None
 
     cdef sd_bus_message *msg = NULL
     cdef char* buff = data
 
+    task = asyncio.get_event_loop().create_future()
     try:
         r = sd_bus_message_new_method_call(
             bus.bus,
@@ -281,6 +274,8 @@ def bt_write(Bus bus, str path, bytes data, task):
 
         r = sd_bus_call_async(bus.bus, NULL, msg, task_cb_write, <void*>task, 0)
         check_call('write data to {}'.format(path), r)
+
+        return (await task)
     finally:
         sd_bus_message_unref(msg)
 
@@ -297,50 +292,44 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
 
     for _ in msg_container_dict(bus_msg, '{sv}'):
         name = msg_read_value(bus_msg, 's')
-
-        if cb.properties and name in cb.properties:
+        if cb.is_registered(name):
             value = msg_read_value(bus_msg, 'v')
             cb.put(name, value)
         else:
             msg_skip(bus_msg, 'v')
-            continue
+
     return 1
 
-def _bt_property_monitor(Bus bus, str path, str iface, PropertyChangeTask task):
+def bt_property_monitor_start(Bus bus, str path, str iface):
     """
-    Start detection of value changes of Bluetooth device property via an
-    asynchronous task.
+    Enable notification of value changes of Bluetooth device property.
+
+    Property notification object is returned, which allows to register
+    property names.
 
     :param bus: D-Bus reference.
     :param path: GATT characteristics path of the device.
     :param iface: Device interface.
-    :param task: Asynchronous task for property value changes.
     """
     assert bus is not None
 
     cdef sd_bus_slot *slot
     rule = fmt_rule(path, iface)
-    r = sd_bus_add_match(bus.bus, &slot, rule, task_cb_property_monitor, <void*>task)
+
+    data = PropertyNotification()
+
+    r = sd_bus_add_match(
+        bus.bus,
+        &slot,
+        rule,
+        task_cb_property_monitor,
+        <void*>data
+    )
     check_call('bus match rule', r)
+    assert slot is not NULL
 
-    task.slot = slot
-
-def bt_property_monitor(Bus bus, str path, str iface, *properties):
-    """
-    Create asynchronous task to detect value changes of Bluetooth device
-    property.
-
-    Asynchronous task it returned.
-
-    :param bus: D-Bus reference.
-    :param path: GATT characteristics path of the device.
-    :param iface: Device interface.
-    :param *properties: Property names to watch.
-    """
-    assert bus is not None
-    task = PropertyChangeTask(*properties)
-    _bt_property_monitor(bus, path, iface, task)
-    return task
+    data.slot = slot
+    return data
 
 def bt_property_str(Bus bus, str path, str iface, str name):
     assert bus is not None
@@ -394,12 +383,10 @@ def bt_property_bool(Bus bus, str path, str iface, str name):
 
     return value
 
-def bt_notify(Bus bus, str path):
+def bt_notify_start(Bus bus, str path):
     """
     Start monitoring value changes of a device identified by GATT
     characteristics path.
-
-    Asynchronous task is returned.
 
     :param bus: D-Bus reference.
     :param path: GATT characteristics path of the device.
@@ -424,11 +411,14 @@ def bt_notify(Bus bus, str path):
     )
     check_call('start notification', r)
 
-    task = ValueChangeTask()
-    _bt_property_monitor(bus, path, iface, task)
-    return task
-
 def bt_notify_stop(Bus bus, str path):
+    """
+    Stop monitoring value changes of a device identified by GATT
+    characteristics path.
+
+    :param bus: D-Bus reference.
+    :param path: GATT characteristics path of the device.
+    """
     assert bus is not None
 
     cdef sd_bus_message *msg = NULL
