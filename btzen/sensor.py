@@ -75,15 +75,9 @@ class Sensor:
     async def set_interval(self, interval):
         await self._conn_event.wait()
         path = self._params.path_period
-        if path:
-            value = int(interval * 100)
-            assert value < 256
-            bus = self._system_bus
-            try:
-                await self._write(path, bytes([value]))
-            except DataWriteError as ex:
-                msg = 'Cannot set sensor interval value: {}'.format(r)
-                raise ConfigurationError(msg) from ex
+        value = int(interval * 100)
+        assert value < 256
+        await self._write(path, bytes([value]))
 
     async def read(self):
         """
@@ -264,6 +258,10 @@ class Button(Sensor):
     CONFIG_ON = None
     CONFIG_ON_NOTIFY = None
     CONFIG_OFF = None
+
+    # not possible to set interval on button
+    async def set_interval(self, interval):
+        pass
 
 class Weight(Sensor):
     DATA_LEN = 9
