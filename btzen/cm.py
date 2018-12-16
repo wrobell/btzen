@@ -38,7 +38,6 @@ class ConnectionManager:
         self._bus = BUS.get_bus()
         self._devices = defaultdict(set)
         self._process = False
-        self._tasks = []
 
         self._enable = partial(self._exec, ENABLE)
         self._hold = partial(self._exec, HOLD)
@@ -51,13 +50,11 @@ class ConnectionManager:
         self._process = False
         for dev in flatten(self._devices.values()):
             dev.close()
-        for t in self._tasks:
-            t.close()
         logger.info('connection manager closed')
 
     def __await__(self):
-        self._tasks = [self._reconnect(mac, devs) for mac, devs in self._devices.items()]
-        yield from asyncio.wait(self._tasks).__await__()
+        tasks = [self._reconnect(mac, devs) for mac, devs in self._devices.items()]
+        yield from asyncio.gather(*tasks).__await__()
 
     async def _reconnect(self, mac, devices):
         path = _device_path(mac)
@@ -93,6 +90,6 @@ class ConnectionManager:
 
     async def _exec(self, f_get, devices):
         tasks = [f_get(dev)() for dev in devices]
-        await asyncio.wait(tasks)
+        await asyncio.gather(*tasks)
 
 # vim: sw=4:et:ai
