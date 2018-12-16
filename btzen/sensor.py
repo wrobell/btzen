@@ -101,8 +101,30 @@ class Sensor:
 
         Pending, asynchronous coroutines are closed.
         """
-        self._stop()
-        self._close_task()
+        params = self._params
+        if not params:
+            return
+
+        if self._notifying:
+            try:
+                # TODO: make it asynchronous
+                BUS._gatt_stop(params.path_data)
+            except Exception as ex:
+                logger.warning('cannot stop notifications: {}'.format(ex))
+
+        # disable switched on sensor; some sensors stay always on,
+        # i.e. button
+        if params.config_off:
+            try:
+                _btzen.bt_write_sync(self._system_bus, params.path_conf, params.config_off)
+            except Exception as ex:
+                logger.warning('Cannot switch sensor off: {}'.format(ex))
+
+        task = self._task
+        if task is not None:
+            task.close()
+            self._task = None
+
         logger.info('sensor {} closed'.format(self))
 
     def _set_parameters(self):
@@ -153,40 +175,7 @@ class Sensor:
 
     async def _hold(self):
         self._conn_event.clear()
-        self._close_task()
         logger.info('device {} on hold'.format(self))
-
-    def _stop(self):
-        """
-        Stop sensor notifications and switch the sensor off.
-        """
-        params = self._params
-        if not params:
-            return
-
-        if self._notifying:
-            try:
-                # TODO: make it asynchronous
-                BUS._gatt_stop(params.path_data)
-            except Exception as ex:
-                logger.warning('Cannot stop notifications: {}'.format(ex))
-
-        # disable switched on sensor; some sensors stay always on,
-        # i.e. button
-        if params.config_off:
-            try:
-                _btzen.bt_write_sync(self._system_bus, params.path_conf, params.config_off)
-            except Exception as ex:
-                logger.warning('Cannot switch sensor off: {}'.format(ex))
-
-    def _close_task(self):
-        """
-        Close current asynchronous task.
-        """
-        task = self._task
-        if task is not None:
-            task.close()
-            self._task = None
 
     def __repr__(self):
         return '{}/{}'.format(self._mac, self.__class__.__name__)
