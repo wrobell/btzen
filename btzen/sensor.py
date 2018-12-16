@@ -103,7 +103,7 @@ class Sensor:
         """
         self._close_task()
         self._loop.run_until_complete(self._stop())
-        logger.info('sensor {} closed'.format(self._mac))
+        logger.info('sensor {} closed'.format(self))
 
     def _set_parameters(self):
         assert isinstance(self.UUID_DATA, str)
@@ -149,7 +149,7 @@ class Sensor:
         if notify:
             BUS._gatt_start(params.path_data)
         self._conn_event.set()
-        logger.info('enabled device: {}'.format(self._mac))
+        logger.info('enabled device: {}'.format(self))
 
     async def _disable(self):
         """
@@ -157,12 +157,12 @@ class Sensor:
         """
         await self._hold()
         await self._stop()
-        logger.info('disabled device: {}'.format(self._mac))
+        logger.info('disabled device: {}'.format(self))
 
     async def _hold(self):
         self._conn_event.clear()
         self._close_task()
-        logger.info('device {} on hold'.format(self._mac))
+        logger.info('device {} on hold'.format(self))
 
     async def _stop(self):
         """
@@ -195,6 +195,9 @@ class Sensor:
         if task is not None:
             task.close()
             self._task = None
+
+    def __repr__(self):
+        return '{}/{}'.format(self._mac, self.__class__.__name__)
 
 
 class Temperature(Sensor):
