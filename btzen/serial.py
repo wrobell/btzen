@@ -57,39 +57,42 @@ class Serial:
         self._buffer = bytearray()
 
     async def connect(self):
+        await BUS.connect(self._mac)
+        await self._enable()
+
+    async def _enable(self):
         bus = self._system_bus = BUS.get_bus()
         get_path = partial(BUS.sensor_path, self._mac)
-        bt_notify = partial(_btzen.bt_notify, bus)
-
-        await BUS.connect(self._mac)
 
         self._tx_credit_path = get_path(self.UUID_TX_CREDIT)
         self._tx_uart_path = get_path(self.UUID_TX_UART)
         self._rx_credit_path = get_path(self.UUID_RX_CREDIT)
         self._rx_uart_path = get_path(self.UUID_RX_UART)
 
-        self._tx_credit = bt_notify(self._tx_credit_path)
-        self._tx_uart = bt_notify(self._tx_uart_path)
+        BUS._gatt_start(self._tx_credit_path)
+        BUS._gatt_start(self._tx_uart_path)
+
+        self._tx_credit = partial(BUS._gatt_get, self._tx_credit_path)
+        self._tx_uart = partial(BUS._gatt_get, self._tx_uart_path)
+        self._tx_credit_size = partial(BUS._gatt_size, self._tx_credit_path)
 
         self._rx_credits = 0
         await self._add_rx_credits()
-        logger.debug('requesting tx credits')
-        value = await self._tx_credit
-        logger.debug('got tx credits: {}'.format(value))
+        logger.debug('requesting tx credits on enable')
+        value = await self._tx_credit()
+        logger.debug('got tx credits on enable: {}'.format(value))
 
     async def read(self, n):
-        tx = self._tx_uart
-
         data = bytearray(self._buffer)
         while len(data) < n:
             async with self._rx_credits_mgr(n - len(data)):
-                item = await tx
+                item = await self._tx_uart()
                 data.extend(item)
 
                 if __debug__:
                     logger.debug(
-                        'bytes read {}, last {}, tx credits queue len {}'
-                        .format(len(data), hexlify(data[-5:]), len(self._tx_credit))
+                        'bytes read {}, last {}, tx credits size {}'
+                        .format(len(data), hexlify(data[-5:]), self._tx_credit_size())
                     )
 
         assert len(data) >= n
@@ -104,9 +107,9 @@ class Serial:
         if self._rx_credits < 1:
             await self._add_rx_credits()
 
-        if len(self._tx_credit):
+        if self._tx_credit_size() > 0:
             logger.debug('requesting tx credits')
-            value = await self._tx_credit
+            value = await self._tx_credit()
             logger.debug('got tx credits: {}'.format(value))
 
         await self._write(self._rx_uart_path, data)
@@ -115,9 +118,8 @@ class Serial:
         """
         Close serial device.
         """
-        bt_notify_stop = partial(_btzen.bt_notify_stop, self._system_bus)
-        bt_notify_stop(self._tx_credit_path)
-        bt_notify_stop(self._tx_uart_path)
+        BUS._gatt_stop(self._tx_credit_path)
+        BUS._gatt_stop(self._tx_uart_path)
 
     @contextmanager
     async def _rx_credits_mgr(self, n):
@@ -134,8 +136,7 @@ class Serial:
         logger.debug('rx credits: {}'.format(self._rx_credits))
 
     async def _write(self, path, data):
-        task = self._loop.create_future()
-        _btzen.bt_write(self._system_bus, path, data, task)
+        task = _btzen.bt_write(self._system_bus, path, data)
         await task
 
 # vim: sw=4:et:ai

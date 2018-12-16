@@ -128,6 +128,9 @@ cdef class PropertyNotification:
         assert self.slot is not NULL
         return (await self.queues[name].get())
 
+    def size(self, name) -> int:
+        return self.queues[name].qsize()
+
     def stop(self):
         self.queues.clear()
         sd_bus_slot_unref(self.slot)
@@ -374,7 +377,8 @@ def bt_property_bool(Bus bus, str path, str iface, str name):
         &msg,
         'b'
     )
-    assert r == 0, strerror(-r)
+    if r != 0:
+        raise DataReadError(strerror(-r))
 
     bus_msg.c_obj = msg
     value = msg_read_value(bus_msg, 'b')

@@ -111,6 +111,9 @@ class Bus:
         _btzen.bt_notify_stop(self.get_bus(), path)
         self._notifications.stop(path, INTERFACE_GATT_CHR)
 
+    def _gatt_size(self, path) -> int:
+        return self._notifications.size(path, INTERFACE_GATT_CHR, 'Value')
+
     def _dev_property_start(self, path, name):
         self._notifications.start(path, INTERFACE_DEVICE, name)
 
@@ -154,6 +157,7 @@ class Bus:
             # exception might be raised if device is already connected, so
             # check if errors has to be raised
             logger.debug('connection error: {}'.format(ex))
+            # FIXME: if no scan on, then this fails
             connected = self._property_bool(path, 'Connected')
             if not connected:
                 raise
@@ -203,6 +207,10 @@ class Notifications:
         key = path, iface
         data = self._data[key]
         return (await data.get(name))
+
+    def size(self, path, iface, name):
+        key = path, iface
+        return self._data[key].size(name)
 
     def stop(self, path, iface):
         # TODO: add name and call PropertyNotification.stop when no
