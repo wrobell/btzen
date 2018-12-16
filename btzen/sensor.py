@@ -151,14 +151,6 @@ class Sensor:
         self._conn_event.set()
         logger.info('enabled device: {}'.format(self))
 
-    async def _disable(self):
-        """
-        Disable and switch off the sensor.
-        """
-        await self._hold()
-        await self._stop()
-        logger.info('disabled device: {}'.format(self))
-
     async def _hold(self):
         self._conn_event.clear()
         self._close_task()
