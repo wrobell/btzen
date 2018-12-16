@@ -94,6 +94,8 @@ class ConnectionManager:
 
     async def _exec(self, f_get, devices):
         tasks = [f_get(dev)() for dev in devices]
-        await asyncio.gather(*tasks)
+        # use `wait` to execute each task independently, so a failed task
+        # does not influence other one
+        await asyncio.wait(tasks)
 
 # vim: sw=4:et:ai
