@@ -20,6 +20,8 @@
 
 """
 Display weight data from Xiaomi Mi Smart Scale.
+
+Connection manager is used for automatic connection to the scale.
 """
 
 import argparse
