@@ -30,15 +30,8 @@ import btzen
 
 async def read_weight(reader):
     while True:
-        t1 = loop.time()
-
-        try:
-            value = await reader.read()
-        except asyncio.CancelledError as ex:
-            pass
-
-        t2 = loop.time()
-        print('weight: {} ({:.4f}s)'.format(value, t2 - t1))
+        value = await reader.read()
+        print('weight: {}'.format(value)
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -47,16 +40,18 @@ parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
 sensor = btzen.Weight(args.device, notifying=True)
-task = read_weight(sensor)
 
 # create connection manager
 manager = btzen.ConnectionManager()
 manager.add(sensor)
 
+task = asyncio.gather(read_weight(sensor), manager)
 loop = asyncio.get_event_loop()
 try:
-    loop.run_until_complete(asyncio.gather(task, manager))
+    loop.run_until_complete(task)
 finally:
+    # manager also closes all referenced devices, the weight scale in this
+    # case
     manager.close()
 
 # vim: sw=4:et:ai
