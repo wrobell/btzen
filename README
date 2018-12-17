@@ -16,8 +16,9 @@ Features
    - Mi Smart Scale
    - serial devices implementing Stollmann (Telit) protocol
 
-2. Device access using `asyncio` coroutines.
-3. Notifications interface is supported.
+2. Asynchronous access to device data.
+3. Notification interface is supported.
+4. Automatic reconnections to devices using connection manager.
 
 The scripts in `scripts` directory demonstrate reading data from various
 Bluetooth Smart devices, i.e. Sensor Tag, Mi Smart Scale or OSTC dive
@@ -25,7 +26,8 @@ computer.
 
 Requirements
 
-- bluez 5.45
+- bluez 5.50
 - Python 3.6
 - `sd-bus` (part of `systemd`)
+- Cython
 
