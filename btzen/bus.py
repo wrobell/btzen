@@ -95,7 +95,7 @@ class Bus:
 
     def sensor_path(self, mac, uuid):
         if uuid is None:
-            return ''
+            return None
         by_uuid = self._get_sensor_paths(mac)
         return by_uuid[uuid]
 

@@ -56,10 +56,11 @@ class Sensor:
         self._notifying = notifying
         self._loop = asyncio.get_event_loop()
         self._task = None
+        self._interval = 1
 
         self._params = None
         self._system_bus = BUS.get_bus()
-        self._conn_event = asyncio.Event()
+        self._connected = asyncio.Event()
 
         read = partial(_btzen.bt_read, self._system_bus)
         self._read_data = BUS._gatt_get if notifying else read
@@ -72,12 +73,10 @@ class Sensor:
         await BUS.connect(self._mac)
         await self._enable()
 
-    async def set_interval(self, interval):
-        await self._conn_event.wait()
-        path = self._params.path_period
-        value = int(interval * 100)
-        assert value < 256
-        await self._write(path, bytes([value]))
+    async def set_interval(self, interval: int) -> None:
+        self._interval = interval
+        await self._connected.wait()
+        await self._write_interval(interval)
 
     async def read(self):
         """
@@ -86,7 +85,7 @@ class Sensor:
         This method is an asynchronous coroutine and is *not* thread safe.
         """
         try:
-            await self._conn_event.wait()
+            await self._connected.wait()
             self._task = self._read_data(self._params.path_data)
             value = self._converter(await self._task)
         except Exception as ex:
@@ -170,12 +169,24 @@ class Sensor:
 
         if notify:
             BUS._gatt_start(params.path_data)
-        self._conn_event.set()
+
+        await self._write_interval(self._interval)
+
+        self._connected.set()
         logger.info('enabled device: {}'.format(self))
 
     async def _hold(self):
-        self._conn_event.clear()
+        self._connected.clear()
         logger.info('device {} on hold'.format(self))
+
+    async def _write_interval(self, interval: int) -> None:
+        path = self._params.path_period
+        if path is not None:
+            value = int(interval * 100)
+            assert value < 256
+            await self._write(path, bytes([value]))
+        else:
+            logger.warning('setting interval for {} not supported'.format(self))
 
     def __repr__(self):
         return '{}/{}'.format(self._mac, self.__class__.__name__)
