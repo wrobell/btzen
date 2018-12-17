@@ -54,6 +54,20 @@ async def read_button(name, reader):
         t, value = await read(name, reader)
         print('button: {} ({:.4f}s)'.format(value, t))
 
+
+#
+# sensor definitions
+#
+SENSORS = [
+    ('pressure', btzen.Pressure, False, read_sensor),
+    ('temperature', btzen.Temperature, False, read_sensor),
+    ('humidity', btzen.Humidity, False, read_sensor),
+    ('light', btzen.Light, False, read_sensor),
+    # notifying readers
+    ('button', btzen.Button, True, read_button),
+    ('accelerometer', btzen.Accelerometer, True, read_accelerometer),
+]
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     '--verbose', default=False, action='store_true',
@@ -69,20 +83,10 @@ else:
 
 print('connecting to {}...'.format(args.device))
 
-sensor_def = [
-    ('pressure', btzen.Pressure, False, read_sensor),
-    ('temperature', btzen.Temperature, False, read_sensor),
-    ('humidity', btzen.Humidity, False, read_sensor),
-    ('light', btzen.Light, False, read_sensor),
-    # notifying readers
-    ('button', btzen.Button, True, read_button),
-    ('accelerometer', btzen.Accelerometer, True, read_accelerometer),
-]
-
 # initialize all Sensor Tag sensors
 items = [
     (name, reader, cls(args.device, notifying=notifying))
-    for name, cls, notifying, reader in sensor_def
+    for name, cls, notifying, reader in SENSORS
 ]
 sensors =  [sensor for _, _, sensor in items]
 
