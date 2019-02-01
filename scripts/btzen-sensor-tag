@@ -21,6 +21,7 @@
 import argparse
 import asyncio
 import logging
+import uvloop
 from datetime import datetime
 
 import btzen
@@ -73,7 +74,9 @@ if args.verbose:
 else:
     logging.basicConfig(level=logging.INFO)
 
-print('connecting to {}...'.format(args.device))
+# get the loop first
+uvloop.install()
+loop = asyncio.get_event_loop()
 
 # initialize all Sensor Tag sensors
 items = [
@@ -88,12 +91,9 @@ tasks = [reader(name, sensor) for name, reader, sensor in items]
 # create connection manager
 manager = btzen.ConnectionManager()
 manager.add(*sensors)
-tasks.append(manager)
 
-print('sensors initialized')
-loop = asyncio.get_event_loop()
 try:
-    loop.run_until_complete(asyncio.gather(*tasks))
+    loop.run_until_complete(asyncio.gather(manager, *tasks))
 finally:
     # connection manager closes all sensors
     manager.close()

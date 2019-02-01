@@ -24,7 +24,7 @@ from functools import partial
 from itertools import chain
 from operator import attrgetter
 
-from .bus import BUS, _device_path
+from .bus import Bus, _device_path
 
 flatten = chain.from_iterable
 
@@ -35,7 +35,6 @@ HOLD = attrgetter('_hold')
 
 class ConnectionManager:
     def __init__(self):
-        self._bus = BUS.get_bus()
         self._devices = defaultdict(set)
         self._process = False
 
@@ -66,7 +65,7 @@ class ConnectionManager:
         # hogging
         while self._process:
             try:
-                await BUS.connect(mac)
+                await Bus.get_bus().connect(mac)
                 await self._enable(devices)
                 await self._restart(path, devices)
             except Exception as ex:
@@ -81,16 +80,17 @@ class ConnectionManager:
         # renable or hold device when services resolved property changes;
         # no exception handling as it is done by `self._reconnect`; here we
         # assume everything works without any errors
-        BUS._dev_property_start(path, 'ServicesResolved')
+        bus = Bus.get_bus()
+        bus._dev_property_start(path, 'ServicesResolved')
         try:
             while self._process:
-                resolved = await BUS._dev_property_get(path, 'ServicesResolved')
+                resolved = await bus._dev_property_get(path, 'ServicesResolved')
                 # enable if services resolved, otherwise no point of disabling
                 # or disconnecting the device, so just hold
                 f = self._enable if resolved else self._hold
                 await f(devices)
         finally:
-            BUS._dev_property_stop(path, 'ServicesResolved')
+            bus._dev_property_stop(path, 'ServicesResolved')
 
     async def _exec(self, f_get, devices):
         tasks = [f_get(dev)() for dev in devices]

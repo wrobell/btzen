@@ -18,6 +18,7 @@
 #
 
 import asyncio
+import contextvars
 import logging
 import threading
 from functools import lru_cache, partial
@@ -38,13 +39,13 @@ def _device_path(mac):
     return '/org/bluez/hci0/dev_{}'.format(_mac(mac))
 
 class Bus:
-    THREAD_LOCAL = threading.local()
+    bus = contextvars.ContextVar('bus', default=None)
 
-    def __init__(self):
-        self._loop = asyncio.get_event_loop()
+    def __init__(self, system_bus):
+        self.system_bus = system_bus
 
-        self._fd = self.get_bus().fileno
-        self._loop.add_reader(self._fd, self._process_event)
+        loop = asyncio.get_event_loop()
+        loop.add_reader(system_bus.fileno, self._process_event)
 
         # cache of connection locks; lock is used to perform single
         # connection to a given bluetooth device; once a lock is deleted,
@@ -59,10 +60,12 @@ class Bus:
 
         The reference is local to current thread.
         """
-        local = Bus.THREAD_LOCAL
-        if not hasattr(local, 'bus'):
-            local.bus = _btzen.default_bus()
-        return local.bus
+        bus = Bus.bus.get()
+        if bus is None:
+            system_bus = _btzen.default_bus()
+            bus = Bus(system_bus)
+            Bus.bus.set(bus)
+        return bus
 
     async def connect(self, mac):
         """
@@ -72,7 +75,6 @@ class Bus:
 
         :param mac: MAC address of Bluetooth device.
         """
-        bus = self.get_bus()
         path = _device_path(mac)
 
         lock = self._lock.get(mac)
@@ -81,7 +83,7 @@ class Bus:
 
         try:
             async with lock:
-                await self._connect_and_resolve(bus, path)
+                await self._connect_and_resolve(path)
         finally:
             # destroy lock, so it is removed from the cache when no longer
             # in use
@@ -101,14 +103,14 @@ class Bus:
 
     def _gatt_start(self, path):
         self._notifications.start(path, INTERFACE_GATT_CHR, 'Value')
-        _btzen.bt_notify_start(self.get_bus(), path)
+        _btzen.bt_notify_start(self.system_bus, path)
 
     async def _gatt_get(self, path):
         task = self._notifications.get(path, INTERFACE_GATT_CHR, 'Value')
         return (await task)
 
     def _gatt_stop(self, path):
-        _btzen.bt_notify_stop(self.get_bus(), path)
+        _btzen.bt_notify_stop(self.system_bus, path)
         self._notifications.stop(path, INTERFACE_GATT_CHR)
 
     def _gatt_size(self, path) -> int:
@@ -131,9 +133,9 @@ class Bus:
         finally:
             self._dev_property_stop(path, name)
 
-    async def _connect_and_resolve(self, bus, path):
+    async def _connect_and_resolve(self, path):
         logger.info('connecting to {}'.format(path))
-        await self._connect(bus, path)
+        await self._connect(path)
 
         # first create task
         task_sr = self._dev_property(path, 'ServicesResolved')
@@ -149,9 +151,10 @@ class Bus:
             # destroy the notification
             task_sr.close()
 
-    async def _connect(self, bus, path):
+    async def _connect(self, path):
+        assert self.system_bus is not None
         try:
-            task = _btzen.bt_connect(bus, path)
+            task = _btzen.bt_connect(self.system_bus, path)
             await task
         except Exception as ex:
             # exception might be raised if device is already connected, so
@@ -161,26 +164,29 @@ class Bus:
             connected = self._property_bool(path, 'Connected')
             if not connected:
                 raise
+        else:
+            connected = self._property_bool(path, 'Connected')
+            logger.info('connected to {}: {}'.format(path, connected))
 
     def _property_bool(self, path, name):
-        bus = self.get_bus()
+        bus = self.system_bus
         value = _btzen.bt_property_bool(bus, path, INTERFACE_DEVICE, name)
         return value
 
     @lru_cache()
     def _get_sensor_paths(self, mac):
         path = _device_path(mac)
-        by_uuid = _btzen.bt_characteristic(self.get_bus(), path)
+        by_uuid = _btzen.bt_characteristic(self.system_bus, path)
         return by_uuid
 
     @lru_cache()
     def _get_name(self, mac):
         path = _device_path(mac)
-        bus = self.get_bus()
+        bus = self.system_bus
         return _btzen.bt_property_str(bus, path, INTERFACE_DEVICE, 'Name')
 
     def _process_event(self):
-        bus = self.get_bus()
+        bus = self.system_bus
         process = _btzen.bt_process
         r = process(bus)
         while r > 0:
@@ -195,7 +201,7 @@ class Notifications:
         key = path, iface
         data = self._data.get(key)
         if data is None:
-            bus = self._bus.get_bus()
+            bus = self._bus.system_bus
             data = _btzen.bt_property_monitor_start(bus, path, iface)
             self._data[key] = data
 
@@ -217,7 +223,5 @@ class Notifications:
         # properties monitored
         key = path, iface
         data = self._data[key].stop()
-
-BUS = Bus()
 
 # vim: sw=4:et:ai

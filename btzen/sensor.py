@@ -34,7 +34,7 @@ from functools import partial
 
 from . import _btzen
 from .import converter
-from .bus import BUS
+from .bus import Bus
 from .error import ConfigurationError, DataReadError, DataWriteError
 from .util import dev_uuid
 
@@ -49,28 +49,24 @@ Parameters = namedtuple('Parameters', [
 class Sensor:
     """
     :var _task: Current asynchronous task.
-    :var _system_bus: System D-Bus reference (not thread safe).
     """
     def __init__(self, mac, notifying=False):
         self._mac = mac
         self._notifying = notifying
-        self._loop = asyncio.get_event_loop()
         self._task = None
         self._interval = 1
 
         self._params = None
-        self._system_bus = BUS.get_bus()
+        self._bus = None
+        self._read_data = None
+        self._write = None
         self._connected = asyncio.Event()
-
-        read = partial(_btzen.bt_read, self._system_bus)
-        self._read_data = BUS._gatt_get if notifying else read
-        self._write = partial(_btzen.bt_write, self._system_bus)
 
     async def connect(self):
         """
         Connect to sensor Bluetooth device.
         """
-        await BUS.connect(self._mac)
+        await Bus.get_bus().connect(self._mac)
         await self._enable()
 
     async def set_interval(self, interval: int) -> None:
@@ -84,15 +80,11 @@ class Sensor:
 
         This method is an asynchronous coroutine and is *not* thread safe.
         """
-        try:
-            await self._connected.wait()
-            self._task = self._read_data(self._params.path_data)
-            value = self._converter(await self._task)
-        except Exception as ex:
-            raise asyncio.CancelledError('Read error') from ex
-        else:
-            self._task = None
-            return value
+        await self._connected.wait()
+        self._task = self._read_data(self._params.path_data)
+        value = self._converter(await self._task)
+        self._task = None
+        return value
 
     def close(self):
         """
@@ -107,15 +99,16 @@ class Sensor:
         if self._notifying:
             try:
                 # TODO: make it asynchronous
-                BUS._gatt_stop(params.path_data)
+                self._bus._gatt_stop(params.path_data)
             except Exception as ex:
                 logger.warning('cannot stop notifications: {}'.format(ex))
 
         # disable switched on sensor; some sensors stay always on,
         # i.e. button
+        system_bus = self._bus.system_bus
         if params.config_off:
             try:
-                _btzen.bt_write_sync(self._system_bus, params.path_conf, params.config_off)
+                _btzen.bt_write_sync(system_bus, params.path_conf, params.config_off)
             except Exception as ex:
                 logger.warning('Cannot switch sensor off: {}'.format(ex))
 
@@ -131,9 +124,9 @@ class Sensor:
         assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
         assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
 
-        get_path = partial(BUS.sensor_path, self._mac)
+        get_path = partial(self._bus.sensor_path, self._mac)
         mac = self._mac
-        name = BUS._get_name(mac)
+        name = self._bus._get_name(mac)
 
         self._params = params = Parameters(
             name,
@@ -155,11 +148,18 @@ class Sensor:
         """
         Switch on and enable the sensor.
         """
+        notify = self._notifying
+
+        self._bus = Bus.get_bus()
+        system_bus = self._bus.system_bus
+
+        read = partial(_btzen.bt_read, system_bus)
+        self._read_data = self._bus._gatt_get if notify else read
+        self._write = partial(_btzen.bt_write, system_bus)
+
         self._set_parameters()
 
-        bus = self._system_bus
         params = self._params
-        notify = self._notifying
 
         config_on = params.config_on_notify if notify else params.config_on
 
@@ -168,7 +168,7 @@ class Sensor:
             await self._write(params.path_conf, config_on)
 
         if notify:
-            BUS._gatt_start(params.path_data)
+            self._bus._gatt_start(params.path_data)
 
         await self._write_interval(self._interval)
 

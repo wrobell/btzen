@@ -33,7 +33,7 @@ from binascii import hexlify
 from functools import partial
 
 from btzen import _btzen
-from .bus import BUS
+from .bus import Bus
 from .util import contextmanager
 
 logger = logging.getLogger(__name__)
@@ -52,29 +52,29 @@ class Serial:
 
     def __init__(self, mac):
         self._mac = mac
-        self._system_bus = None
+        self._bus = None
         self._loop = asyncio.get_event_loop()
         self._buffer = bytearray()
 
     async def connect(self):
-        await BUS.connect(self._mac)
+        self._bus = Bus.get_bus()
+        await self._bus.connect(self._mac)
         await self._enable()
 
     async def _enable(self):
-        bus = self._system_bus = BUS.get_bus()
-        get_path = partial(BUS.sensor_path, self._mac)
+        get_path = partial(bus.sensor_path, self._mac)
 
         self._tx_credit_path = get_path(self.UUID_TX_CREDIT)
         self._tx_uart_path = get_path(self.UUID_TX_UART)
         self._rx_credit_path = get_path(self.UUID_RX_CREDIT)
         self._rx_uart_path = get_path(self.UUID_RX_UART)
 
-        BUS._gatt_start(self._tx_credit_path)
-        BUS._gatt_start(self._tx_uart_path)
+        self._bus._gatt_start(self._tx_credit_path)
+        self._bus._gatt_start(self._tx_uart_path)
 
-        self._tx_credit = partial(BUS._gatt_get, self._tx_credit_path)
-        self._tx_uart = partial(BUS._gatt_get, self._tx_uart_path)
-        self._tx_credit_size = partial(BUS._gatt_size, self._tx_credit_path)
+        self._tx_credit = partial(self._bus._gatt_get, self._tx_credit_path)
+        self._tx_uart = partial(self._bus._gatt_get, self._tx_uart_path)
+        self._tx_credit_size = partial(self._bus._gatt_size, self._tx_credit_path)
 
         self._rx_credits = 0
         await self._add_rx_credits()
@@ -118,8 +118,8 @@ class Serial:
         """
         Close serial device.
         """
-        BUS._gatt_stop(self._tx_credit_path)
-        BUS._gatt_stop(self._tx_uart_path)
+        self._bus._gatt_stop(self._tx_credit_path)
+        self._bus._gatt_stop(self._tx_uart_path)
 
     @contextmanager
     async def _rx_credits_mgr(self, n):
@@ -136,7 +136,7 @@ class Serial:
         logger.debug('rx credits: {}'.format(self._rx_credits))
 
     async def _write(self, path, data):
-        task = _btzen.bt_write(self._system_bus, path, data)
+        task = _btzen.bt_write(self._bus._system_bus, path, data)
         await task
 
 # vim: sw=4:et:ai
