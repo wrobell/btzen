@@ -73,10 +73,10 @@ cdef extern from "<systemd/sd-bus.h>":
     int sd_bus_call(sd_bus*, sd_bus_message*, long, sd_bus_error*, sd_bus_message**)
     int sd_bus_call_async(sd_bus*, sd_bus_slot*, sd_bus_message*, sd_bus_message_handler_t, void*, long)
 
-
     int sd_bus_get_property(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, sd_bus_message**, const char*)
 
     const sd_bus_error *sd_bus_message_get_error(sd_bus_message*)
+    const char *sd_bus_message_get_path(sd_bus_message*)
     int sd_bus_message_read(sd_bus_message*, const char*, ...)
     int sd_bus_message_read_basic(sd_bus_message*, char, void*)
     int sd_bus_message_read_array(sd_bus_message*, char, const void**, size_t*)
@@ -106,9 +106,11 @@ cdef class Bus:
 cdef class PropertyNotification:
     cdef sd_bus_slot *slot
     cdef public object queues
+    cdef public str path
 
-    def __init__(self):
+    def __init__(self, path):
         self.queues = {}
+        self.path = path
 
     def register(self, name):
         assert name not in self.queues
@@ -321,8 +323,11 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
     cdef object cb = <object>user_data
     cdef const char *contents
     cdef char msg_type
+    cdef const char *path
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
+    path = sd_bus_message_get_path(msg)
+    assert path == cb.path
     bus_msg.c_obj = msg
 
     # skip interface name
@@ -336,7 +341,7 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
         else:
             msg_skip(bus_msg, 'v')
 
-    return 1
+    return 0
 
 def bt_property_monitor_start(Bus bus, str path, str iface):
     """
@@ -354,7 +359,7 @@ def bt_property_monitor_start(Bus bus, str path, str iface):
     cdef sd_bus_slot *slot
     rule = fmt_rule(path, iface)
 
-    data = PropertyNotification()
+    data = PropertyNotification(path)
 
     r = sd_bus_add_match(
         bus.bus,
@@ -481,10 +486,15 @@ def bt_notify_stop(Bus bus, str path):
         sd_bus_message_unref(msg)
 
 def bt_process(Bus bus):
+    """
+    Process D-Bus events.
+    """
+    cdef int r
     assert bus is not None
 
-    cdef sd_bus_message *msg
-    return sd_bus_process(bus.bus, &msg)
+    r = sd_bus_process(bus.bus, NULL)
+    while r > 0:
+        r = sd_bus_process(bus.bus, NULL)
 
 def bt_characteristic(Bus bus, str path):
     """

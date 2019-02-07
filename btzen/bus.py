@@ -45,7 +45,8 @@ class Bus:
         self.system_bus = system_bus
 
         loop = asyncio.get_event_loop()
-        loop.add_reader(system_bus.fileno, self._process_event)
+        process = partial(_btzen.bt_process, system_bus)
+        loop.add_reader(system_bus.fileno, process)
 
         # cache of connection locks; lock is used to perform single
         # connection to a given bluetooth device; once a lock is deleted,
@@ -184,13 +185,6 @@ class Bus:
         path = _device_path(mac)
         bus = self.system_bus
         return _btzen.bt_property_str(bus, path, INTERFACE_DEVICE, 'Name')
-
-    def _process_event(self):
-        bus = self.system_bus
-        process = _btzen.bt_process
-        r = process(bus)
-        while r > 0:
-            r = process(bus)
 
 class Notifications:
     def __init__(self, bus):
