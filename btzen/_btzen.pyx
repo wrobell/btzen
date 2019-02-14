@@ -68,6 +68,7 @@ cdef extern from "<systemd/sd-bus.h>":
     int sd_bus_message_new_method_call(sd_bus*, sd_bus_message**, const char*, const char*, const char*, const char*)
     int sd_bus_message_append_array(sd_bus_message*, char, const void*, size_t)
     int sd_bus_message_append_basic(sd_bus_message*, char, const void*)
+    int sd_bus_message_append(sd_bus_message*, const char*, ...)
     int sd_bus_message_open_container(sd_bus_message*, char, const char*)
     int sd_bus_message_close_container(sd_bus_message*)
     int sd_bus_call(sd_bus*, sd_bus_message*, long, sd_bus_error*, sd_bus_message**)
@@ -196,6 +197,42 @@ async def bt_connect(Bus bus, str path):
     )
     check_call('connect to {}'.format(path), r)
     await task
+
+async def bt_connect_adapter(Bus bus, str path, str address):
+    """
+    Connect to Bluetooth device.
+
+    :param bus: D-Bus reference.
+    :param path: D-Bus adapter path.
+    :param address: Bluetooth device address.
+    """
+    assert bus is not None
+
+    buff = address.encode()
+    cdef sd_bus_message *msg = NULL
+    cdef unsigned char *addr_data = buff
+
+    task = asyncio.get_event_loop().create_future()
+    try:
+        r = sd_bus_message_new_method_call(
+            bus.bus,
+            &msg,
+            'org.bluez',
+            path.encode(),
+            'org.bluez.Adapter1',
+            'ConnectDevice'
+        )
+        check_call('write data to {}'.format(path), r)
+
+        r = sd_bus_message_append(msg, 'a{sv}', 2, 'Address', 's', addr_data, "AddressType", "s", "public")
+        check_call('write data to {}'.format(path), r)
+
+        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb_connect, <void*>task, 0)
+        check_call('write data to {}'.format(path), r)
+
+        return (await task)
+    finally:
+        sd_bus_message_unref(msg)
 
 cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object task = <object>user_data
