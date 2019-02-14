@@ -29,7 +29,7 @@ CC2650STK
 import asyncio
 import logging
 import struct
-from collections import deque, namedtuple
+from collections import namedtuple
 from functools import partial
 
 from . import _btzen
