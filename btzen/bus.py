@@ -103,6 +103,8 @@ class Bus:
         return by_uuid[uuid]
 
     def _gatt_start(self, path):
+        # TODO: creates notification session; if another session started,
+        # then we get notifications twice; this needs to be fixed
         self._notifications.start(path, INTERFACE_GATT_CHR, 'Value')
         _btzen.bt_notify_start(self.system_bus, path)
 

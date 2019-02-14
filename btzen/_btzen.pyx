@@ -137,7 +137,7 @@ cdef class PropertyNotification:
         self.queues.clear()
         sd_bus_slot_unref(self.slot)
 
-def fmt_rule(path, iface):
+cdef fmt_rule(iface, path):
     rule = FMT_RULE.format(path, iface)
     rule = rule.strip().replace('\n', '')
     return rule.encode()
@@ -154,8 +154,10 @@ def check_call(msg_err, code):
 
 def default_bus():
     cdef Bus bus = Bus.__new__(Bus)
+    cdef int r
 
-    sd_bus_default_system(&bus.bus)
+    r = sd_bus_default_system(&bus.bus)
+    check_call('connect bus', r)
     bus._fd_no = sd_bus_get_fd(bus.bus)
 
     return bus
@@ -321,7 +323,6 @@ def bt_write_sync(Bus bus, str path, bytes data):
 
 cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object cb = <object>user_data
-    cdef const char *contents
     cdef char msg_type
     cdef const char *path
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
@@ -357,8 +358,8 @@ def bt_property_monitor_start(Bus bus, str path, str iface):
     assert bus is not None
 
     cdef sd_bus_slot *slot
-    rule = fmt_rule(path, iface)
 
+    rule = fmt_rule(iface, path)
     data = PropertyNotification(path)
 
     r = sd_bus_add_match(
