@@ -72,7 +72,7 @@ cdef extern from "<systemd/sd-bus.h>":
     int sd_bus_message_open_container(sd_bus_message*, char, const char*)
     int sd_bus_message_close_container(sd_bus_message*)
     int sd_bus_call(sd_bus*, sd_bus_message*, long, sd_bus_error*, sd_bus_message**)
-    int sd_bus_call_async(sd_bus*, sd_bus_slot*, sd_bus_message*, sd_bus_message_handler_t, void*, long)
+    int sd_bus_call_async(sd_bus*, sd_bus_slot**, sd_bus_message*, sd_bus_message_handler_t, void*, long)
 
     int sd_bus_get_property(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, sd_bus_message**, const char*)
 
@@ -239,22 +239,26 @@ cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_er
     cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
-    if error and error.message:
+    if task.done():
+        return 0
+    elif error and error.message:
         task.set_exception(DataReadError(error.message))
     else:
         bus_msg.c_obj = msg
         value = msg_read_value(bus_msg, 'y')
         task.set_result(value)
-    return 1
+    return 0
 
 async def bt_read(Bus bus, str path):
     assert bus is not None
+
+    cdef sd_bus_slot *slot = NULL
 
     task = asyncio.get_event_loop().create_future()
 
     r = sd_bus_call_method_async(
         bus.bus,
-        NULL,
+        &slot,
         'org.bluez',
         path.encode(),
         'org.bluez.GattCharacteristic1',
@@ -266,7 +270,10 @@ async def bt_read(Bus bus, str path):
     )
     check_call('read data from {}'.format(path), r)
 
-    return (await task)
+    try:
+        return (await task)
+    finally:
+        sd_bus_slot_unref(slot)
 
 cdef int task_cb_write(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     """
@@ -274,11 +281,14 @@ cdef int task_cb_write(sd_bus_message *msg, void *user_data, sd_bus_error *ret_e
     """
     cdef object task = <object>user_data
     cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
-    if error and error.message:
+
+    if task.done():
+        return 0
+    elif error and error.message:
         task.set_exception(DataWriteError(error.message))
     else:
         task.set_result(None)
-    return 1
+    return 0
 
 async def bt_write(Bus bus, str path, bytes data):
     """
@@ -291,6 +301,7 @@ async def bt_write(Bus bus, str path, bytes data):
     assert bus is not None
 
     cdef sd_bus_message *msg = NULL
+    cdef sd_bus_slot *slot = NULL
     cdef char* buff = data
 
     task = asyncio.get_event_loop().create_future()
@@ -314,12 +325,13 @@ async def bt_write(Bus bus, str path, bytes data):
         r = sd_bus_message_close_container(msg)
         check_call('write data to {}'.format(path), r)
 
-        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb_write, <void*>task, 0)
+        r = sd_bus_call_async(bus.bus, &slot, msg, task_cb_write, <void*>task, 0)
         check_call('write data to {}'.format(path), r)
 
         return (await task)
     finally:
         sd_bus_message_unref(msg)
+        sd_bus_slot_unref(slot)
 
 def bt_write_sync(Bus bus, str path, bytes data):
     """
