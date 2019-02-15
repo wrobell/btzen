@@ -42,7 +42,9 @@ setup(
         'Topic :: Software Development :: Libraries',
     ],
     ext_modules=cythonize([
-        Extension('btzen._btzen', ['btzen/_btzen.pyx'], libraries=['systemd'])
+        Extension('btzen._sd_bus', ['btzen/_sd_bus.pyx'], libraries=['systemd']),
+        Extension('btzen._btzen', ['btzen/_btzen.pyx'], libraries=['systemd']),
+        Extension('btzen._cm', ['btzen/_cm.pyx'], libraries=['systemd']),
     ]),
     packages=find_packages('.'),
     include_package_data=True,

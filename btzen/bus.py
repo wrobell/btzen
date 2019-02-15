@@ -20,11 +20,11 @@
 import asyncio
 import contextvars
 import logging
-import threading
 from functools import lru_cache, partial
 from weakref import WeakValueDictionary
 
 from . import _btzen
+from . import _sd_bus
 from .error import ConnectionError
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ class Bus:
         """
         bus = Bus.bus.get()
         if bus is None:
-            system_bus = _btzen.default_bus()
+            system_bus = _sd_bus.default_bus()
             bus = Bus(system_bus)
             Bus.bus.set(bus)
         return bus
