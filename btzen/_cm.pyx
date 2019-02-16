@@ -25,9 +25,12 @@ Bluetooth connection management.
 """
 
 import asyncio
+import logging
 
 from ._sd_bus cimport *
 from . import _sd_bus
+
+logger = logging.getLogger(__name__)
 
 cdef extern from *:
     """
@@ -67,7 +70,6 @@ cdef int cm_property(
 
     #cdef object cm = <object>user_data
     cdef char* uv
-    print(1)
     r = sd_bus_message_append(reply, 'as', 1, "f000aa64-0451-4000-b000-000000000000", NULL)
     return r
 
@@ -108,7 +110,7 @@ async def cm_init(Bus bus, cm):
         '/org/bluez/hci0',
         'org.bluez.GattManager1',
         'RegisterApplication',
-        task_cb_register_app,
+        task_cb,
         <void*>task,
          'oa{sv}',
          '/',
@@ -117,16 +119,47 @@ async def cm_init(Bus bus, cm):
     _sd_bus.check_call('register application call', r)
     await task
 
-cdef int task_cb_register_app(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+cdef int task_cb(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object task = <object>user_data
-    cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
+    cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
+    bus_msg.c_obj = msg
 
-    if task.done():
-        return 0
-    elif error and error.message:
-        task.set_exception(ConnectionError(error.message))
-    else:
-        task.set_result(None)
-    return 0
+    return _sd_bus.task_handle_message(bus_msg, task, ConnectionError, None)
+
+async def bt_connect(Bus bus, str path, str address):
+    """
+    Connect to Bluetooth device.
+
+    :param bus: D-Bus reference.
+    :param path: D-Bus adapter path.
+    :param address: Bluetooth device address.
+    """
+    assert bus is not None
+
+    buff = address.encode()
+    cdef sd_bus_message *msg = NULL
+    cdef unsigned char *addr_data = buff
+
+    task = asyncio.get_event_loop().create_future()
+    try:
+        r = sd_bus_message_new_method_call(
+            bus.bus,
+            &msg,
+            'org.bluez',
+            path.encode(),
+            'org.bluez.Adapter1',
+            'ConnectDevice'
+        )
+        _sd_bus.check_call('write data to {}'.format(path), r)
+
+        r = sd_bus_message_append(msg, 'a{sv}', 2, 'Address', 's', addr_data, "AddressType", "s", "public")
+        _sd_bus.check_call('write data to {}'.format(path), r)
+
+        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb, <void*>task, 0)
+        _sd_bus.check_call('write data to {}'.format(path), r)
+
+        return (await task)
+    finally:
+        sd_bus_message_unref(msg)
 
 # vim: sw=4:et:ai

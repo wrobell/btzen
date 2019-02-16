@@ -19,45 +19,26 @@
 # distutils: language = c
 # cython: c_string_type=unicode, c_string_encoding=utf8, language_level=3str
 
+from libc.stdio cimport perror
+from libc.string cimport strerror
+from libc.errno cimport errno
+from cpython.bytes cimport PyBytes_FromStringAndSize
+
+import logging
 from contextlib import contextmanager
 
 from ._sd_bus cimport *
 from .error import *
 
+logger = logging.getLogger(__name__)
+
+ERROR_HINTS = {
+}
+
 cdef class Bus:
     @property
     def fileno(self):
         return self._fd_no
-
-cdef class PropertyNotification:
-    def __init__(self, path):
-        self.queues = {}
-        self.path = path
-
-    def register(self, name):
-        assert name not in self.queues
-        assert self.slot is not NULL
-        self.queues[name] = asyncio.Queue()
-
-    def is_registered(self, name):
-        return name in self.queues
-
-    def put(self, name, value):
-        assert name in self.queues
-        assert self.slot is not NULL
-        self.queues[name].put_nowait(value)
-
-    async def get(self, name):
-        assert name in self.queues
-        assert self.slot is not NULL
-        return (await self.queues[name].get())
-
-    def size(self, name) -> int:
-        return self.queues[name].qsize()
-
-    def stop(self):
-        self.queues.clear()
-        sd_bus_slot_unref(self.slot)
 
 def default_bus():
     """
@@ -80,6 +61,7 @@ def check_call(msg_err, code):
         msg_err = 'Call failed - {}: {} ({})'.format(
             msg_err, strerror(-code), code
         )
+        logger.debug('got error code {}: '.format(code, strerror(-code)))
         raise CallError(msg_err)
 
 #
@@ -96,6 +78,28 @@ def check_msg_error(r):
             'D-Bus message parsing error: {}'.format(strerror(-r))
         )
 
+def task_handle_message(BusMessage bus_msg, task, cls_err, value_type: str):
+    """
+    Handle asynchronous task result or error.
+
+    :param bus_msg: D-Bus message representation as Python object.
+    :param task: Asynchronous task instance.
+    :param cls: Class of exception to be raised on error.
+    :param value_type: Type of value to be read from D-Bus message.
+    """
+    cdef const sd_bus_error *error = sd_bus_message_get_error(bus_msg.c_obj)
+
+    if task.done():
+        return 0
+    elif error and error.message:
+        task.set_exception(cls_err(error.message))
+    elif value_type is None:
+        task.set_result(None)
+    else:
+        value = msg_read_value(bus_msg, value_type)
+        task.set_result(value)
+    return 0
+
 @contextmanager
 def msg_container(BusMessage bus_msg, str type, str contents):
     """
@@ -103,6 +107,7 @@ def msg_container(BusMessage bus_msg, str type, str contents):
     """
     cdef char msg_type = ord(type)
     cdef sd_bus_message *msg = bus_msg.c_obj
+    assert msg != NULL
 
     r = sd_bus_message_enter_container(msg, msg_type, contents.encode())
     check_msg_error(r)
@@ -201,7 +206,7 @@ def msg_read_value(BusMessage bus_msg, str type):
 
     return r_value
 
-cdef void msg_skip(BusMessage bus_msg, str type) except *:
+def msg_skip(BusMessage bus_msg, str type):
     """
     Skip D-Bus message entry of given type.
     """

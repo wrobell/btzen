@@ -60,18 +60,11 @@ class Sensor:
         self._bus = None
         self._read_data = None
         self._write = None
-        self._connected = asyncio.Event()
-
-    async def connect(self):
-        """
-        Connect to sensor Bluetooth device.
-        """
-        await Bus.get_bus().connect(self._mac)
-        await self._enable()
+        self._cm = None
 
     async def set_interval(self, interval: int) -> None:
         self._interval = interval
-        await self._connected.wait()
+        await self._cm.connected(self._mac)
         await self._write_interval(interval)
 
     async def read(self):
@@ -80,7 +73,7 @@ class Sensor:
 
         This method is an asynchronous coroutine and is *not* thread safe.
         """
-        await self._connected.wait()
+        await self._cm.connected(self._mac)
         self._task = self._read_data(self._params.path_data)
         value = self._converter(await self._task)
         self._task = None
@@ -124,6 +117,8 @@ class Sensor:
         assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
         assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
 
+        self._bus = Bus.get_bus()
+
         get_path = partial(self._bus.sensor_path, self._mac)
         mac = self._mac
         name = self._bus._get_name(mac)
@@ -148,6 +143,7 @@ class Sensor:
         """
         Switch on and enable the sensor.
         """
+        logger.info('enabling device: {}'.format(self))
         notify = self._notifying
 
         self._bus = Bus.get_bus()
@@ -171,13 +167,7 @@ class Sensor:
             self._bus._gatt_start(params.path_data)
 
         await self._write_interval(self._interval)
-
-        self._connected.set()
         logger.info('enabled device: {}'.format(self))
-
-    async def _hold(self):
-        self._connected.clear()
-        logger.info('device {} on hold'.format(self))
 
     async def _write_interval(self, interval: int) -> None:
         path = self._params.path_period

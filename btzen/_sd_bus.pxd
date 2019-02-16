@@ -100,15 +100,4 @@ cdef class BusMessage:
     """
     cdef sd_bus_message *c_obj
 
-cdef class PropertyNotification:
-    """
-    Property notification based on asyncio queue class.
-
-    The `put` method is used to add new value for a property. The `get`
-    coroutine allows to retrieve property value in asynchronous manner.
-    """
-    cdef sd_bus_slot *slot
-    cdef public object queues
-    cdef public str path
-
 # vim: sw=4:et:ai

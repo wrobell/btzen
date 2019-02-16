@@ -25,25 +25,26 @@ from itertools import chain
 from operator import attrgetter
 
 from .bus import Bus, _device_path
+from . import _cm
 
 flatten = chain.from_iterable
 
 logger = logging.getLogger(__name__)
 
-ENABLE = attrgetter('_enable')
-HOLD = attrgetter('_hold')
+PATH_ADAPTER = '/org/bluez/hci0'
 
 class ConnectionManager:
     def __init__(self):
         self._devices = defaultdict(set)
+        self._connected = {}
         self._process = False
-
-        self._enable = partial(self._exec, ENABLE)
-        self._hold = partial(self._exec, HOLD)
 
     def add(self, *devices):
         for dev in devices:
             self._devices[dev._mac].add(dev)
+            dev._cm = self
+        for mac in self._devices:
+            self._connected[mac] = asyncio.Event()
 
     def close(self):
         self._process = False
@@ -51,51 +52,94 @@ class ConnectionManager:
             dev.close()
         logger.info('connection manager closed')
 
+    async def connected(self, mac):
+        if not mac in self._connected:
+            raise ValueError(
+                'Device with address {} not managed by the connection manager'
+                .format(mac)
+            )
+        await self._connected[mac].wait()
+
     def __await__(self):
-        tasks = [self._reconnect(mac, devs) for mac, devs in self._devices.items()]
+        self._process = True
+
+        # TODO: if bluez daemon is restarted, the connection manager needs
+        # to be reinitialized
+        yield from _cm.cm_init(Bus.get_bus().system_bus, self).__await__()
+
+        f = self._reconnect
+        tasks = (f(mac, devs) for mac, devs in self._devices.items())
         yield from asyncio.gather(*tasks).__await__()
 
     async def _reconnect(self, mac, devices):
         path = _device_path(mac)
-
-        self._process = True
-        # run reconnection in the loop; this loop shall rarely restart as
-        # `self._restart` is the main loop reacting to reconnections;
-        # therefore if there is an error, sleep for 5 seconds to avoid cpu
-        # hogging
-        while self._process:
-            try:
-                await Bus.get_bus().connect(mac)
-                await self._enable(devices)
-                await self._restart(path, devices)
-            except Exception as ex:
-                logger.warning(
-                    'cannot connect to {} due to {}, waiting 5s'
-                    .format(mac, ex)
-                )
-                # TODO: make it configurable
-                await asyncio.sleep(5)
-
-    async def _restart(self, path, devices):
-        # renable or hold device when services resolved property changes;
-        # no exception handling as it is done by `self._reconnect`; here we
-        # assume everything works without any errors
         bus = Bus.get_bus()
+
+        # enable monitoring of the `ServicesResolved` property first
         bus._dev_property_start(path, 'ServicesResolved')
+
+        # connect to a device
+        #
+        # NOTE: scanning by external programs shall be off or we will never
+        # connect
+        try:
+            await _cm.bt_connect(bus.system_bus, PATH_ADAPTER, mac)
+        except Exception as ex:
+            if str(ex) == 'Already Exists':
+                logger.info('connection for {} already exists'.format(mac))
+            else:
+                raise
+
+        try:
+            # if connected, then enable devices
+            #
+            # NOTE: at this stage we might be affected by race conditions,
+            # we need to improve this
+            if bus._property_bool(path, 'ServicesResolved'):
+                await self._enable(mac, devices)
+        except Exception as ex:
+            logger.info(
+                'error when enabling devices of {} on start: {}'
+                .format(mac, ex)
+            )
+
+        await self._restart(mac, devices)
+
+    async def _restart(self, mac, devices):
+        """
+        Renable or hold Bluetooth device when property 'ServicesResolved`
+        changes.
+        """
+        path = _device_path(mac)
+        bus = Bus.get_bus()
+        enable = partial(self._enable, mac, devices)
+        clear = self._connected[mac].clear
         try:
             while self._process:
+                logger.info('waiting for services to be resolved for {}'.format(mac))
                 resolved = await bus._dev_property_get(path, 'ServicesResolved')
-                # enable if services resolved, otherwise no point of disabling
-                # or disconnecting the device, so just hold
-                f = self._enable if resolved else self._hold
-                await f(devices)
+                # enable if services resolved
+                #
+                # otherwise force the devices to wait; no point to
+                # disconnect or disable device at this stage
+                if resolved:
+                    await enable()
+                else:
+                    clear()
+                    logger.info('device {} disconnected'.format(mac))
         finally:
             bus._dev_property_stop(path, 'ServicesResolved')
 
-    async def _exec(self, f_get, devices):
-        tasks = [f_get(dev)() for dev in devices]
-        # use `wait` to execute each task independently, so a failed task
-        # does not influence another one
-        await asyncio.wait(tasks)
+    async def _enable(self, mac, devices):
+        for dev in devices:
+            # enable devices one by one to avoid any deadlocks
+            await dev._enable()
+
+        # wait for first data sample to be measured using the longest
+        # interval
+        interval = max(dev._interval for dev in devices)
+        await asyncio.sleep(interval)
+
+        self._connected[mac].set()
 
 # vim: sw=4:et:ai

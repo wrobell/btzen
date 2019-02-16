@@ -24,8 +24,6 @@ from libc.stdio cimport perror
 from libc.string cimport strerror
 from libc.errno cimport errno
 
-from cpython.bytes cimport PyBytes_FromStringAndSize
-
 import asyncio
 import logging
 
@@ -44,96 +42,58 @@ path='{}',
 arg0='{}'
 """
 
+cdef class PropertyNotification:
+    """
+    Property notification based on asyncio queue class.
+
+    The `put` method is used to add new value for a property. The `get`
+    coroutine allows to retrieve property value in asynchronous manner.
+    """
+    cdef sd_bus_slot *slot
+    cdef public object queues
+    cdef public str path
+
+    def __init__(self, path):
+        self.queues = {}
+        self.path = path
+
+    def register(self, name):
+        assert name not in self.queues
+        assert self.slot is not NULL
+        self.queues[name] = asyncio.Queue()
+
+    def is_registered(self, name):
+        return name in self.queues
+
+    def put(self, name, value):
+        assert name in self.queues
+        assert self.slot is not NULL
+        self.queues[name].put_nowait(value)
+
+    async def get(self, name):
+        assert name in self.queues
+        assert self.slot is not NULL
+        return (await self.queues[name].get())
+
+    def size(self, name) -> int:
+        return self.queues[name].qsize()
+
+    def stop(self):
+        self.queues.clear()
+        sd_bus_slot_unref(self.slot)
+
 cdef fmt_rule(iface, path):
     rule = FMT_RULE.format(path, iface)
     rule = rule.strip().replace('\n', '')
     return rule.encode()
 
-cdef int task_cb_connect(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
-    cdef object task = <object>user_data
-    cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
-
-    if error and error.message:
-        task.set_exception(ConnectionError(error.message))
-    else:
-        task.set_result(None)
-    return 1
-
-async def bt_connect(Bus bus, str path):
-    """
-    Connect to Bluetooth device.
-
-    :param bus: D-Bus reference.
-    :param path: D-Bus device path.
-    """
-    assert bus is not None
-
-    task = asyncio.get_event_loop().create_future()
-    r = sd_bus_call_method_async(
-        bus.bus,
-        NULL,
-        'org.bluez',
-        path.encode(),
-        'org.bluez.Device1',
-        'Connect',
-        task_cb_connect,
-        <void*>task,
-        NULL,
-        NULL
-    )
-    _sd_bus.check_call('connect to {}'.format(path), r)
-    await task
-
-async def bt_connect_adapter(Bus bus, str path, str address):
-    """
-    Connect to Bluetooth device.
-
-    :param bus: D-Bus reference.
-    :param path: D-Bus adapter path.
-    :param address: Bluetooth device address.
-    """
-    assert bus is not None
-
-    buff = address.encode()
-    cdef sd_bus_message *msg = NULL
-    cdef unsigned char *addr_data = buff
-
-    task = asyncio.get_event_loop().create_future()
-    try:
-        r = sd_bus_message_new_method_call(
-            bus.bus,
-            &msg,
-            'org.bluez',
-            path.encode(),
-            'org.bluez.Adapter1',
-            'ConnectDevice'
-        )
-        _sd_bus.check_call('write data to {}'.format(path), r)
-
-        r = sd_bus_message_append(msg, 'a{sv}', 2, 'Address', 's', addr_data, "AddressType", "s", "public")
-        _sd_bus.check_call('write data to {}'.format(path), r)
-
-        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb_connect, <void*>task, 0)
-        _sd_bus.check_call('write data to {}'.format(path), r)
-
-        return (await task)
-    finally:
-        sd_bus_message_unref(msg)
-
 cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object task = <object>user_data
     cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
+    bus_msg.c_obj = msg
 
-    if task.done():
-        return 0
-    elif error and error.message:
-        task.set_exception(DataReadError(error.message))
-    else:
-        bus_msg.c_obj = msg
-        value = msg_read_value(bus_msg, 'y')
-        task.set_result(value)
-    return 0
+    return _sd_bus.task_handle_message(bus_msg, task, DataReadError, 'y')
 
 async def bt_read(Bus bus, str path):
     assert bus is not None
@@ -166,15 +126,10 @@ cdef int task_cb_write(sd_bus_message *msg, void *user_data, sd_bus_error *ret_e
     Data write callback used by `bt_write` function.
     """
     cdef object task = <object>user_data
-    cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
+    cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
+    bus_msg.c_obj = msg
 
-    if task.done():
-        return 0
-    elif error and error.message:
-        task.set_exception(DataWriteError(error.message))
-    else:
-        task.set_result(None)
-    return 0
+    return _sd_bus.task_handle_message(bus_msg, task, DataWriteError, None)
 
 async def bt_write(Bus bus, str path, bytes data):
     """
@@ -267,15 +222,15 @@ cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_e
     bus_msg.c_obj = msg
 
     # skip interface name
-    msg_skip(bus_msg, 's')
+    _sd_bus.msg_skip(bus_msg, 's')
 
-    for _ in msg_container_dict(bus_msg, '{sv}'):
-        name = msg_read_value(bus_msg, 's')
+    for _ in _sd_bus.msg_container_dict(bus_msg, '{sv}'):
+        name = _sd_bus.msg_read_value(bus_msg, 's')
         if cb.is_registered(name):
-            value = msg_read_value(bus_msg, 'v')
+            value = _sd_bus.msg_read_value(bus_msg, 'v')
             cb.put(name, value)
         else:
-            msg_skip(bus_msg, 'v')
+            _sd_bus.msg_skip(bus_msg, 'v')
 
     return 0
 
@@ -330,7 +285,7 @@ def bt_property_str(Bus bus, str path, str iface, str name):
     assert r == 0, strerror(-r)
 
     bus_msg.c_obj = msg
-    value = msg_read_value(bus_msg, 's')
+    value =_sd_bus.msg_read_value(bus_msg, 's')
     sd_bus_message_unref(msg)
     sd_bus_error_free(&error)
 
@@ -357,7 +312,7 @@ def bt_property_bool(Bus bus, str path, str iface, str name):
         raise DataReadError(strerror(-r))
 
     bus_msg.c_obj = msg
-    value = msg_read_value(bus_msg, 'b')
+    value = _sd_bus.msg_read_value(bus_msg, 'b')
     sd_bus_message_unref(msg)
     sd_bus_error_free(&error)
 
@@ -473,27 +428,27 @@ def bt_characteristic(Bus bus, str path):
 
 def _parse_characteristics(BusMessage bus_msg, str path):
     data = {}
-    for _ in msg_container_dict(bus_msg, '{oa{sa{sv}}}'):
-        chr_path = msg_read_value(bus_msg, 'o')
+    for _ in _sd_bus.msg_container_dict(bus_msg, '{oa{sa{sv}}}'):
+        chr_path = _sd_bus.msg_read_value(bus_msg, 'o')
 
         if not chr_path.startswith(path):
-             msg_skip(bus_msg, 'a{sa{sv}}')
+             _sd_bus.msg_skip(bus_msg, 'a{sa{sv}}')
              continue
 
-        for _ in msg_container_dict(bus_msg, '{sa{sv}}'):
-            iface = msg_read_value(bus_msg, 's')
+        for _ in _sd_bus.msg_container_dict(bus_msg, '{sa{sv}}'):
+            iface = _sd_bus.msg_read_value(bus_msg, 's')
 
             if iface != 'org.bluez.GattCharacteristic1':
-                msg_skip(bus_msg, 'a{sv}')
+                _sd_bus.msg_skip(bus_msg, 'a{sv}')
                 continue
 
-            for _ in msg_container_dict(bus_msg, '{sv}'):
-                name = msg_read_value(bus_msg, 's')
+            for _ in _sd_bus.msg_container_dict(bus_msg, '{sv}'):
+                name = _sd_bus.msg_read_value(bus_msg, 's')
                 if name == 'UUID':
-                    uuid = msg_read_value(bus_msg, 'v')
+                    uuid = _sd_bus.msg_read_value(bus_msg, 'v')
                     data[uuid] = chr_path
                 else:
-                    msg_skip(bus_msg, 'v')
+                    _sd_bus.msg_skip(bus_msg, 'v')
     return data
 
 # vim: sw=4:et:ai

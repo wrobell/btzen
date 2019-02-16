@@ -21,7 +21,6 @@ import asyncio
 import contextvars
 import logging
 from functools import lru_cache, partial
-from weakref import WeakValueDictionary
 
 from . import _btzen
 from . import _sd_bus
@@ -48,10 +47,6 @@ class Bus:
         process = partial(_btzen.bt_process, system_bus)
         loop.add_reader(system_bus.fileno, process)
 
-        # cache of connection locks; lock is used to perform single
-        # connection to a given bluetooth device; once a lock is deleted,
-        # it will be removed from the dictionary
-        self._lock = WeakValueDictionary()
         self._notifications = Notifications(self)
 
     @staticmethod
@@ -67,34 +62,6 @@ class Bus:
             bus = Bus(system_bus)
             Bus.bus.set(bus)
         return bus
-
-    async def connect(self, mac):
-        """
-        Connect to Bluetooth device.
-
-        If connected, the method does nothing.
-
-        :param mac: MAC address of Bluetooth device.
-        """
-        path = _device_path(mac)
-
-        lock = self._lock.get(mac)
-        if lock is None:
-            self._lock[mac] = lock = asyncio.Lock()
-
-        try:
-            async with lock:
-                await self._connect_and_resolve(path)
-        finally:
-            # destroy lock, so it is removed from the cache when no longer
-            # in use
-            del lock
-            logger.debug('number of connection locks: {}'.format(len(self._lock)))
-
-        name = self._get_name(mac)
-        logger.info('connected to {}'.format(name))
-
-        return name
 
     def sensor_path(self, mac, uuid):
         if uuid is None:
@@ -135,41 +102,6 @@ class Bus:
             return (await self._dev_property_get(path, name))
         finally:
             self._dev_property_stop(path, name)
-
-    async def _connect_and_resolve(self, path):
-        logger.info('connecting to {}'.format(path))
-        await self._connect(path)
-
-        # first create task
-        task_sr = self._dev_property(path, 'ServicesResolved')
-        # then check the property
-        resolved = self._property_bool(path, 'ServicesResolved')
-        try:
-            if not resolved:
-                logger.info('resolving services for {}'.format(path))
-                # and wait for services to be resolved
-                value = await task_sr
-                logger.info('{} services resolved {}'.format(path, value))
-        finally:
-            # destroy the notification
-            task_sr.close()
-
-    async def _connect(self, path):
-        assert self.system_bus is not None
-        try:
-            task = _btzen.bt_connect(self.system_bus, path)
-            await task
-        except Exception as ex:
-            # exception might be raised if device is already connected, so
-            # check if errors has to be raised
-            logger.debug('connection error: {}'.format(ex))
-            # FIXME: if no scan on, then this fails
-            connected = self._property_bool(path, 'Connected')
-            if not connected:
-                raise
-        else:
-            connected = self._property_bool(path, 'Connected')
-            logger.info('connected to {}: {}'.format(path, connected))
 
     def _property_bool(self, path, name):
         bus = self.system_bus
