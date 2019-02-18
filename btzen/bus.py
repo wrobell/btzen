@@ -83,9 +83,6 @@ class Bus:
         _btzen.bt_notify_stop(self.system_bus, path)
         self._notifications.stop(path, INTERFACE_GATT_CHR)
 
-    def _gatt_size(self, path) -> int:
-        return self._notifications.size(path, INTERFACE_GATT_CHR, 'Value')
-
     def _dev_property_start(self, path, name):
         self._notifications.start(path, INTERFACE_DEVICE, name)
 
@@ -141,10 +138,6 @@ class Notifications:
         key = path, iface
         data = self._data[key]
         return (await data.get(name))
-
-    def size(self, path, iface, name):
-        key = path, iface
-        return self._data[key].size(name)
 
     def stop(self, path, iface):
         # TODO: add name and call PropertyNotification.stop when no
