@@ -20,7 +20,7 @@
 import asyncio
 import contextvars
 import logging
-from functools import lru_cache, partial
+from functools import partial
 
 from . import _btzen
 from . import _sd_bus
@@ -109,13 +109,11 @@ class Bus:
         value = _btzen.bt_property_bool(bus, path, INTERFACE_DEVICE, name)
         return value
 
-    @lru_cache()
     def _get_sensor_paths(self, mac):
         path = _device_path(mac)
         by_uuid = _btzen.bt_characteristic(self.system_bus, path)
         return by_uuid
 
-    @lru_cache()
     def _get_name(self, mac):
         path = _device_path(mac)
         bus = self.system_bus
