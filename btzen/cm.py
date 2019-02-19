@@ -83,30 +83,21 @@ class ConnectionManager:
 
         # connect to a device
         #
-        # NOTE: scanning by external programs shall be off or we will never
-        # connect
+        # NOTE: bluez 5.50 - scanning by external programs shall be off or
+        # we will never connect
         try:
             await _cm.bt_connect(bus.system_bus, PATH_ADAPTER, mac)
         except Exception as ex:
             if str(ex) == 'Already Exists':
                 logger.info('connection for {} already exists'.format(mac))
             else:
+                bus._dev_property_stop(path, 'ServicesResolved')
                 raise
 
         try:
-            # if connected, then enable devices
-            #
-            # NOTE: at this stage we might be affected by race conditions,
-            # we need to improve this
-            if bus._property_bool(path, 'ServicesResolved'):
-                await self._enable(mac, devices)
-        except Exception as ex:
-            logger.info(
-                'error when enabling devices of {} on start: {}'
-                .format(mac, ex)
-            )
-
-        await self._restart(mac, devices)
+            await self._restart(mac, devices)
+        finally:
+            bus._dev_property_stop(path, 'ServicesResolved')
 
     async def _restart(self, mac, devices):
         """
@@ -116,22 +107,28 @@ class ConnectionManager:
         path = _device_path(mac)
         bus = Bus.get_bus()
         enable = partial(self._enable, mac, devices)
-        clear = self._connected[mac].clear
-        try:
-            while self._process:
-                logger.info('waiting for services to be resolved for {}'.format(mac))
-                resolved = await bus._dev_property_get(path, 'ServicesResolved')
-                # enable if services resolved
-                #
-                # otherwise force the devices to wait; no point to
-                # disconnect or disable device at this stage
-                if resolved:
-                    await enable()
-                else:
-                    clear()
-                    logger.info('device {} disconnected'.format(mac))
-        finally:
-            bus._dev_property_stop(path, 'ServicesResolved')
+        cn_clear = self._connected[mac].clear
+        cn_set = self._connected[mac].set
+
+        while self._process:
+            # try to enable device first; if this fails, then wait for
+            # services to be resolved; this way we try to avoid connection
+            # race conditions
+            try:
+                logger.info('enabling device {}'.format(mac))
+                await enable()
+            except Exception as ex:
+                logger.exception('enabling device %s failed', mac)
+                cn_clear()
+            else:
+                cn_set()
+
+            logger.info(
+                'device {} waiting for services resolved status change'
+                .format(mac)
+            )
+            resolved = await bus._dev_property_get(path, 'ServicesResolved')
+            logger.info('device {} services resolved: {}'.format(mac, resolved))
 
     async def _enable(self, mac, devices):
         for dev in devices:
@@ -142,7 +139,5 @@ class ConnectionManager:
         # interval
         interval = max(dev._interval for dev in devices)
         await asyncio.sleep(interval)
-
-        self._connected[mac].set()
 
 # vim: sw=4:et:ai
