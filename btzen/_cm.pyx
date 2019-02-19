@@ -24,39 +24,52 @@
 Bluetooth connection management.
 """
 
+from libc.stdlib cimport malloc, free
+
 import asyncio
 import logging
+from itertools import chain
 
 from ._sd_bus cimport *
 from . import _sd_bus
 
 logger = logging.getLogger(__name__)
 
+flatten = chain.from_iterable
+
 cdef extern from *:
+    # cdef sd_bus_vtable *cm_vtable = [
+    #     SD_BUS_VTABLE_START(0),
+    #     SD_BUS_METHOD('Release', '', '', cm_release, 0),
+    #     SD_BUS_PROPERTY('UUIDs', 'as', cm_property, 0, SD_BUS_VTABLE_PROPERTY_CONST),
+    #     SD_BUS_VTABLE_END
+    # ]
     """
     #include <string.h>
     void create_vtable(sd_bus_message_handler_t f_release, sd_bus_property_get_t f_property, sd_bus_vtable** ret) {
         /* FIXME: fix the local variable issue */
-        sd_bus_vtable cm_vtable[] = {
+        sd_bus_vtable vtable[] = {
             SD_BUS_VTABLE_START(0),
             SD_BUS_METHOD("Release", "", "", f_release, 0),
             SD_BUS_PROPERTY("UUIDs", "as", f_property, 0, SD_BUS_VTABLE_PROPERTY_CONST),
             SD_BUS_VTABLE_END
         };
         *ret = malloc(4 * sizeof(sd_bus_vtable));
-        memcpy(*ret, cm_vtable, 4 * sizeof(sd_bus_vtable));
+        memcpy(*ret, vtable, 4 * sizeof(sd_bus_vtable));
     }
     """
     void create_vtable(sd_bus_message_handler_t, sd_bus_property_get_t, sd_bus_vtable**)
-#   cdef sd_bus_vtable *cm_vtable = [
-#       SD_BUS_VTABLE_START(0),
-#       SD_BUS_METHOD('Release', '', '', cm_release, 0),
-#       SD_BUS_PROPERTY('UUIDs', 'as', cm_property, 0, SD_BUS_VTABLE_PROPERTY_CONST),
-#       SD_BUS_VTABLE_END
-#   ]
+
+cdef class ConnectionManagerHandle:
+    cdef sd_bus_slot *slot
+    cdef sd_bus_vtable *vtable
+
+    def stop(self):
+        sd_bus_slot_unref(self.slot)
+        free(self.vtable)
 
 cdef int cm_release(sd_bus_message *msg, void *user_data, sd_bus_error *error) with gil:
-    return sd_bus_reply_method_return(msg, '')
+    return sd_bus_reply_method_return(msg, NULL)
 
 cdef int cm_property(
         sd_bus *bus,
@@ -68,25 +81,31 @@ cdef int cm_property(
         sd_bus_error *error
     ) with gil:
 
-    #cdef object cm = <object>user_data
-    cdef char* uv
-    r = sd_bus_message_append(reply, 'as', 1, "f000aa64-0451-4000-b000-000000000000", NULL)
-    return r
+    cdef object cm = <object>user_data
+    cdef int r
 
-    # TODO
-    #if prop != 'UUIDs':
-    #    return -ENOENT
+    uuids = set(dev.UUID_SERVICE.encode() for dev in flatten(cm._devices.values()))
+    size = len(uuids) + 1
+    cdef char **arr = <char**>malloc(size * sizeof(char*))
 
-#   for uuid in cm.uuid:
-#       uv = uuid
-#       r = sd_bus_message_append(reply, 'as', 1, uv, NULL)
-#       _sd_bus.check_call('message append', r)
-#   return 0
+    for i, uv in enumerate(uuids):
+        arr[i] = uv
+    arr[size - 1] = NULL
+
+    r = sd_bus_message_append_strv(reply, arr)
+    free(arr)
+
+    _sd_bus.check_call('adding uuids', r)
+    return 0
 
 async def cm_init(Bus bus, cm):
-    cdef sd_bus_vtable *cm_vtable
+    """
+    Initialize connection manager.
+    """
+    cdef sd_bus_slot *slot
 
-    create_vtable(cm_release, cm_property, &cm_vtable)
+    handle = ConnectionManagerHandle()
+    create_vtable(cm_release, cm_property, &handle.vtable)
 
     task = asyncio.get_event_loop().create_future()
 
@@ -95,11 +114,11 @@ async def cm_init(Bus bus, cm):
 
     r = sd_bus_add_object_vtable(
         bus.bus,
-        NULL,
+        &slot,
         '/org/btzen/ConnectionManager',
         'org.bluez.GattProfile1',
-        cm_vtable,
-        NULL
+        handle.vtable,
+        <void*>cm
     )
     _sd_bus.check_call('add cm vtable', r)
 
@@ -116,8 +135,45 @@ async def cm_init(Bus bus, cm):
          '/',
          0
     )
-    _sd_bus.check_call('register application call', r)
+    try:
+        _sd_bus.check_call('register application call', r)
+    except Exception as ex:
+        sd_bus_slot_unref(slot)
+        raise
+    else:
+        handle.slot = slot
+
     await task
+    return handle
+
+def cm_close(Bus bus, handle):
+    """
+    Close connection manager.
+    """
+    assert bus is not None
+
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+
+    handle.stop()
+
+    r = sd_bus_call_method(
+        bus.bus,
+        'org.bluez',
+        '/org/bluez/hci0',
+        'org.bluez.GattManager1',
+        'UnregisterApplication',
+        &error,
+        &msg,
+         'o',
+         '/',
+         NULL
+    )
+
+    sd_bus_error_free(&error);
+    sd_bus_message_unref(msg);
+
+    _sd_bus.check_call('unregister application call', r)
 
 cdef int task_cb(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object task = <object>user_data

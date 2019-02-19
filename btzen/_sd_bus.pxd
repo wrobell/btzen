@@ -56,6 +56,7 @@ cdef extern from "<systemd/sd-bus.h>":
     int sd_bus_message_append_array(sd_bus_message*, char, const void*, size_t)
     int sd_bus_message_append_basic(sd_bus_message*, char, const void*)
     int sd_bus_message_append(sd_bus_message*, const char*, ...)
+    int sd_bus_message_append_strv(sd_bus_message*, char**)
     int sd_bus_message_open_container(sd_bus_message*, char, const char*)
     int sd_bus_message_close_container(sd_bus_message*)
 

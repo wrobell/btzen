@@ -38,6 +38,7 @@ class ConnectionManager:
         self._devices = defaultdict(set)
         self._connected = {}
         self._process = False
+        self._handle = None
 
     def add(self, *devices):
         for dev in devices:
@@ -50,6 +51,7 @@ class ConnectionManager:
         self._process = False
         for dev in flatten(self._devices.values()):
             dev.close()
+        _cm.cm_close(Bus.get_bus().system_bus, self._handle)
         logger.info('connection manager closed')
 
     async def connected(self, mac):
@@ -65,7 +67,8 @@ class ConnectionManager:
 
         # TODO: if bluez daemon is restarted, the connection manager needs
         # to be reinitialized
-        yield from _cm.cm_init(Bus.get_bus().system_bus, self).__await__()
+        handle = yield from _cm.cm_init(Bus.get_bus().system_bus, self).__await__()
+        self._handle = handle
 
         f = self._reconnect
         tasks = (f(mac, devs) for mac, devs in self._devices.items())

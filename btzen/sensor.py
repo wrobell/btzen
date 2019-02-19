@@ -184,6 +184,7 @@ class Sensor:
 
 class Temperature(Sensor):
     DATA_LEN = 4
+    UUID_SERVICE = dev_uuid(0xaa00)
     UUID_DATA = dev_uuid(0xaa01)
     UUID_CONF = dev_uuid(0xaa02)
     UUID_PERIOD = dev_uuid(0xaa03)
@@ -194,6 +195,7 @@ class Temperature(Sensor):
 
 class Pressure(Sensor):
     DATA_LEN = 6
+    UUID_SERVICE = dev_uuid(0xaa40)
     UUID_DATA = dev_uuid(0xaa41)
     UUID_CONF = dev_uuid(0xaa42)
     UUID_PERIOD = dev_uuid(0xaa44)
@@ -204,6 +206,7 @@ class Pressure(Sensor):
 
 class Humidity(Sensor):
     DATA_LEN = 4
+    UUID_SERVICE = dev_uuid(0xaa20)
     UUID_DATA = dev_uuid(0xaa21)
     UUID_CONF = dev_uuid(0xaa22)
     UUID_PERIOD = dev_uuid(0xaa23)
@@ -214,6 +217,7 @@ class Humidity(Sensor):
 
 class Light(Sensor):
     DATA_LEN = 2
+    UUID_SERVICE = dev_uuid(0xaa70)
     UUID_DATA = dev_uuid(0xaa71)
     UUID_CONF = dev_uuid(0xaa72)
     UUID_PERIOD = dev_uuid(0xaa73)
@@ -224,6 +228,7 @@ class Light(Sensor):
 
 class Accelerometer(Sensor):
     DATA_LEN = 18
+    UUID_SERVICE = dev_uuid(0xaa80)
     UUID_DATA = dev_uuid(0xaa81)
     UUID_CONF = dev_uuid(0xaa82)
     UUID_PERIOD = dev_uuid(0xaa83)
@@ -239,6 +244,7 @@ class Accelerometer(Sensor):
 
 class Button(Sensor):
     DATA_LEN = 1
+    UUID_SERVICE = '0000ffe1-0000-1000-8000-00805f9b34fb'
     UUID_DATA = '0000ffe1-0000-1000-8000-00805f9b34fb'
     UUID_CONF = None
     UUID_PERIOD = None

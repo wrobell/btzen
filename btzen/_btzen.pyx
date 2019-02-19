@@ -213,7 +213,6 @@ def bt_write_sync(Bus bus, str path, bytes data):
 
 cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object cb = <object>user_data
-    cdef char msg_type
     cdef const char *path
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
@@ -344,6 +343,9 @@ def bt_notify_start(Bus bus, str path):
         NULL,
         NULL
     )
+    sd_bus_error_free(&error);
+    sd_bus_message_unref(msg);
+
     _sd_bus.check_call('start notification', r)
 
 def bt_notify_stop(Bus bus, str path):
