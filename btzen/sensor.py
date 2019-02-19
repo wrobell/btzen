@@ -34,7 +34,7 @@ from functools import partial
 
 from . import _btzen
 from .import converter
-from .bus import Bus
+from .bus import Bus, _device_path
 from .error import ConfigurationError, DataReadError, DataWriteError
 from .util import dev_uuid
 
@@ -259,6 +259,7 @@ class Button(Sensor):
 
 class Weight(Sensor):
     DATA_LEN = 9
+    UUID_SERVICE = '0000181d-0000-1000-8000-00805f9b34fb'
     UUID_DATA = '00002a9d-0000-1000-8000-00805f9b34fb'
 
     UUID_CONF = None
@@ -267,5 +268,24 @@ class Weight(Sensor):
     CONFIG_ON = None
     CONFIG_ON_NOTIFY = None
     CONFIG_OFF = None
+
+class Battery:
+    UUID_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb'
+
+    def __init__(self, mac):
+        self._interval = 0
+        self._mac = mac
+        self._bus = Bus.get_bus()
+        self._bus._bat_property_start(_device_path(self._mac))
+
+    async def _enable(self):
+        pass
+
+    async def read(self):
+        # TODO: add non-notifying version
+        return (await self._bus._bat_property_get(_device_path(self._mac)))
+
+    def close(self):
+        self._bus._bat_property_start(_device_path(self._mac))
 
 # vim: sw=4:et:ai

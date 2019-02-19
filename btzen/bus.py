@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 INTERFACE_DEVICE = 'org.bluez.Device1'
 INTERFACE_GATT_CHR = 'org.bluez.GattCharacteristic1'
+INTERFACE_BATTERY = 'org.bluez.Battery1'
 
 def _mac(mac):
     return mac.replace(':', '_').upper()
@@ -93,12 +94,15 @@ class Bus:
     def _dev_property_stop(self, path, name):
         self._notifications.stop(path, INTERFACE_DEVICE)
 
-    async def _dev_property(self, path, name):
-        self._dev_property_start(path, name)
-        try:
-            return (await self._dev_property_get(path, name))
-        finally:
-            self._dev_property_stop(path, name)
+    def _bat_property_start(self, path):
+        self._notifications.start(path, INTERFACE_BATTERY, 'Percentage')
+
+    async def _bat_property_get(self, path):
+        value = await self._notifications.get(path, INTERFACE_BATTERY, 'Percentage')
+        return value
+
+    def _bat_property_stop(self, path):
+        self._notifications.stop(path, INTERFACE_BATTERY)
 
     def _property_bool(self, path, name):
         bus = self.system_bus

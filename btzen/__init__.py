@@ -18,7 +18,7 @@
 #
 
 from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
-    Button, Weight
+    Button, Weight, Battery
 from .cm import ConnectionManager
 from .serial import Serial
 from .error import *
@@ -27,7 +27,7 @@ __version__ = '0.2.5'
 
 __all__ = [
     'Temperature', 'Humidity', 'Pressure', 'Light', 'Accelerometer',
-    'Button', 'Weight', 'Serial', 'ConnectionManager', 'Error',
+    'Button', 'Weight', 'Serial', 'Battery', 'ConnectionManager', 'Error',
     'ConnectionError', 'ConfigurationError', 'DataReadError',
 ]
 

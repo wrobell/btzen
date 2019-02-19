@@ -44,6 +44,11 @@ async def read_button(name, button):
         value = await button.read()
         print_data(name, value)
 
+async def battery_level(battery):
+    while True:
+        value = await battery.read()
+        print_data('battery level', value)
+
 def print_data(name, value):
     print('{} {}: {}'.format(datetime.now(), name, value))
 
@@ -88,9 +93,11 @@ sensors =  [sensor for _, _, sensor in items]
 # create tasks reading the sensor data
 tasks = [reader(name, sensor) for name, reader, sensor in items]
 
+battery = btzen.Battery(args.device)
+
 # create connection manager
 manager = btzen.ConnectionManager()
-manager.add(*sensors)
+manager.add(battery, *sensors)
 
 try:
     loop.run_until_complete(asyncio.gather(manager, *tasks))
