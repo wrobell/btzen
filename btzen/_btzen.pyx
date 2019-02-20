@@ -264,7 +264,7 @@ def bt_property_monitor_start(Bus bus, str path, str iface):
     data.slot = slot
     return data
 
-def bt_property_str(Bus bus, str path, str iface, str name):
+async def bt_property(Bus bus, str path, str iface, str name, str type):
     assert bus is not None
 
     cdef sd_bus_message *msg = NULL
@@ -279,39 +279,12 @@ def bt_property_str(Bus bus, str path, str iface, str name):
         name.encode(),
         &error,
         &msg,
-        's'
+        type.encode()
     )
-    assert r == 0, strerror(-r)
+    _sd_bus.check_call('getting property {}'.format(name), r)
 
     bus_msg.c_obj = msg
-    value =_sd_bus.msg_read_value(bus_msg, 's')
-    sd_bus_message_unref(msg)
-    sd_bus_error_free(&error)
-
-    return value
-
-def bt_property_bool(Bus bus, str path, str iface, str name):
-    assert bus is not None
-
-    cdef sd_bus_message *msg = NULL
-    cdef sd_bus_error error = SD_BUS_ERROR_NULL
-    cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
-
-    r = sd_bus_get_property(
-        bus.bus,
-        'org.bluez',
-        path.encode(),
-        iface.encode(),
-        name.encode(),
-        &error,
-        &msg,
-        'b'
-    )
-    if r != 0:
-        raise DataReadError(strerror(-r))
-
-    bus_msg.c_obj = msg
-    value = _sd_bus.msg_read_value(bus_msg, 'b')
+    value =_sd_bus.msg_read_value(bus_msg, type)
     sd_bus_message_unref(msg)
     sd_bus_error_free(&error)
 

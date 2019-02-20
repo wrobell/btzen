@@ -24,7 +24,7 @@ from functools import partial
 from itertools import chain
 from operator import attrgetter
 
-from .bus import Bus, _device_path
+from .bus import Bus
 from . import _cm
 
 flatten = chain.from_iterable
@@ -75,11 +75,10 @@ class ConnectionManager:
         yield from asyncio.gather(*tasks).__await__()
 
     async def _reconnect(self, mac, devices):
-        path = _device_path(mac)
         bus = Bus.get_bus()
 
         # enable monitoring of the `ServicesResolved` property first
-        bus._dev_property_start(path, 'ServicesResolved')
+        bus._dev_property_start(mac, 'ServicesResolved')
 
         # connect to a device
         #
@@ -91,20 +90,19 @@ class ConnectionManager:
             if str(ex) == 'Already Exists':
                 logger.info('connection for {} already exists'.format(mac))
             else:
-                bus._dev_property_stop(path, 'ServicesResolved')
+                bus._dev_property_stop(mac, 'ServicesResolved')
                 raise
 
         try:
             await self._restart(mac, devices)
         finally:
-            bus._dev_property_stop(path, 'ServicesResolved')
+            bus._dev_property_stop(mac, 'ServicesResolved')
 
     async def _restart(self, mac, devices):
         """
         Renable or hold Bluetooth device when property 'ServicesResolved`
         changes.
         """
-        path = _device_path(mac)
         bus = Bus.get_bus()
         enable = partial(self._enable, mac, devices)
         cn_clear = self._connected[mac].clear
@@ -127,7 +125,7 @@ class ConnectionManager:
                 'device {} waiting for services resolved status change'
                 .format(mac)
             )
-            resolved = await bus._dev_property_get(path, 'ServicesResolved')
+            resolved = await bus._dev_property_get(mac, 'ServicesResolved')
             logger.info('device {} services resolved: {}'.format(mac, resolved))
 
     async def _enable(self, mac, devices):

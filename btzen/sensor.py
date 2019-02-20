@@ -112,7 +112,7 @@ class Sensor:
 
         logger.info('sensor {} closed'.format(self))
 
-    def _set_parameters(self):
+    def _set_parameters(self, name):
         assert isinstance(self.UUID_DATA, str)
         assert isinstance(self.UUID_CONF, str) or self.UUID_CONF is None
         assert isinstance(self.UUID_PERIOD, str) or self.UUID_PERIOD is None
@@ -121,7 +121,6 @@ class Sensor:
 
         get_path = partial(self._bus.sensor_path, self._mac)
         mac = self._mac
-        name = self._bus._get_name(mac)
 
         self._params = params = Parameters(
             name,
@@ -153,7 +152,8 @@ class Sensor:
         self._read_data = self._bus._gatt_get if notify else read
         self._write = partial(_btzen.bt_write, system_bus)
 
-        self._set_parameters()
+        name = await self._bus._get_name(self._mac)
+        self._set_parameters(name)
 
         params = self._params
 
@@ -268,24 +268,5 @@ class Weight(Sensor):
     CONFIG_ON = None
     CONFIG_ON_NOTIFY = None
     CONFIG_OFF = None
-
-class Battery:
-    UUID_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb'
-
-    def __init__(self, mac):
-        self._interval = 0
-        self._mac = mac
-        self._bus = Bus.get_bus()
-        self._bus._bat_property_start(_device_path(self._mac))
-
-    async def _enable(self):
-        pass
-
-    async def read(self):
-        # TODO: add non-notifying version
-        return (await self._bus._bat_property_get(_device_path(self._mac)))
-
-    def close(self):
-        self._bus._bat_property_start(_device_path(self._mac))
 
 # vim: sw=4:et:ai

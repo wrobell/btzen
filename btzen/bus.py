@@ -84,29 +84,23 @@ class Bus:
         _btzen.bt_notify_stop(self.system_bus, path)
         self._notifications.stop(path, INTERFACE_GATT_CHR)
 
-    def _dev_property_start(self, path, name):
-        self._notifications.start(path, INTERFACE_DEVICE, name)
+    def _dev_property_start(self, mac, name, iface=INTERFACE_DEVICE):
+        path = _device_path(mac)
+        self._notifications.start(path, iface, name)
 
-    async def _dev_property_get(self, path, name):
-        value = await self._notifications.get(path, INTERFACE_DEVICE, name)
+    async def _dev_property_get(self, mac, name, iface=INTERFACE_DEVICE):
+        path = _device_path(mac)
+        value = await self._notifications.get(path, iface, name)
         return value
 
-    def _dev_property_stop(self, path, name):
-        self._notifications.stop(path, INTERFACE_DEVICE)
+    def _dev_property_stop(self, mac, name, iface=INTERFACE_DEVICE):
+        path = _device_path(mac)
+        self._notifications.stop(path, iface)
 
-    def _bat_property_start(self, path):
-        self._notifications.start(path, INTERFACE_BATTERY, 'Percentage')
-
-    async def _bat_property_get(self, path):
-        value = await self._notifications.get(path, INTERFACE_BATTERY, 'Percentage')
-        return value
-
-    def _bat_property_stop(self, path):
-        self._notifications.stop(path, INTERFACE_BATTERY)
-
-    def _property_bool(self, path, name):
+    async def _property(self, mac, iface, name, type='s'):
         bus = self.system_bus
-        value = _btzen.bt_property_bool(bus, path, INTERFACE_DEVICE, name)
+        path = _device_path(mac)
+        value = await _btzen.bt_property(bus, path, iface, name, type)
         return value
 
     def _get_sensor_paths(self, mac):
@@ -114,10 +108,11 @@ class Bus:
         by_uuid = _btzen.bt_characteristic(self.system_bus, path)
         return by_uuid
 
-    def _get_name(self, mac):
+    async def _get_name(self, mac):
         path = _device_path(mac)
         bus = self.system_bus
-        return _btzen.bt_property_str(bus, path, INTERFACE_DEVICE, 'Name')
+        value = await _btzen.bt_property(bus, path, INTERFACE_DEVICE, 'Name', 's')
+        return value
 
 class Notifications:
     def __init__(self, bus):
