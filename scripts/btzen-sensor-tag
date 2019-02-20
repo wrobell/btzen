@@ -94,6 +94,7 @@ sensors =  [sensor for _, _, sensor in items]
 tasks = [reader(name, sensor) for name, reader, sensor in items]
 
 battery = btzen.Battery(args.device)
+tasks.append(battery_level(battery))
 
 # create connection manager
 manager = btzen.ConnectionManager()
