@@ -19,7 +19,8 @@
 #
 
 """
-Display weight data from Xiaomi Mi Smart Scale.
+Display weight data from a scale supporting Bluetooth weight measurement
+characteristic.
 
 Connection manager is used for automatic connection to the scale.
 """
@@ -30,9 +31,9 @@ import logging
 
 import btzen
 
-async def read_weight(reader):
+async def read_weight(scale):
     while True:
-        value = await reader.read()
+        value = await scale.read()
         print('weight: {}'.format(value))
 
 logging.basicConfig(level=logging.DEBUG)
@@ -41,13 +42,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
-sensor = btzen.WeightMeasurement(args.device, notifying=True)
+scale = btzen.WeightMeasurement(args.device, notifying=True)
 
 # create connection manager
 manager = btzen.ConnectionManager()
-manager.add(sensor)
+manager.add(scale)
 
-task = asyncio.gather(read_weight(sensor), manager)
+task = asyncio.gather(read_weight(scale), manager)
 loop = asyncio.get_event_loop()
 try:
     loop.run_until_complete(task)
