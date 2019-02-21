@@ -1,4 +1,6 @@
 *~
+*.c
+*.so
 *.pyc
 *.pyo
 *.swp

@@ -178,9 +178,6 @@ class Sensor:
         else:
             logger.warning('setting interval for {} not supported'.format(self))
 
-    def __repr__(self):
-        return '{}/{}'.format(self._mac, self.__class__.__name__)
-
 
 class Temperature(Sensor):
     DATA_LEN = 4
@@ -256,17 +253,5 @@ class Button(Sensor):
     # not possible to set interval on button
     async def set_interval(self, interval):
         pass
-
-class Weight(Sensor):
-    DATA_LEN = 9
-    UUID_SERVICE = '0000181d-0000-1000-8000-00805f9b34fb'
-    UUID_DATA = '00002a9d-0000-1000-8000-00805f9b34fb'
-
-    UUID_CONF = None
-    UUID_PERIOD = None
-
-    CONFIG_ON = None
-    CONFIG_ON_NOTIFY = None
-    CONFIG_OFF = None
 
 # vim: sw=4:et:ai

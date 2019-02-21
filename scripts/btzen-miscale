@@ -33,7 +33,7 @@ import btzen
 async def read_weight(reader):
     while True:
         value = await reader.read()
-        print('weight: {}'.format(value)
+        print('weight: {}'.format(value))
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -41,7 +41,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
-sensor = btzen.Weight(args.device, notifying=True)
+sensor = btzen.WeightMeasurement(args.device, notifying=True)
 
 # create connection manager
 manager = btzen.ConnectionManager()

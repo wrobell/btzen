@@ -18,7 +18,8 @@
 #
 
 from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
-    Button, Weight
+    Button
+from .bt_weight import WeightFlags, WeightData, WeightMeasurement
 from .device import BatteryLevel
 from .cm import ConnectionManager
 from .serial import Serial
