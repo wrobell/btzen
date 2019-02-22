@@ -17,9 +17,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-# function to convert 16-bit part uuid to full 128-bit UUID string
-dev_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
-
 #
 # from https://github.com/agronholm/asyncio_extras/blob/master/asyncio_extras/contextmanager.py
 # MIT license

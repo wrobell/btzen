@@ -79,6 +79,27 @@ class InfoCharacteristic(Info):
     uuid_data: str
     size: int
 
+@dataclass(frozen=True)
+class InfoEnvSensing(InfoCharacteristic):
+    """
+    Bluetooth device information for device providing data via Bluetooth
+    Environmental Sensing characteristic.
+
+    :var uuid_conf: UUID of characteristic to write and read device
+        configuration.
+    :var uuid_trigger: UUID of characteristic to write and read device
+        trigger data.
+    :var config_on: Default configuration of device to switch device on.
+    :var config_off: Default configuration of device to switch device off.
+    :var config_notify_on: Default configuration of device to switch device
+        on in notifying mode. If none, then `config_on` is used.
+    """
+    uuid_conf: tp.Optional[str] = None
+    uuid_trigger: tp.Optional[str] = None
+    config_on: tp.Optional[bytes] = None
+    config_off: tp.Optional[bytes] = None
+    config_on_notify: tp.Optional[bytes] = None
+
 class Device:
     """
     Base class for all Bluetooth devices.
@@ -190,16 +211,18 @@ class DeviceCharacteristic(Device):
         logger.info('enabling device: {}'.format(self))
         notify = self.notifying
 
-        system_bus = self._bus.system_bus
-        path = self._bus.sensor_path(self.mac, self.info.uuid_data)
-        self._path_data = path
+        self._path_data = path = self._get_path(self.info.uuid_data)
 
-        read = partial(_btzen.bt_read, system_bus, path)
+        read = partial(_btzen.bt_read, self._bus.system_bus, path)
         read_notify = partial(self._bus._gatt_get, path)
         self._read_data = read_notify if notify else read
 
+        await self._pre_notify_start()
+
         if notify:
             self._bus._gatt_start(path)
+
+        await self._post_notify_start()
 
         logger.info('enabled device: {}'.format(self))
 
@@ -211,6 +234,73 @@ class DeviceCharacteristic(Device):
                 logger.warning('cannot stop notifications: {}'.format(ex))
 
         super().close()
+
+    async def _pre_notify_start(self):
+        return None
+
+    async def _post_notify_start(self):
+        return None
+
+    def _get_path(self, uuid):
+        return self._bus.sensor_path(self.mac, uuid)
+
+class DeviceEnvSensing(DeviceCharacteristic):
+    """
+    Bluetooth device providing data via Bluetooth Environmental Sensing
+    characteristic.
+    """
+    info: InfoEnvSensing
+
+    def __init__(self, mac, notifying=False):
+        super().__init__(mac, notifying=notifying)
+
+        self._path_conf = None
+        self._path_trigger = None
+        self._data_trigger = None
+
+    def set_trigger(self, data: bytes):
+        self._data_trigger = data
+
+    def close(self):
+        super().close()
+
+        info = self.info
+        system_bus = self._bus.system_bus
+        if info.config_off:
+            try:
+                _btzen.bt_write_sync(system_bus, self._path_conf, info.config_off)
+            except Exception as ex:
+                logger.warning('cannot switch device off: {}'.format(ex))
+
+
+    async def _pre_notify_start(self):
+        info = self.info
+
+        self._path_conf = self._get_path(info.uuid_conf)
+        print(info.uuid_conf)
+        self._path_trigger = self._get_path(info.uuid_trigger)
+
+        config_on = info.config_on_notify if self.notifying else info.config_on
+
+        if config_on:
+            if __debug__:
+                logger.debug(
+                    'writing {} configuration data to {}'
+                    .format(config_on, self._path_conf)
+                )
+            await self._write(self._path_conf, config_on)
+
+    async def _post_notify_start(self):
+        path = self._path_trigger
+        data = self._data_trigger
+        if path is not None and data is not None:
+            await self._write(path, data)
+        else:
+            logger.warning('setting trigger for {} not supported'.format(self))
+
+    async def _write(self, path: str, data: bytes) -> None:
+        await _btzen.bt_write(self._bus.system_bus, path, data)
+
 
 class BatteryLevel(DeviceInterface):
     """

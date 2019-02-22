@@ -17,8 +17,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .sensor import Temperature, Humidity, Pressure, Light, Accelerometer, \
-    Button
 from .bt_weight import WeightFlags, WeightData, WeightMeasurement
 from .device import BatteryLevel
 from .cm import ConnectionManager
