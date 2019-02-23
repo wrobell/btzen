@@ -129,13 +129,16 @@ class ConnectionManager:
             logger.info('device {} services resolved: {}'.format(mac, resolved))
 
     async def _enable(self, mac, devices):
-        for dev in devices:
-            # enable devices one by one to avoid any deadlocks
-            await dev._enable()
-
-        # wait for first data sample to be measured using the longest
-        # interval
-        interval = max(dev._interval for dev in devices)
-        await asyncio.sleep(interval)
+        # NOTE: some devices might deadlock when trying to enable multiple
+        # subsystems, i.e. sensor tag with button and temperatue only; use
+        # timeout to try to avoid the deadlock
+        while self._process:
+            try:
+                tasks = (dev.enable() for dev in devices)
+                tasks = (asyncio.wait_for(t, timeout=5) for t in tasks)
+                await asyncio.gather(*tasks)
+                break
+            except asyncio.TimeoutError as ex:
+                logger.exception('enabling device %s failed due to timeout', mac)
 
 # vim: sw=4:et:ai

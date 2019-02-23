@@ -118,9 +118,6 @@ class Device:
 
         # FIXME: remove after api change stabilized
         self._mac = mac
-        self._enable = self.enable
-        self._interval = 0
-
 
     async def enable(self):
         """

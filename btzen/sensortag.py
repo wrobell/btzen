@@ -55,7 +55,13 @@ class DeviceSensorTag(DeviceEnvSensing):
 
         self.set_interval(1)
 
+    async def _configure(self):
+        await super()._configure()
+        # allow to read first value from sensor
+        await asyncio.sleep(self._interval)
+
     def set_interval(self, interval):
+        self._interval = interval
         value = int(interval * 100)
         assert value < 256
         self._data_trigger = bytes([value])
