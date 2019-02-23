@@ -61,6 +61,9 @@ class DeviceSensorTag(DeviceEnvSensing):
         self._data_trigger = bytes([value])
 
 class Temperature(DeviceSensorTag):
+    """
+    Sensor Tag Bluetooth device temperature sensor.
+    """
     info = InfoEnvSensing(
         to_uuid(0xaa00),
         to_uuid(0xaa01),
@@ -107,22 +110,37 @@ class Temperature(DeviceSensorTag):
 #       CONFIG_ON = b'\x01'
 #       CONFIG_ON_NOTIFY = b'\x01'
 #       CONFIG_OFF = b'\x00'
-#
-#
-#   class Accelerometer(Sensor):
-#       DATA_LEN = 18
-#       UUID_SERVICE = dev_uuid(0xaa80)
-#       UUID_DATA = dev_uuid(0xaa81)
-#       UUID_CONF = dev_uuid(0xaa82)
-#       UUID_PERIOD = dev_uuid(0xaa83)
-#
-#       ACCEL_Z = 0x08
-#       ACCEL_Y = 0x10
-#       ACCEL_X = 0x20
-#       WAKE_ON_MOTION = 0x80
-#       CONFIG_ON = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z)
-#       CONFIG_ON_NOTIFY = struct.pack('<H', ACCEL_X | ACCEL_Y | ACCEL_Z | WAKE_ON_MOTION)
-#       CONFIG_OFF = b'\x00\x00'
+
+class Accelerometer(DeviceSensorTag):
+    """
+    Sensor Tag Bluetooth device accelerometer sensor.
+    """
+    ACCEL = 0x08 | 0x10 | 0x20
+    WAKE_ON_MOTION = 0x80
+
+    MPU9250_GYRO = 65536 / 500
+    MPU9250_ACCEL_2G = 32768 / 2
+    MPU9250_ACCEL_UNPACK = struct.Struct('<3h').unpack
+
+    info = InfoEnvSensing(
+        to_uuid(0xaa80),
+        to_uuid(0xaa81),
+        18,
+        to_uuid(0xaa82),
+        to_uuid(0xaa83),
+        struct.pack('<H', ACCEL),
+        struct.pack('<H', ACCEL | WAKE_ON_MOTION),
+        b'\x00\x00',
+    )
+    UUID_SERVICE = info.service
+
+    def get_value(self, data):
+        # gyro: data[:6]
+        # magnet: data[12:]
+        return tuple(
+            v / self.MPU9250_ACCEL_2G
+            for v in self.MPU9250_ACCEL_UNPACK(data[6:12])
+        )
 
 class Button(DeviceCharacteristic):
     """

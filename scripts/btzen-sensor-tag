@@ -64,7 +64,7 @@ SENSORS = [
 #    ('light', btzen.sensortag.Light, False, read_sensor),
     # notifying readers
     ('button', btzen.sensortag.Button, True, read_button),
-#    ('accelerometer', btzen.sensortag.Accelerometer, True, read_accelerometer),
+    ('accelerometer', btzen.sensortag.Accelerometer, True, read_accelerometer),
 ]
 
 parser = argparse.ArgumentParser()

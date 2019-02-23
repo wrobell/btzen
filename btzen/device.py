@@ -90,15 +90,15 @@ class InfoEnvSensing(InfoCharacteristic):
     :var uuid_trigger: UUID of characteristic to write and read device
         trigger data.
     :var config_on: Default configuration of device to switch device on.
-    :var config_off: Default configuration of device to switch device off.
     :var config_notify_on: Default configuration of device to switch device
         on in notifying mode. If none, then `config_on` is used.
+    :var config_off: Default configuration of device to switch device off.
     """
     uuid_conf: tp.Optional[str] = None
     uuid_trigger: tp.Optional[str] = None
     config_on: tp.Optional[bytes] = None
-    config_off: tp.Optional[bytes] = None
     config_on_notify: tp.Optional[bytes] = None
+    config_off: tp.Optional[bytes] = None
 
 class Device:
     """
@@ -217,12 +217,10 @@ class DeviceCharacteristic(Device):
         read_notify = partial(self._bus._gatt_get, path)
         self._read_data = read_notify if notify else read
 
-        await self._pre_notify_start()
+        await self._configure()
 
         if notify:
             self._bus._gatt_start(path)
-
-        await self._post_notify_start()
 
         logger.info('enabled device: {}'.format(self))
 
@@ -235,10 +233,7 @@ class DeviceCharacteristic(Device):
 
         super().close()
 
-    async def _pre_notify_start(self):
-        return None
-
-    async def _post_notify_start(self):
+    async def _configure(self):
         return None
 
     def _get_path(self, uuid):
@@ -273,11 +268,10 @@ class DeviceEnvSensing(DeviceCharacteristic):
                 logger.warning('cannot switch device off: {}'.format(ex))
 
 
-    async def _pre_notify_start(self):
+    async def _configure(self):
         info = self.info
 
         self._path_conf = self._get_path(info.uuid_conf)
-        print(info.uuid_conf)
         self._path_trigger = self._get_path(info.uuid_trigger)
 
         config_on = info.config_on_notify if self.notifying else info.config_on
@@ -290,7 +284,6 @@ class DeviceEnvSensing(DeviceCharacteristic):
                 )
             await self._write(self._path_conf, config_on)
 
-    async def _post_notify_start(self):
         path = self._path_trigger
         data = self._data_trigger
         if path is not None and data is not None:
