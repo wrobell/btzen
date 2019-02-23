@@ -60,7 +60,7 @@ def print_data(name, value):
 SENSORS = [
     ('pressure', btzen.sensortag.Pressure, False, read_sensor),
     ('temperature', btzen.sensortag.Temperature, False, read_sensor),
-#    ('humidity', btzen.sensortag.Humidity, False, read_sensor),
+    ('humidity', btzen.sensortag.Humidity, False, read_sensor),
 #    ('light', btzen.sensortag.Light, False, read_sensor),
     # notifying readers
     ('button', btzen.sensortag.Button, True, read_button),

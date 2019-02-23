@@ -46,6 +46,8 @@ logger = logging.getLogger(__name__)
 # function to convert 16-bit UUID to full 128-bit Sensor Tag UUID
 to_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
 
+to_int = partial(int.from_bytes, byteorder='little')
+
 class DeviceSensorTag(DeviceEnvSensing):
     """
     Sensor Tag Bluetooth device sensor.
@@ -83,7 +85,7 @@ class Temperature(DeviceSensorTag):
     UUID_SERVICE = info.service
 
     def get_value(self, data):
-        return int.from_bytes(data[2:], byteorder='little') / 128.0
+        return to_int(data[2:]) / 128.0
 
 class Pressure(DeviceSensorTag):
     """
@@ -102,19 +104,29 @@ class Pressure(DeviceSensorTag):
     UUID_SERVICE = info.service
 
     def get_value(self, data):
-        return int.from_bytes(data[3:], byteorder='little')
+        return to_int(data[3:])
 
-#   class Humidity(Sensor):
-#       DATA_LEN = 4
-#       UUID_SERVICE = dev_uuid(0xaa20)
-#       UUID_DATA = dev_uuid(0xaa21)
-#       UUID_CONF = dev_uuid(0xaa22)
-#       UUID_PERIOD = dev_uuid(0xaa23)
-#       CONFIG_ON = b'\x01'
-#       CONFIG_ON_NOTIFY = b'\x01'
-#       CONFIG_OFF = b'\x00'
-#
-#
+class Humidity(DeviceSensorTag):
+    """
+    Sensor Tag Bluetooth device humidity sensor.
+    """
+    HDC1000_HUMIDITY = 65536 / 100
+
+    info = InfoEnvSensing(
+        to_uuid(0xaa20),
+        to_uuid(0xaa21),
+        4,
+        to_uuid(0xaa22),
+        to_uuid(0xaa23),
+        b'\x01',
+        b'\x01',
+        b'\x00',
+    )
+    UUID_SERVICE = info.service
+
+    def get_value(self, data):
+        return to_int(data[2:]) / self.HDC1000_HUMIDITY
+
 #   class Light(Sensor):
 #       DATA_LEN = 2
 #       UUID_SERVICE = dev_uuid(0xaa70)
