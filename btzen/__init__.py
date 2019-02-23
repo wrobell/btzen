@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from .bt_weight import WeightFlags, WeightData, WeightMeasurement
+from .btweight import WeightFlags, WeightData, WeightMeasurement
 from .device import BatteryLevel
 from .cm import ConnectionManager
 from .serial import Serial
