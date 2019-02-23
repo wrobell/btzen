@@ -85,17 +85,25 @@ class Temperature(DeviceSensorTag):
     def get_value(self, data):
         return int.from_bytes(data[2:], byteorder='little') / 128.0
 
-#   class Pressure(Sensor):
-#       DATA_LEN = 6
-#       UUID_SERVICE = dev_uuid(0xaa40)
-#       UUID_DATA = dev_uuid(0xaa41)
-#       UUID_CONF = dev_uuid(0xaa42)
-#       UUID_PERIOD = dev_uuid(0xaa44)
-#       CONFIG_ON = b'\x01'
-#       CONFIG_ON_NOTIFY = b'\x01'
-#       CONFIG_OFF = b'\x00'
-#
-#
+class Pressure(DeviceSensorTag):
+    """
+    Sensor Tag Bluetooth device pressure sensor.
+    """
+    info = InfoEnvSensing(
+        to_uuid(0xaa40),
+        to_uuid(0xaa41),
+        6,
+        to_uuid(0xaa42),
+        to_uuid(0xaa44),
+        b'\x01',
+        b'\x01',
+        b'\x00',
+    )
+    UUID_SERVICE = info.service
+
+    def get_value(self, data):
+        return int.from_bytes(data[3:], byteorder='little')
+
 #   class Humidity(Sensor):
 #       DATA_LEN = 4
 #       UUID_SERVICE = dev_uuid(0xaa20)
