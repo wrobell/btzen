@@ -128,7 +128,7 @@ class Button(DeviceCharacteristic):
     """
     Sensor Tag button.
     """
-    info = InfoCharacteristic(to_bt_uuid(0xffe1), to_bt_uuid(0xffe1), 1)
+    info = InfoCharacteristic(to_bt_uuid(0xffe0), to_bt_uuid(0xffe1), 1)
     UUID_SERVICE = info.service
 
     def get_value(self, data):
