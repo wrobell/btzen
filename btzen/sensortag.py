@@ -127,15 +127,27 @@ class Humidity(DeviceSensorTag):
     def get_value(self, data):
         return to_int(data[2:]) / self.HDC1000_HUMIDITY
 
-#   class Light(Sensor):
-#       DATA_LEN = 2
-#       UUID_SERVICE = dev_uuid(0xaa70)
-#       UUID_DATA = dev_uuid(0xaa71)
-#       UUID_CONF = dev_uuid(0xaa72)
-#       UUID_PERIOD = dev_uuid(0xaa73)
-#       CONFIG_ON = b'\x01'
-#       CONFIG_ON_NOTIFY = b'\x01'
-#       CONFIG_OFF = b'\x00'
+class Light(DeviceSensorTag):
+    """
+    Sensor Tag Bluetooth device light sensor.
+    """
+    info = InfoEnvSensing(
+        to_uuid(0xaa70),
+        to_uuid(0xaa71),
+        2,
+        to_uuid(0xaa72),
+        to_uuid(0xaa73),
+        b'\x01',
+        b'\x01',
+        b'\x00',
+    )
+    UUID_SERVICE = info.service
+
+    def get_value(self, data):
+        v = to_int(data)
+        m = (v & 0x0FFF) / 100
+        e = (v & 0xF000) >> 12
+        return m * (2 << e)
 
 class Accelerometer(DeviceSensorTag):
     """
