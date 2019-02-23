@@ -32,6 +32,7 @@ CC2650STK
 """
 
 import asyncio
+import enum
 import logging
 import struct
 from functools import partial
@@ -175,13 +176,22 @@ class Accelerometer(DeviceSensorTag):
             for v in self.MPU9250_ACCEL_UNPACK(data[6:12])
         )
 
+class ButtonState(enum.IntFlag):
+    """
+    Sensor Tag Bluetooth device button state.
+    """
+    OFF = 0x00
+    USER = 0x01
+    POWER = 0x02
+    REED_RELAY = 0x04
+
 class Button(DeviceCharacteristic):
     """
-    Sensor Tag button.
+    Sensor Tag Bluetooth device button.
     """
     info = InfoCharacteristic(to_bt_uuid(0xffe0), to_bt_uuid(0xffe1), 1)
 
-    def get_value(self, data):
-        return data[0]
+    def get_value(self, data: bytes) -> ButtonState:
+        return ButtonState(data[0])
 
 # vim: sw=4:et:ai
