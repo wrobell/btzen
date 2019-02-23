@@ -62,7 +62,6 @@ class WeightMeasurement(DeviceCharacteristic):
     Weight measurement Bluetooth device.
     """
     info = InfoCharacteristic(to_uuid(0x181d), to_uuid(0x2a9d), 9)
-    UUID_SERVICE = info.service  # FIXME: remove
 
     def get_value(self, data: bytes):
         flags, weight = struct.unpack('<BH', data[0:3])

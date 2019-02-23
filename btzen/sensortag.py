@@ -82,7 +82,6 @@ class Temperature(DeviceSensorTag):
         b'\x01',
         b'\x00',
     )
-    UUID_SERVICE = info.service
 
     def get_value(self, data):
         return to_int(data[2:]) / 128.0
@@ -101,7 +100,6 @@ class Pressure(DeviceSensorTag):
         b'\x01',
         b'\x00',
     )
-    UUID_SERVICE = info.service
 
     def get_value(self, data):
         return to_int(data[3:])
@@ -122,7 +120,6 @@ class Humidity(DeviceSensorTag):
         b'\x01',
         b'\x00',
     )
-    UUID_SERVICE = info.service
 
     def get_value(self, data):
         return to_int(data[2:]) / self.HDC1000_HUMIDITY
@@ -141,7 +138,6 @@ class Light(DeviceSensorTag):
         b'\x01',
         b'\x00',
     )
-    UUID_SERVICE = info.service
 
     def get_value(self, data):
         v = to_int(data)
@@ -170,7 +166,6 @@ class Accelerometer(DeviceSensorTag):
         struct.pack('<H', ACCEL | WAKE_ON_MOTION),
         b'\x00\x00',
     )
-    UUID_SERVICE = info.service
 
     def get_value(self, data):
         # gyro: data[:6]
@@ -185,7 +180,6 @@ class Button(DeviceCharacteristic):
     Sensor Tag button.
     """
     info = InfoCharacteristic(to_bt_uuid(0xffe0), to_bt_uuid(0xffe1), 1)
-    UUID_SERVICE = info.service
 
     def get_value(self, data):
         return data[0]

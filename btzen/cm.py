@@ -42,7 +42,7 @@ class ConnectionManager:
 
     def add(self, *devices):
         for dev in devices:
-            self._devices[dev._mac].add(dev)
+            self._devices[dev.mac].add(dev)
             dev._cm = self
         for mac in self._devices:
             self._connected[mac] = asyncio.Event()

@@ -84,7 +84,7 @@ cdef int cm_property(
     cdef object cm = <object>user_data
     cdef int r
 
-    uuids = set(dev.UUID_SERVICE.encode() for dev in flatten(cm._devices.values()))
+    uuids = set(dev.info.service.encode() for dev in flatten(cm._devices.values()))
     size = len(uuids) + 1
     cdef char **arr = <char**>malloc(size * sizeof(char*))
 

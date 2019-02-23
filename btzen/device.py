@@ -116,9 +116,6 @@ class Device:
         self._task = None
         self._read_data = None
 
-        # FIXME: remove after api change stabilized
-        self._mac = mac
-
     async def enable(self):
         """
         Enable Bluetooth device.
@@ -302,6 +299,5 @@ class BatteryLevel(DeviceInterface):
         'Percentage',
         'y'
     )
-    UUID_SERVICE = info.service  # FIXME: remove
 
 # vim: sw=4:et:ai
