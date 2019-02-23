@@ -28,9 +28,8 @@ from dataclasses import dataclass
 
 from .device import InfoCharacteristic, DeviceCharacteristic, to_uuid
 
-class WeightFlags(enum.IntEnum):
-    KG = 0x00
-    LB = 0x01
+class WeightFlags(enum.IntFlag):
+    IMPERIAL = 0x01
     TIMESTAMP = 0x02
     USER_ID = 0x04
     BMI = 0x08
@@ -44,7 +43,7 @@ class WeightData:
     """
     Weight measurement.
 
-    var unit: Indicates measurement unit (in kg or lb).
+    var flags: Weight scale flags value.
     var weight: Weight measurement value.
 
     Mi Smart Scale extensions:
@@ -52,7 +51,7 @@ class WeightData:
     :var stabilized: Indicates if weight stabilized.
     :var load_removed: Indicates if load is removed.
     """
-    flags: int
+    flags: WeightFlags
     weight: float
 
     stabilized: tp.Optional[bool] = True
@@ -67,8 +66,12 @@ class WeightMeasurement(DeviceCharacteristic):
 
     def get_value(self, data: bytes):
         flags, weight = struct.unpack('<BH', data[0:3])
+        flags = WeightFlags(flags)
+
+        # TODO: set only when mi smart scale
         stabilized = bool(flags & WeightFlags.RESERVED_2)
         load_removed = bool(flags & WeightFlags.RESERVED_4)
+
         return WeightData(
             flags,
             weight * 0.005,
