@@ -23,12 +23,24 @@
 Build setup for btsensor library.
 """
 
+import ast
+import sys
 from setuptools import setup, find_packages, Extension
-from Cython.Build import cythonize
+
+VERSION = ast.parse(
+    next(l for l in open('btzen/__init__.py') if l.startswith('__version__'))
+).body[0].value.s
+
+try:
+    from Cython.Build import cythonize
+except:
+    sys.exit(
+        '\ncython is required, please install it with: pip install cython'
+    )
 
 setup(
     name='btzen',
-    version='0.2.5',
+    version=VERSION,
     author='Artur Wroblewski',
     author_email='wrobell@riseup.net',
     url='https://github.com/wrobell/btzen',
