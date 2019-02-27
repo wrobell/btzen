@@ -21,7 +21,9 @@
 Texas Instrument Sensor Tag Bluetooth device sensors.
 
 The sensors do not implement the Bluetooth Environmental Sensing interfaces
-and require custom classes.
+and require custom classes. To enable reading data from sensors, trigger is
+required, which we default to one second. Only one trigger can be
+configured.
 
 The identificators for specific sensors can be found at
 
@@ -39,7 +41,7 @@ from functools import partial
 
 from .bus import Bus
 from .device import InfoCharacteristic, InfoEnvSensing, DeviceEnvSensing, \
-    DeviceCharacteristic
+    DeviceCharacteristic, Trigger, TriggerCondition
 from .device import to_uuid as to_bt_uuid
 
 logger = logging.getLogger(__name__)
@@ -56,18 +58,19 @@ class DeviceSensorTag(DeviceEnvSensing):
     def __init__(self, mac, notifying=False):
         super().__init__(mac, notifying=notifying)
 
-        self.set_interval(1)
+        self.set_trigger(Trigger(TriggerCondition.FIXED_TIME, 1))
 
     async def _configure(self):
         await super()._configure()
         # allow to read first value from sensor
-        await asyncio.sleep(self._interval)
+        await asyncio.sleep(self._trigger.operand)
 
-    def set_interval(self, interval):
-        self._interval = interval
-        value = int(interval * 100)
+    def _trigger_data(self, trigger: Trigger) -> bytes:
+        assert trigger.condition == TriggerCondition.FIXED_TIME
+
+        value = int(trigger.operand * 100)
         assert value < 256
-        self._data_trigger = bytes([value])
+        return bytes([value])
 
 class Temperature(DeviceSensorTag):
     """

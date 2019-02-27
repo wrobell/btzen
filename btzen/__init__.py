@@ -18,7 +18,7 @@
 #
 
 from .btweight import WeightFlags, WeightData, WeightMeasurement
-from .device import BatteryLevel
+from .device import BatteryLevel, Trigger, TriggerCondition
 from .cm import ConnectionManager
 from .serial import Serial
 from .error import *

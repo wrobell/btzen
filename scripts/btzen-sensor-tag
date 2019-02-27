@@ -34,7 +34,7 @@ async def read_sensor(name, sensor):
         await asyncio.sleep(-loop.time() % 1)
 
 async def read_accelerometer(name, sensor):
-    sensor.set_interval(0.1)
+    sensor.set_trigger(btzen.Trigger(btzen.TriggerCondition.FIXED_TIME, 0.1))
     while True:
         values = await sensor.read()
         values = ', '.join('{:.4f}'.format(v) for v in values)

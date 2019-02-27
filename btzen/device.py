@@ -25,6 +25,7 @@ See also
     https://www.bluetooth.com/specifications/gatt/characteristics
 """
 
+import enum
 import logging
 import typing as tp
 from dataclasses import dataclass
@@ -245,10 +246,17 @@ class DeviceEnvSensing(DeviceCharacteristic):
 
         self._path_conf = None
         self._path_trigger = None
-        self._data_trigger = None
+        self._trigger = None
 
-    def set_trigger(self, data: bytes):
-        self._data_trigger = data
+    def set_trigger(self, trigger: 'Trigger'):
+        """
+        Set Bluetooth Environmental Sensing device trigger data.
+
+        NOTE: The specification supports up to three triggers.
+
+        :param trigger: Information for first trigger.
+        """
+        self._trigger = trigger
 
     def close(self):
         super().close()
@@ -260,7 +268,6 @@ class DeviceEnvSensing(DeviceCharacteristic):
                 _btzen.bt_write_sync(system_bus, self._path_conf, info.config_off)
             except Exception as ex:
                 logger.warning('cannot switch device off: {}'.format(ex))
-
 
     async def _configure(self):
         info = self.info
@@ -279,11 +286,20 @@ class DeviceEnvSensing(DeviceCharacteristic):
             await self._write(self._path_conf, config_on)
 
         path = self._path_trigger
-        data = self._data_trigger
+        data = self._trigger_data(self._trigger)
         if path is not None and data is not None:
             await self._write(path, data)
         else:
             logger.warning('setting trigger for {} not supported'.format(self))
+
+    def _trigger_data(self, trigger: 'Trigger') -> bytes:
+        """
+        Convert Bluetooth Environmental Sensing device trigger information
+        into raw data.
+
+        ;param: Trigger information.
+        """
+        return None
 
     async def _write(self, path: str, data: bytes) -> None:
         await _btzen.bt_write(self._bus.system_bus, path, data)
@@ -299,5 +315,24 @@ class BatteryLevel(DeviceInterface):
         'Percentage',
         'y'
     )
+
+class TriggerCondition(enum.IntEnum):
+    """
+    Condition value for Bluetooth Environmental Sensing device trigger
+    information.
+
+    NOTE: Incomplete, see Bluetooth Environmental Sensing Service
+        specification, page 18..
+    """
+    INACTIVE = 0x00
+    FIXED_TIME = 0x01
+
+@dataclass(frozen=True)
+class Trigger:
+    """
+    Bluetooth Environmental Sensing device trigger information.
+    """
+    condition: TriggerCondition
+    operand: tp.Any
 
 # vim: sw=4:et:ai
