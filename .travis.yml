@@ -2,7 +2,7 @@ language: python
 python:
   - "3.7-dev"
 install:
-  - sudo apt-get install -y libsystemd-daemon-dev
+  - sudo apt-get install -y libsystemd-dev
   - pip install 'cython>=0.29.4'
 script:
   - pip install .
