@@ -20,7 +20,7 @@
 
 
 """
-Build setup for btsensor library.
+Build setup for the BTZen library.
 """
 
 import ast
