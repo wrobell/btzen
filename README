@@ -1,33 +1,93 @@
-Library to asynchronously access Bluetooth Smart devices.
+BTZen is a library to asynchronously access Bluetooth devices using Python
+language. It provides simple API over complex D-Bus Bluez interface.
 
 Features
+========
 
-1. Devices and sensor readings
+The main features of BTZen are
 
-   - SensorTag (CC2541DK, CC2650STK)
+1. Connect and access multiple Bluetooth devices in parallel with Python
+   asynchronous coroutines.
+2. GATT notification interface integrated into main API of the library.
+3. Automatic reconnections to devices with a connection manager.
+4. Access to serial devices implementing Stollmann (Telit) protocol.
+5. Support for devices partially following the Bluetooth specification
+   like SensorTag (CC2650STK).
+6. Support for Bluez managed interfaces of devices, i.e. battery level.
 
-     - temperature
-     - pressure
-     - humidity
-     - light (CC2650STK only)
-     - accelerometer (CC2650STK only)
-     - buttons (CC2650STK only)
+The library can be used with any Bluetooth Smart device. It was tested with
 
-   - Mi Smart Scale
-   - serial devices implementing Stollmann (Telit) protocol
+1. SensorTag (CC2650STK) to read temperature, pressure, humidity, light,
+   accelerometer data and state of the buttons.
+2. Mi Smart Scale to read weight data.
+3. OSTC dive computer to read serial device data using Stollmann (Telit)
+   protocol.
 
-2. Access to devices with Python asynchronous coroutines.
-3. Support for device notification interface.
-4. Automatic reconnections to devices using connection manager.
+The library is tested with default `asyncio` event loop and its drop-in
+replacement `uvloop https://github.com/MagicStack/uvloop`_.  Use of
+`uvloop` increases performance of the library.
 
 The scripts in `scripts` directory demonstrate reading data from various
-Bluetooth Smart devices, i.e. Sensor Tag, Mi Smart Scale or OSTC dive
-computer.
+devices.
+
+NOTE: The first version of SensorTag (CC2541DK) is not supported at the
+moment. If you still own the device and would like it to be supported,
+please raise an issue at
+
+    https://github.com/wrobell/btzen/issues
+
+Installation
+============
+Use `pip` to install BTZen library, for example
+
+    pip install --user cython
+    pip install --user btzen
+
+BTZen uses experimental API of Bluez adapter interface to connect to
+Bluetooth devices. The `bluetoothd` daemon has to be started with
+`-E` option. This can be permanently achieved by copying
+`/usr/lib/systemd/system/bluetooth.service` file into
+`/etc/systemd/system/` directory and by modifying the `ExecStart` line.
+
+Connection Management
+=====================
+BTZen uses `ConnectDevice` method of Bluez adapter interface to discover
+and connect to Bluetooth devices. MAC address of a device needs to be known
+in order to connect.
+
+BTZen connection manager allows to connect and disconnect Bluetooth devices
+without restarting of an application. If the application is reading data
+from multiple Bluetooth devices, it can continue working if, for example,
+a sensor requires battery change.
+
+Few notes
+
+- do not start scan with other programs, i.e. `bluetoothctl`, when trying
+  to connect to a device using BTZen library
+- if a device is disconnected with an external program, the external program
+  has to be used to reconnect
+
+Performance
+===========
+The library enables programmers to communicate with mutliple devices in
+parallel without using threads. This avoids threads context switching and
+minimilizes memory requirements, which makes BTZen more efficient than
+other, similar libraries. To keep the library as fast as possible, the
+Cython is used to access Bluez D-Bus API. BTZen can be used with uvloop for
+even more increased performance.
+
+Support for GATT notification interface allows efficient use of Bluetooth
+devices. For example, data from sensors like accelerometers can be read
+only when sensor wakes up and transmits data after sensor has been moved.
+This limits amount of transferred data and avoids draining battery of the
+sensor, which will happen if data is polled at regular, short intervals.
 
 Requirements
+============
+BTZen library requires the following components
 
-- bluez 5.50
 - Python 3.7
+- bluez 5.50
 - `sd-bus` (part of `systemd`)
-- Cython
+- Cython 0.29
 
