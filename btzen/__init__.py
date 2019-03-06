@@ -1,5 +1,5 @@
 #
-# BTZen - Bluetooth Smart sensor reading library.
+# BTZen - library to asynchronously access Bluetooth devices.
 #
 # Copyright (C) 2015-2019 by Artur Wroblewski <wrobell@riseup.net>
 #

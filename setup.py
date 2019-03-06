@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# BTZen - Bluetooth Smart sensor reading library.
+# BTZen - library to asynchronously access Bluetooth devices.
 #
 # Copyright (C) 2015-2019 by Artur Wroblewski <wrobell@riseup.net>
 #
@@ -44,7 +44,7 @@ setup(
     author='Artur Wroblewski',
     author_email='wrobell@riseup.net',
     url='https://github.com/wrobell/btzen',
-    description='BTZen - Bluetooth Smart sensor reading library',
+    description='BTZen - library to asynchronously access Bluetooth devices.,
     setup_requires = ['setuptools_git >= 1.0',],
     classifiers=[
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
