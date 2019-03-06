@@ -91,3 +91,8 @@ BTZen library requires the following components
 - `sd-bus` (part of `systemd`)
 - Cython 0.29
 
+License
+=======
+BTZen library is licensed under terms of GPL license, version 3, see
+`COPYING <https://www.gnu.org/licenses/gpl-3.0.en.html>`_ file for details.
+
