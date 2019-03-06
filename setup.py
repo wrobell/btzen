@@ -44,7 +44,7 @@ setup(
     author='Artur Wroblewski',
     author_email='wrobell@riseup.net',
     url='https://github.com/wrobell/btzen',
-    description='BTZen - library to asynchronously access Bluetooth devices.,
+    description='BTZen - library to asynchronously access Bluetooth devices',
     setup_requires = ['setuptools_git >= 1.0',],
     classifiers=[
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
