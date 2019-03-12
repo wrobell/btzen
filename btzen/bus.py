@@ -84,6 +84,9 @@ class Bus:
         _btzen.bt_notify_stop(self.system_bus, path)
         self._notifications.stop(path, INTERFACE_GATT_CHR)
 
+    def _gatt_size(self, path) -> int:
+        return self._notifications.size(path, INTERFACE_GATT_CHR, 'Value')
+
     def _dev_property_start(self, mac, name, iface=INTERFACE_DEVICE):
         path = _device_path(mac)
         self._notifications.start(path, iface, name)
@@ -130,6 +133,10 @@ class Notifications:
         assert key in self._data
         if not data.is_registered(name):
             data.register(name)
+
+    def size(self, path, iface, name):
+        key = path, iface
+        return self._data[key].size(name)
 
     async def get(self, path, iface, name):
         key = path, iface

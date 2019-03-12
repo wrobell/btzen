@@ -36,8 +36,7 @@ from cytoolz.functoolz import identity
 from datetime import datetime
 from functools import partial
 
-import btzen._btzen as cbtzen
-from btzen import Serial
+from btzen import Serial, ConnectionManager
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +56,13 @@ def parse_header(item):
 async def start(dev):
     await dev.write(b'\xbb')
     value = await dev.read(2)
-    assert value == b'\xbb\x4d'
+    assert value == b'\xbb\x4d', 'got: {}'.format(value)
 
 async def stop(dev):
     await dev.write(b'\xff')
-    logger.debug('closing ostc connection')
+    # NOTE: do not wait for the response as device is disconnected now
+    # value = await dev.read(2)
+    # assert value == b'\xffM', 'got: {}'.format(value)
 
 async def display(dev, msg):
     msg = '{:16.16}'.format(msg).encode()
@@ -73,10 +74,7 @@ async def display(dev, msg):
     value = await dev.read(1)
     assert value == b'\x4d'
 
-async def read_data(mac):
-    dev = Serial(mac)
-    await dev.connect()
-
+async def read_data(dev):
     await start(dev)
     await display(dev, 'BTZen Connected')
 
@@ -99,7 +97,7 @@ async def read_data(mac):
             print(fmt(k, header.datetime, header.depth, header.duration))
     finally:
         await stop(dev)
-        dev.close()
+    print('DONE')
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -113,6 +111,16 @@ if args.verbose:
     logging.basicConfig(level=logging.DEBUG)
 
 loop = asyncio.get_event_loop()
-loop.run_until_complete(read_data(args.device))
+
+dev = Serial(args.device)
+manager = ConnectionManager()
+manager.add(dev)
+
+try:
+    task = asyncio.wait([manager, read_data(dev)], return_when=asyncio.FIRST_COMPLETED)
+    loop.run_until_complete(task)
+finally:
+    # connection manager closes all sensors
+    manager.close()
 
 # vim: sw=4:et:ai

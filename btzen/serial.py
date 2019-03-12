@@ -32,8 +32,9 @@ import logging
 from binascii import hexlify
 from functools import partial
 
-from btzen import _btzen
+from . import _btzen
 from .bus import Bus
+from .device import Device, Info, to_uuid
 from .util import contextmanager
 
 logger = logging.getLogger(__name__)
@@ -44,25 +45,20 @@ def credits_for(n):
     """
     return min(255, math.ceil(n / 20))
 
-class Serial:
+class Serial(Device):
+    info = Info(to_uuid(0xfefb))
+
     UUID_RX_UART = '00000001-0000-1000-8000-008025000000'
     UUID_TX_UART = '00000002-0000-1000-8000-008025000000'
     UUID_TX_CREDIT = '00000004-0000-1000-8000-008025000000'
     UUID_RX_CREDIT = '00000003-0000-1000-8000-008025000000'
 
     def __init__(self, mac):
-        self._mac = mac
-        self._bus = None
-        self._loop = asyncio.get_event_loop()
+        super().__init__(mac)
         self._buffer = bytearray()
 
-    async def connect(self):
-        self._bus = Bus.get_bus()
-        await self._bus.connect(self._mac)
-        await self._enable()
-
-    async def _enable(self):
-        get_path = partial(bus.sensor_path, self._mac)
+    async def enable(self):
+        get_path = partial(self._bus.sensor_path, self.mac)
 
         self._tx_credit_path = get_path(self.UUID_TX_CREDIT)
         self._tx_uart_path = get_path(self.UUID_TX_UART)
@@ -83,6 +79,7 @@ class Serial:
         logger.debug('got tx credits on enable: {}'.format(value))
 
     async def read(self, n):
+        await self._cm.connected(self.mac)
         data = bytearray(self._buffer)
         while len(data) < n:
             async with self._rx_credits_mgr(n - len(data)):
@@ -102,6 +99,7 @@ class Serial:
         return data[:n]
 
     async def write(self, data):
+        await self._cm.connected(self.mac)
         assert len(data) <= 20
 
         if self._rx_credits < 1:
@@ -136,7 +134,7 @@ class Serial:
         logger.debug('rx credits: {}'.format(self._rx_credits))
 
     async def _write(self, path, data):
-        task = _btzen.bt_write(self._bus._system_bus, path, data)
+        task = _btzen.bt_write(self._bus.system_bus, path, data)
         await task
 
 # vim: sw=4:et:ai
