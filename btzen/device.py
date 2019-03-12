@@ -258,6 +258,18 @@ class DeviceEnvSensing(DeviceCharacteristic):
         """
         self._trigger = trigger
 
+    def set_interval(self, interval: float) -> None:
+        """
+        Set fixed time interval for Bluetooth Environmental Sensing device.
+
+        This is equivalent to::
+
+            set_trigger(Trigger(TriggerCondition.FIXED_TIME, interval))
+
+        :param interval: Interval in seconds.
+        """
+        self.set_trigger(Trigger(TriggerCondition.FIXED_TIME, interval))
+
     def close(self):
         super().close()
 
