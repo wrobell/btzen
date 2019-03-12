@@ -31,10 +31,11 @@ flatten = chain.from_iterable
 
 logger = logging.getLogger(__name__)
 
-PATH_ADAPTER = '/org/bluez/hci0'
+FMT_PATH_ADAPTER = '/org/bluez/{}'.format
 
 class ConnectionManager:
-    def __init__(self):
+    def __init__(self, interface='hci0'):
+        self._interface = interface
         self._devices = defaultdict(set)
         self._connected = {}
         self._process = False
@@ -85,7 +86,8 @@ class ConnectionManager:
         # NOTE: bluez 5.50 - scanning by external programs shall be off or
         # we will never connect
         try:
-            await _cm.bt_connect(bus.system_bus, PATH_ADAPTER, mac)
+            path = FMT_PATH_ADAPTER(self._interface)
+            await _cm.bt_connect(bus.system_bus, path, mac)
         except Exception as ex:
             if str(ex) == 'Already Exists':
                 logger.info('connection for {} already exists'.format(mac))
