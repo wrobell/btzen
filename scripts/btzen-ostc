@@ -97,7 +97,6 @@ async def read_data(dev):
             print(fmt(k, header.datetime, header.depth, header.duration))
     finally:
         await stop(dev)
-    print('DONE')
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -117,10 +116,13 @@ manager = ConnectionManager()
 manager.add(dev)
 
 try:
-    task = asyncio.wait([manager, read_data(dev)], return_when=asyncio.FIRST_COMPLETED)
+    task = asyncio.wait(
+        [manager, read_data(dev)],
+        return_when=asyncio.FIRST_COMPLETED,
+    )
     loop.run_until_complete(task)
 finally:
-    # connection manager closes all sensors
+    # connection manager closes all devices
     manager.close()
 
 # vim: sw=4:et:ai
