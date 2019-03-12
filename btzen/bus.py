@@ -30,7 +30,6 @@ logger = logging.getLogger(__name__)
 
 INTERFACE_DEVICE = 'org.bluez.Device1'
 INTERFACE_GATT_CHR = 'org.bluez.GattCharacteristic1'
-INTERFACE_BATTERY = 'org.bluez.Battery1'
 
 def _mac(mac):
     return mac.replace(':', '_').upper()
