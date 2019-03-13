@@ -38,7 +38,8 @@ please raise an issue at
 
 Installation
 ============
-Use `pip` to install BTZen library, for example
+Use `pip` to install BTZen library (Cython needs to be installed first),
+for example
 
     pip install --user cython
     pip install --user btzen
@@ -56,25 +57,25 @@ and connect to Bluetooth devices. MAC address of a device needs to be known
 in order to connect.
 
 BTZen connection manager allows to connect and disconnect Bluetooth devices
-without restarting of an application. If the application is reading data
-from multiple Bluetooth devices, it can continue working if, for example,
-a sensor requires battery change.
+without restarting of an application. If an application is reading data
+from multiple Bluetooth devices, the application can continue working if,
+for example, a sensor requires battery change.
 
-Few notes
+Please note
 
-- do not start scan with other programs, i.e. `bluetoothctl`, when trying
-  to connect to a device using BTZen library
+- when trying to connect to a device using BTZen library, do not start scan
+  with other programs, i.e. `bluetoothctl`
 - if a device is disconnected with an external program, the external program
   has to be used to reconnect
 
 Performance
 ===========
 The library enables programmers to communicate with mutliple devices in
-parallel without using threads. This avoids threads context switching and
-minimilizes memory requirements, which makes BTZen more efficient than
+parallel without using threads. This avoids context switching of threads
+and minimilizes memory requirements, which makes BTZen more efficient than
 other, similar libraries. To keep the library as fast as possible, the
-Cython is used to access Bluez D-Bus API. BTZen can be used with uvloop for
-even more increased performance.
+Cython is used to access Bluez D-Bus API. BTZen can be used with `uvloop`
+for even more increased performance.
 
 Support for GATT notification interface allows efficient use of Bluetooth
 devices. For example, data from sensors like accelerometers can be read
@@ -84,7 +85,7 @@ sensor, which will happen if data is polled at regular, short intervals.
 
 Requirements
 ============
-BTZen library requires the following components
+BTZen library requires the following software components
 
 - Python 3.7
 - bluez 5.50
