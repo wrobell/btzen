@@ -55,7 +55,7 @@ class InfoInterface(Info):
     Bluetooth device information for device providing data via Bluez
     interface property.
 
-    Example of interface for Battery Level Bluetooth characteristics is
+    Example of interface for Battery Level Bluetooth characteristic is
     `org.bluez.Battery1` Bluez interface, which provides data via
     `Percentage` property.
 
@@ -193,7 +193,7 @@ class DeviceInterface(Device):
 
 class DeviceCharacteristic(Device):
     """
-    Bluetooth device reading data from Bluetooth characteristics.
+    Bluetooth device reading data from Bluetooth characteristic.
     """
     info: InfoCharacteristic
 
@@ -232,7 +232,7 @@ class DeviceCharacteristic(Device):
         return None
 
     def _get_path(self, uuid):
-        return self._bus.sensor_path(self.mac, uuid)
+        return self._bus.characteristic_path(self.mac, uuid)
 
 class DeviceEnvSensing(DeviceCharacteristic):
     """

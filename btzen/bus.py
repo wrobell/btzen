@@ -63,11 +63,9 @@ class Bus:
             Bus.bus.set(bus)
         return bus
 
-    def sensor_path(self, mac, uuid):
-        if uuid is None:
-            return None
-        by_uuid = self._get_sensor_paths(mac)
-        return by_uuid[uuid]
+    def characteristic_path(self, mac, uuid):
+        prefix = _device_path(mac)
+        return _btzen.bt_characteristic(self.system_bus, prefix, uuid)
 
     def _gatt_start(self, path):
         # TODO: creates notification session; if another session started,
@@ -104,11 +102,6 @@ class Bus:
         path = _device_path(mac)
         value = await _btzen.bt_property(bus, path, iface, name, type)
         return value
-
-    def _get_sensor_paths(self, mac):
-        path = _device_path(mac)
-        by_uuid = _btzen.bt_characteristic(self.system_bus, path)
-        return by_uuid
 
     async def _get_name(self, mac):
         path = _device_path(mac)

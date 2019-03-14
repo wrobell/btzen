@@ -362,11 +362,10 @@ def bt_process(Bus bus):
     while r > 0:
         r = sd_bus_process(bus.bus, NULL)
 
-def bt_characteristic(Bus bus, str path):
+def bt_characteristic(Bus bus, str prefix, str uuid):
     """
-    Fetch Gatt Characteristic paths relative to `path`.
-
-    Dictionary `uuid -> path` is returned.
+    Fetch Gatt Characteristic path relative to `prefix` and for specified
+    UUID.
     """
     assert bus is not None
 
@@ -393,20 +392,19 @@ def bt_characteristic(Bus bus, str path):
 
         bus_msg.c_obj = msg
 
-        data = _parse_characteristics(bus_msg, path)
+        path = _find_characteristic_path(bus_msg, prefix, uuid)
 
     finally:
         sd_bus_message_unref(msg)
         sd_bus_error_free(&error)
 
-    return data
+    return path
 
-def _parse_characteristics(BusMessage bus_msg, str path):
-    data = {}
+def _find_characteristic_path(BusMessage bus_msg, str prefix, str uuid):
     for _ in _sd_bus.msg_container_dict(bus_msg, '{oa{sa{sv}}}'):
         chr_path = _sd_bus.msg_read_value(bus_msg, 'o')
 
-        if not chr_path.startswith(path):
+        if not chr_path.startswith(prefix):
              _sd_bus.msg_skip(bus_msg, 'a{sa{sv}}')
              continue
 
@@ -420,10 +418,11 @@ def _parse_characteristics(BusMessage bus_msg, str path):
             for _ in _sd_bus.msg_container_dict(bus_msg, '{sv}'):
                 name = _sd_bus.msg_read_value(bus_msg, 's')
                 if name == 'UUID':
-                    uuid = _sd_bus.msg_read_value(bus_msg, 'v')
-                    data[uuid] = chr_path
+                    value = _sd_bus.msg_read_value(bus_msg, 'v')
+                    if uuid == value:
+                        return chr_path
                 else:
                     _sd_bus.msg_skip(bus_msg, 'v')
-    return data
+    return None
 
 # vim: sw=4:et:ai

@@ -58,7 +58,7 @@ class Serial(Device):
         self._buffer = bytearray()
 
     async def enable(self):
-        get_path = partial(self._bus.sensor_path, self.mac)
+        get_path = partial(self._bus.characteristic_path, self.mac)
 
         self._tx_credit_path = get_path(self.UUID_TX_CREDIT)
         self._tx_uart_path = get_path(self.UUID_TX_UART)
