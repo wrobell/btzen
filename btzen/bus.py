@@ -31,17 +31,15 @@ logger = logging.getLogger(__name__)
 INTERFACE_DEVICE = 'org.bluez.Device1'
 INTERFACE_GATT_CHR = 'org.bluez.GattCharacteristic1'
 
-def _mac(mac):
+def _mac_to_path(mac):
     return mac.replace(':', '_').upper()
-
-def _device_path(mac):
-    return '/org/bluez/hci0/dev_{}'.format(_mac(mac))
 
 class Bus:
     bus = contextvars.ContextVar('bus', default=None)
 
-    def __init__(self, system_bus):
+    def __init__(self, system_bus, interface):
         self.system_bus = system_bus
+        self.interface = interface
 
         loop = asyncio.get_event_loop()
         process = partial(_btzen.bt_process, system_bus)
@@ -50,21 +48,23 @@ class Bus:
         self._notifications = Notifications(self)
 
     @staticmethod
-    def get_bus():
+    def get_bus(interface: str) -> 'Bus':
         """
         Get system bus reference.
 
         The reference is local to current thread.
+
+        :param interface: Bluetooth interface, i.e. `hci0`.
         """
         bus = Bus.bus.get()
         if bus is None:
             system_bus = _sd_bus.default_bus()
-            bus = Bus(system_bus)
+            bus = Bus(system_bus, interface)
             Bus.bus.set(bus)
         return bus
 
     def characteristic_path(self, mac, uuid):
-        prefix = _device_path(mac)
+        prefix = self.dev_path(mac)
         return _btzen.bt_characteristic(self.system_bus, prefix, uuid)
 
     def _gatt_start(self, path):
@@ -72,6 +72,9 @@ class Bus:
         # then we get notifications twice; this needs to be fixed
         self._notifications.start(path, INTERFACE_GATT_CHR, 'Value')
         _btzen.bt_notify_start(self.system_bus, path)
+
+    def dev_path(self, mac):
+        return '/org/bluez/{}/dev_{}'.format(self.interface, _mac_to_path(mac))
 
     async def _gatt_get(self, path):
         task = self._notifications.get(path, INTERFACE_GATT_CHR, 'Value')
@@ -85,26 +88,26 @@ class Bus:
         return self._notifications.size(path, INTERFACE_GATT_CHR, 'Value')
 
     def _dev_property_start(self, mac, name, iface=INTERFACE_DEVICE):
-        path = _device_path(mac)
+        path = self.dev_path(mac)
         self._notifications.start(path, iface, name)
 
     async def _dev_property_get(self, mac, name, iface=INTERFACE_DEVICE):
-        path = _device_path(mac)
+        path = self.dev_path(mac)
         value = await self._notifications.get(path, iface, name)
         return value
 
     def _dev_property_stop(self, mac, name, iface=INTERFACE_DEVICE):
-        path = _device_path(mac)
+        path = self.dev_path(mac)
         self._notifications.stop(path, iface)
 
     async def _property(self, mac, iface, name, type='s'):
         bus = self.system_bus
-        path = _device_path(mac)
+        path = self.dev_path(mac)
         value = await _btzen.bt_property(bus, path, iface, name, type)
         return value
 
     async def _get_name(self, mac):
-        path = _device_path(mac)
+        path = self.dev_path(mac)
         bus = self.system_bus
         value = await _btzen.bt_property(bus, path, INTERFACE_DEVICE, 'Name', 's')
         return value

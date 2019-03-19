@@ -24,7 +24,7 @@ from functools import partial
 from itertools import chain
 from operator import attrgetter
 
-from .bus import Bus, _device_path
+from .bus import Bus
 from . import _cm
 
 flatten = chain.from_iterable
@@ -47,6 +47,7 @@ class ConnectionManager:
         for dev in devices:
             self._devices[dev.mac].add(dev)
             dev._cm = self
+            dev._bus = self._get_bus()
         for mac in self._devices:
             self._connected[mac] = asyncio.Event()
 
@@ -56,16 +57,16 @@ class ConnectionManager:
 
         All managed devices are closed and disconnected.
         """
-        system_bus = Bus.get_bus().system_bus
+        bus = self._get_bus()
         self._process = False
         for dev in flatten(self._devices.values()):
             dev.close()
 
         for mac in self._devices:
-            _cm.bt_disconnect(system_bus, _device_path(mac))
+            _cm.bt_disconnect(bus.system_bus, bus.dev_path(mac))
             logger.info('device {} disconnected'.format(mac))
 
-        _cm.cm_close(system_bus, self._handle)
+        _cm.cm_close(bus.system_bus, self._handle)
         logger.info('connection manager closed')
 
     async def connected(self, mac):
@@ -78,10 +79,11 @@ class ConnectionManager:
 
     def __await__(self):
         self._process = True
+        bus = self._get_bus()
 
         # TODO: if bluez daemon is restarted, the connection manager needs
         # to be reinitialized
-        handle = yield from _cm.cm_init(Bus.get_bus().system_bus, self).__await__()
+        handle = yield from _cm.cm_init(bus.system_bus, self).__await__()
         self._handle = handle
 
         f = self._reconnect
@@ -89,7 +91,7 @@ class ConnectionManager:
         yield from asyncio.gather(*tasks).__await__()
 
     async def _reconnect(self, mac, devices):
-        bus = Bus.get_bus()
+        bus = self._get_bus()
 
         # enable monitoring of the `ServicesResolved` property first
         bus._dev_property_start(mac, 'ServicesResolved')
@@ -118,7 +120,7 @@ class ConnectionManager:
         Renable or hold Bluetooth device when property 'ServicesResolved`
         changes.
         """
-        bus = Bus.get_bus()
+        bus = self._get_bus()
         enable = partial(self._enable, mac, devices)
         cn_clear = self._connected[mac].clear
         cn_set = self._connected[mac].set
@@ -156,5 +158,8 @@ class ConnectionManager:
                 break
             except asyncio.TimeoutError as ex:
                 logger.exception('enabling device %s failed due to timeout', mac)
+
+    def _get_bus(self):
+        return Bus.get_bus(self._interface)
 
 # vim: sw=4:et:ai

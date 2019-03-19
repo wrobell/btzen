@@ -112,7 +112,7 @@ class Device:
         self.mac = mac
         self.notifying = notifying
 
-        self._bus = Bus.get_bus()
+        self._bus = None
         self._cm = None
         self._task = None
         self._read_data = None
@@ -177,12 +177,12 @@ class DeviceInterface(Device):
             'name': self.info.property,
             'iface': self.info.interface,
         }
-
-        read_notify = partial(self._bus._dev_property_get, **self._params)
-        read = partial(self._bus._property, **self._params, type=self.info.type)
-        self._read_data = read_notify if notifying else read
+        self._read_data = None
 
     async def enable(self):
+        read_notify = partial(self._bus._dev_property_get, **self._params)
+        read = partial(self._bus._property, **self._params, type=self.info.type)
+        self._read_data = read_notify if self.notifying else read
         if self.notifying:
             self._bus._dev_property_start(**self._params)
 
