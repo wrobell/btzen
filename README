@@ -68,6 +68,16 @@ Please note
 - if a device is disconnected with an external program, the external program
   has to be used to reconnect
 
+Obtaining MAC Address
+=====================
+If Bluetooth device MAC address is not known
+
+1. Start `bluetoothctl`.
+2. Start scan.
+3. Save discovered MAC address.
+4. Remove device with `remove` command of `bluetoothctl`.
+5. Start BTZen based application using the discovered MAC address.
+
 Performance
 ===========
 The library enables programmers to communicate with mutliple devices in
