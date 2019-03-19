@@ -41,6 +41,8 @@ class ConnectionManager:
         self._process = False
         self._handle = None
 
+        self.enable_timeout = 30
+
     def add(self, *devices):
         for dev in devices:
             self._devices[dev.mac].add(dev)
@@ -135,9 +137,10 @@ class ConnectionManager:
         # subsystems, i.e. sensor tag with button and temperatue only; use
         # timeout to try to avoid the deadlock
         while self._process:
+            timeout = self.enable_timeout
             try:
                 tasks = (dev.enable() for dev in devices)
-                tasks = (asyncio.wait_for(t, timeout=5) for t in tasks)
+                tasks = (asyncio.wait_for(t, timeout=timeout) for t in tasks)
                 await asyncio.gather(*tasks)
                 break
             except asyncio.TimeoutError as ex:
