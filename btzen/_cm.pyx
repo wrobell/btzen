@@ -218,4 +218,32 @@ async def bt_connect(Bus bus, str path, str address):
     finally:
         sd_bus_message_unref(msg)
 
+def bt_disconnect(Bus bus, str path):
+    """
+    Disconnect Bluetooth device.
+
+    :param bus: D-Bus reference.
+    :param path: D-Bus device path.
+    """
+    assert bus is not None
+
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+
+    r = sd_bus_call_method(
+        bus.bus,
+        'org.bluez',
+        path.encode(),
+        "org.bluez.Device1",
+        'Disconnect',
+        &error,
+        &msg,
+        NULL,
+        NULL
+    )
+    sd_bus_error_free(&error);
+    sd_bus_message_unref(msg);
+
+    _sd_bus.check_call('disconnect device', r)
+
 # vim: sw=4:et:ai

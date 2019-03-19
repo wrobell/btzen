@@ -24,7 +24,7 @@ from functools import partial
 from itertools import chain
 from operator import attrgetter
 
-from .bus import Bus
+from .bus import Bus, _device_path
 from . import _cm
 
 flatten = chain.from_iterable
@@ -51,10 +51,21 @@ class ConnectionManager:
             self._connected[mac] = asyncio.Event()
 
     def close(self):
+        """
+        Close connection manager.
+
+        All managed devices are closed and disconnected.
+        """
+        system_bus = Bus.get_bus().system_bus
         self._process = False
         for dev in flatten(self._devices.values()):
             dev.close()
-        _cm.cm_close(Bus.get_bus().system_bus, self._handle)
+
+        for mac in self._devices:
+            _cm.bt_disconnect(system_bus, _device_path(mac))
+            logger.info('device {} disconnected'.format(mac))
+
+        _cm.cm_close(system_bus, self._handle)
         logger.info('connection manager closed')
 
     async def connected(self, mac):
