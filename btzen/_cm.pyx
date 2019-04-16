@@ -206,13 +206,13 @@ async def bt_connect(Bus bus, str path, str address):
             'org.bluez.Adapter1',
             'ConnectDevice'
         )
-        _sd_bus.check_call('write data to {}'.format(path), r)
+        _sd_bus.check_call('bt connect call prepare {}'.format(path), r)
 
         r = sd_bus_message_append(msg, 'a{sv}', 2, 'Address', 's', addr_data, "AddressType", "s", "public")
-        _sd_bus.check_call('write data to {}'.format(path), r)
+        _sd_bus.check_call('bt connect call args {}'.format(path), r)
 
         r = sd_bus_call_async(bus.bus, NULL, msg, task_cb, <void*>task, 0)
-        _sd_bus.check_call('write data to {}'.format(path), r)
+        _sd_bus.check_call('bt connect call {}'.format(path), r)
 
         return (await task)
     finally:
@@ -245,5 +245,106 @@ def bt_disconnect(Bus bus, str path):
     sd_bus_message_unref(msg);
 
     _sd_bus.check_call('disconnect device', r)
+
+async def bt_register_agent(Bus bus):
+    """
+    Register pairing agent for BTZen library.
+
+    :param bus: D-Bus reference.
+    """
+    assert bus is not None
+    await _bt_agent_register_agent(bus)
+    await _bt_agent_request_default_agent(bus)
+
+async def _bt_agent_register_agent(Bus bus):
+    """
+    Register auto pair agent.
+
+    :param bus: D-Bus reference.
+    """
+    assert bus is not None
+    cdef sd_bus_message *msg = NULL
+
+    try:
+        task = asyncio.get_event_loop().create_future()
+        r = sd_bus_message_new_method_call(
+            bus.bus,
+            &msg,
+            'org.bluez',
+            '/org/bluez',
+            'org.bluez.AgentManager1',
+            'RegisterAgent'
+        )
+        _sd_bus.check_call('agent registration call prepare', r)
+
+        r = sd_bus_message_append(msg, 'os', '/org/btzen/Agent', 'NoInputNoOutput')
+        _sd_bus.check_call('agent registration params', r)
+
+        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb, <void*>task, 0)
+        _sd_bus.check_call('agent registration call', r)
+
+        return (await task)
+    finally:
+        sd_bus_message_unref(msg)
+
+async def _bt_agent_request_default_agent(Bus bus):
+    """
+    Request default agent.
+
+    :param bus: D-Bus reference.
+    """
+    assert bus is not None
+    cdef sd_bus_message *msg = NULL
+    cdef unsigned char *arg_data
+
+    try:
+        task = asyncio.get_event_loop().create_future()
+        r = sd_bus_message_new_method_call(
+            bus.bus,
+            &msg,
+            'org.bluez',
+            '/org/bluez',
+            'org.bluez.AgentManager1',
+            'RequestDefaultAgent'
+        )
+        _sd_bus.check_call('agent registration call prepare', r)
+
+        r = sd_bus_message_append(msg, 'o', '/org/btzen/Agent')
+        _sd_bus.check_call('agent registration params', r)
+
+        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb, <void*>task, 0)
+        _sd_bus.check_call('agent registration call', r)
+
+        return (await task)
+    finally:
+        sd_bus_message_unref(msg)
+
+def bt_unregister_agent(Bus bus):
+    """
+    Unregister auto pair agent.
+
+    :param bus: D-Bus reference.
+    """
+    assert bus is not None
+
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+
+    r = sd_bus_call_method(
+        bus.bus,
+        'org.bluez',
+        '/org/bluez',
+        "org.bluez.AgentManager1",
+        'UnregisterAgent',
+        &error,
+        &msg,
+        'o',
+        '/org/btzen/Agent',
+        NULL
+    )
+    sd_bus_error_free(&error);
+    sd_bus_message_unref(msg);
+
+    _sd_bus.check_call('unregister agent', r)
 
 # vim: sw=4:et:ai
