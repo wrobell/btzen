@@ -83,8 +83,10 @@ class ConnectionManager:
     def __await__(self):
         self._process = True
         bus = self._get_bus()
+        path = FMT_PATH_ADAPTER(self._interface)
 
         yield from _cm.bt_register_agent(bus.system_bus).__await__()
+        yield from _cm.bt_start_discovery(bus.system_bus, path).__await__()
 
         # TODO: if bluez daemon is restarted, the connection manager needs
         # to be reinitialized
