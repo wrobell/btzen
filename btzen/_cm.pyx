@@ -294,7 +294,7 @@ async def bt_register_agent(Bus bus):
 
 async def _bt_agent_register_agent(Bus bus):
     """
-    Register auto pair agent.
+    Register auto pair Bluetooth agent.
 
     :param bus: D-Bus reference.
     """
@@ -325,7 +325,7 @@ async def _bt_agent_register_agent(Bus bus):
 
 async def _bt_agent_request_default_agent(Bus bus):
     """
-    Request default agent.
+    Request Bluetooth default agent.
 
     :param bus: D-Bus reference.
     """
