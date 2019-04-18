@@ -22,6 +22,13 @@
 
 """
 Bluetooth connection management.
+
+Based on
+
+    https://gist.github.com/parthitce/eb6b751df3235f7247babc4c9aba41d8
+
+NOTE: Discovery is still required on devices like Raspberry Pi to reconnect
+    a long running device.
 """
 
 from libc.stdlib cimport malloc, free
@@ -221,8 +228,6 @@ async def bt_connect(Bus bus, str path, str address):
 async def bt_start_discovery(Bus bus, str path):
     """
     Start device discovery.
-
-    At the moment, this is required on devices like Raspberry Pi.
 
     :param bus: D-Bus reference.
     :param path: D-Bus adapter path.
