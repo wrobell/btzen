@@ -24,7 +24,7 @@ The library can be used with any Bluetooth Smart device. It was tested with
    protocol.
 
 The library is tested with default `asyncio` event loop and its drop-in
-replacement `uvloop https://github.com/MagicStack/uvloop`_.  Use of
+replacement `uvloop https://github.com/MagicStack/uvloop`_. Use of
 `uvloop` increases performance of the library.
 
 The scripts in `scripts` directory demonstrate reading data from various
@@ -82,10 +82,10 @@ Performance
 ===========
 The library enables programmers to communicate with mutliple devices in
 parallel without using threads. This avoids context switching of threads
-and minimilizes memory requirements, which makes BTZen more efficient than
+and minimizes memory requirements, which makes BTZen more efficient than
 other, similar libraries. To keep the library as fast as possible, the
 Cython is used to access Bluez D-Bus API. BTZen can be used with `uvloop`
-for even more increased performance.
+for even more increased performance of an application.
 
 Support for GATT notification interface allows efficient use of Bluetooth
 devices. For example, data from sensors like accelerometers can be read
