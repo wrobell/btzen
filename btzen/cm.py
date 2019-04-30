@@ -62,9 +62,15 @@ class ConnectionManager:
         for dev in flatten(self._devices.values()):
             dev.close()
 
+        adapter_path = FMT_PATH_ADAPTER(self._interface)
         for mac in self._devices:
-            _cm.bt_disconnect(bus.system_bus, bus.dev_path(mac))
+            dev_path = bus.dev_path(mac)
+
+            _cm.bt_disconnect(bus.system_bus, dev_path)
             logger.info('device {} disconnected'.format(mac))
+
+            _cm.bt_remove(bus.system_bus, adapter_path, dev_path)
+            logger.info('device {} removed'.format(mac))
 
         _cm.bt_unregister_agent(bus.system_bus)
 

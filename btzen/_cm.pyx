@@ -282,6 +282,38 @@ def bt_disconnect(Bus bus, str path):
 
     _sd_bus.check_call('disconnect device', r)
 
+def bt_remove(Bus bus, str adapter, str device):
+    """
+    Remove Bluetooth device.
+
+    :param bus: D-Bus reference.
+    :param adapter: D-Bus adapter path.
+    :param device: D-Bus device path.
+    """
+    assert bus is not None
+
+    cdef sd_bus_message *msg = NULL
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+
+    buff = device.encode()
+    cdef unsigned char *dev_data = buff
+
+    r = sd_bus_call_method(
+        bus.bus,
+        'org.bluez',
+        adapter.encode(),
+        "org.bluez.Adapter1",
+        'RemoveDevice',
+        &error,
+        &msg,
+        'o',
+        dev_data
+    )
+    sd_bus_error_free(&error);
+    sd_bus_message_unref(msg);
+
+    _sd_bus.check_call('remove device', r)
+
 async def bt_register_agent(Bus bus):
     """
     Register pairing agent for BTZen library.
