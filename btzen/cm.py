@@ -17,6 +17,40 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+Connection manager to manage connections of multiple Bluetooth devices.
+
+Based on
+
+    https://gist.github.com/parthitce/eb6b751df3235f7247babc4c9aba41d8
+
+NOTE: Discovery is still required on devices like Raspberry Pi to reconnect
+    a long running device.
+
+When starting and running connection manager
+
+1. Register Bluetooth agent.
+2. Start discovery (it seems to be still required on devices like Raspberry
+   Pi in order to reconnect disconnected devices).
+3. Create connection manager object on D-Bus event bus and register UUIDs
+   of services of devices to be managed by the connection manager.
+4. For each device
+4.1. Use `ConnectDevice` method of adapter interface to connect to the
+     device.
+4.2. Wait for `ServicesResolved` property to be changed.
+4.3.1. If the property is set to true enable Bluetooth device.
+4.3.2. If the property is set to false, then disable Bluetooth device.
+
+When connection manager is closed
+
+1. Close each Bluetooth device.
+2. Disconnect each Bluetooth device.
+3. Remove each Bluetooth device.
+4. Unregister Bluetooth agent.
+5. Close connection manager.
+
+"""
+
 import asyncio
 import logging
 from collections import defaultdict

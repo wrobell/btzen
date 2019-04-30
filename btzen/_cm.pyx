@@ -22,13 +22,6 @@
 
 """
 Bluetooth connection management.
-
-Based on
-
-    https://gist.github.com/parthitce/eb6b751df3235f7247babc4c9aba41d8
-
-NOTE: Discovery is still required on devices like Raspberry Pi to reconnect
-    a long running device.
 """
 
 from libc.stdlib cimport malloc, free
