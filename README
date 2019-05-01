@@ -32,14 +32,12 @@ devices.
 
 NOTE: The first version of SensorTag (CC2541DK) is not supported at the
 moment. If you still own the device and would like it to be supported,
-please raise an issue at
-
-    https://github.com/wrobell/btzen/issues
+please `raise an issue <https://github.com/wrobell/btzen/issues>`_.
 
 Installation
 ============
 Use `pip` to install BTZen library (Cython needs to be installed first),
-for example
+for example::
 
     pip install --user cython
     pip install --user btzen
