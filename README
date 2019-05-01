@@ -24,7 +24,7 @@ The library can be used with any Bluetooth Smart device. It was tested with
    protocol.
 
 The library is tested with default `asyncio` event loop and its drop-in
-replacement `uvloop https://github.com/MagicStack/uvloop`_. Use of
+replacement `uvloop <https://github.com/MagicStack/uvloop>`_. Use of
 `uvloop` increases performance of the library.
 
 The scripts in `scripts` directory demonstrate reading data from various
