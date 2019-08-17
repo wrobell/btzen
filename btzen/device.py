@@ -131,7 +131,10 @@ class Device:
         Read data from Bluetooth device.
 
         If device is in notifying mode, the data might be returned after
-        long period of time.
+        long period of time. The timeout value is ignored for devices in
+        such mode.
+
+        :param timeout: Data read timeout in seconds.
         """
         await self._cm.connected(self.mac)
         self._task = self._read_data(timeout=timeout)
