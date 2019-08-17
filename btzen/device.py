@@ -126,7 +126,7 @@ class Device:
         """
         raise NotImplementedError('Enable method is not implemented')
 
-    async def read(self):
+    async def read(self, timeout=0):
         """
         Read data from Bluetooth device.
 
@@ -134,7 +134,7 @@ class Device:
         long period of time.
         """
         await self._cm.connected(self.mac)
-        self._task = self._read_data()
+        self._task = self._read_data(timeout=timeout)
         data = await self._task
         self._task = None
         return self.get_value(data)

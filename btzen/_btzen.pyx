@@ -95,30 +95,42 @@ cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_er
 
     return _sd_bus.task_handle_message(bus_msg, task, DataReadError, 'y')
 
-async def bt_read(Bus bus, str path):
+async def bt_read(Bus bus, str path, timeout=0):
     assert bus is not None
 
+    cdef sd_bus_message *msg = NULL
     cdef sd_bus_slot *slot = NULL
 
     task = asyncio.get_event_loop().create_future()
 
-    r = sd_bus_call_method_async(
+    r = sd_bus_message_new_method_call(
         bus.bus,
-        &slot,
+        &msg,
         'org.bluez',
         path.encode(),
         'org.bluez.GattCharacteristic1',
-        'ReadValue',
-        task_cb_read,
+        'ReadValue'
+    )
+    _sd_bus.check_call('prepare read data from {}'.format(path), r)
+
+    r = sd_bus_message_open_container(msg, 'a', '{sv}')
+    _sd_bus.check_call('write data to {}'.format(path), r)
+
+    r = sd_bus_message_close_container(msg)
+    _sd_bus.check_call('write data to {}'.format(path), r)
+
+    r = sd_bus_call_async(
+        bus.bus, &slot,
+        msg, task_cb_read,
         <void*>task,
-        'a{sv}',
-        NULL
+        1e9 * timeout
     )
     _sd_bus.check_call('read data from {}'.format(path), r)
 
     try:
         return (await task)
     finally:
+        sd_bus_message_unref(msg)
         sd_bus_slot_unref(slot)
 
 cdef int task_cb_write(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
