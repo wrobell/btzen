@@ -180,7 +180,12 @@ class ConnectionManager:
                 logger.info('enabling device {}'.format(mac))
                 await enable()
             except Exception as ex:
-                logger.exception('enabling device %s failed', mac)
+                logger.info(
+                    'enabling device %s failed, seems to be not connected',
+                    mac
+                )
+                if __debug__:
+                    logger.exception('error when enabling %s', mac)
                 cn_clear()
             else:
                 cn_set()
