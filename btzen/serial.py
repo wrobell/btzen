@@ -56,6 +56,7 @@ class Serial(Device):
     def __init__(self, mac):
         super().__init__(mac)
         self._buffer = bytearray()
+        self._init_paths()
 
     async def enable(self):
         get_path = partial(self._bus.characteristic_path, self.mac)
@@ -116,8 +117,11 @@ class Serial(Device):
         """
         Close serial device.
         """
-        self._bus._gatt_stop(self._tx_credit_path)
-        self._bus._gatt_stop(self._tx_uart_path)
+        if self._tx_credit_path:
+            self._bus._gatt_stop(self._tx_credit_path)
+        if self._tx_uart_path:
+            self._bus._gatt_stop(self._tx_uart_path)
+        self._init_paths()
 
     @contextmanager
     async def _rx_credits_mgr(self, n):
@@ -136,5 +140,11 @@ class Serial(Device):
     async def _write(self, path, data):
         task = _btzen.bt_write(self._bus.system_bus, path, data)
         await task
+
+    def _init_paths(self):
+        self._tx_credit_path = None
+        self._tx_uart_path = None
+        self._rx_credit_path = None
+        self._rx_uart_path = None
 
 # vim: sw=4:et:ai
