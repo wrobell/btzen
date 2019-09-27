@@ -23,6 +23,6 @@ from .cm import ConnectionManager
 from .serial import Serial
 from .error import *
 
-__version__ = '0.3.2'
+__version__ = '0.3.3'
 
 # vim: sw=4:et:ai
