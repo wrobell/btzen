@@ -72,6 +72,10 @@ parser.add_argument(
     '--verbose', default=False, action='store_true',
     help='show debug log'
 )
+parser.add_argument(
+    '-i', '--interface', default='hci0',
+    help='Host controller interface (HCI)'
+)
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
@@ -96,7 +100,7 @@ battery = btzen.BatteryLevel(args.device, notifying=True)
 tasks.append(battery_level(battery))
 
 # create connection manager
-manager = btzen.ConnectionManager()
+manager = btzen.ConnectionManager(interface=args.interface)
 manager.add(battery, *sensors)
 
 try:
