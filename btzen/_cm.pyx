@@ -98,7 +98,7 @@ cdef int cm_property(
     _sd_bus.check_call('adding uuids', r)
     return 0
 
-async def cm_init(Bus bus, cm):
+async def cm_init(Bus bus, str path, cm):
     """
     Initialize connection manager.
     """
@@ -126,7 +126,7 @@ async def cm_init(Bus bus, cm):
         bus.bus,
         NULL,
         'org.bluez',
-        '/org/bluez/hci0',
+        path.encode(),
         'org.bluez.GattManager1',
         'RegisterApplication',
         task_cb,
@@ -146,7 +146,7 @@ async def cm_init(Bus bus, cm):
     await task
     return handle
 
-def cm_close(Bus bus, handle):
+def cm_close(Bus bus, str path, handle):
     """
     Close connection manager.
     """
@@ -160,7 +160,7 @@ def cm_close(Bus bus, handle):
     r = sd_bus_call_method(
         bus.bus,
         'org.bluez',
-        '/org/bluez/hci0',
+        path.encode(),
         'org.bluez.GattManager1',
         'UnregisterApplication',
         &error,

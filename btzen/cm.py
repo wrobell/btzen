@@ -109,7 +109,7 @@ class ConnectionManager:
         _cm.bt_unregister_agent(bus.system_bus)
 
         if self._handle is not None:
-            _cm.cm_close(bus.system_bus, self._handle)
+            _cm.cm_close(bus.system_bus, adapter_path, self._handle)
         logger.info('connection manager closed')
 
     async def connected(self, mac):
@@ -130,7 +130,7 @@ class ConnectionManager:
 
         # TODO: if bluez daemon is restarted, the connection manager needs
         # to be reinitialized
-        handle = yield from _cm.cm_init(bus.system_bus, self).__await__()
+        handle = yield from _cm.cm_init(bus.system_bus, path, self).__await__()
         self._handle = handle
 
         f = self._reconnect
