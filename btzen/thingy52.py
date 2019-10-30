@@ -23,7 +23,8 @@ Nordic Thingy:52 Bluetooth device sensors
     https://nordicsemiconductor.github.io/Nordic-Thingy52-FW/documentation/firmware_architecture.html
 
 The sensors do not implement the Bluetooth Environmental Sensing interfaces
-and require custom classes.
+and require custom classes. All Thingy:52 Bluetooth device sensors are
+notifying.
 """
 
 import asyncio
@@ -40,7 +41,7 @@ to_uuid = 'ef68{:04x}-9b35-4933-9b10-52ffa9740042'.format
 
 class DeviceThingy52(DeviceEnvSensing):
     """
-    Thingy52 Bluetooth device sensor.
+    Thingy:52 Bluetooth device sensor.
     """
     def __init__(self, mac, notifying=True):
         super().__init__(mac, notifying=notifying)
@@ -53,7 +54,7 @@ class DeviceThingy52(DeviceEnvSensing):
 
 class Temperature(DeviceThingy52):
     """
-    Thingy52 Bluetooth device temperature sensor.
+    Thingy:52 Bluetooth device temperature sensor.
     """
     info = InfoEnvSensing(
         to_uuid(0x0200),
@@ -66,7 +67,7 @@ class Temperature(DeviceThingy52):
 
 class Pressure(DeviceThingy52):
     """
-    Thingy52 Bluetooth device pressure sensor.
+    Thingy:52 Bluetooth device pressure sensor.
     """
     info = InfoEnvSensing(
         to_uuid(0x0200),
@@ -79,7 +80,7 @@ class Pressure(DeviceThingy52):
 
 class Humidity(DeviceThingy52):
     """
-    Thingy52 Bluetooth device humidity sensor.
+    Thingy:52 Bluetooth device humidity sensor.
     """
     info = InfoEnvSensing(
         to_uuid(0x0200),
