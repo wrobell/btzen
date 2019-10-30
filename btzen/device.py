@@ -291,7 +291,6 @@ class DeviceEnvSensing(DeviceCharacteristic):
         self._path_trigger = self._get_path(info.uuid_trigger)
 
         config_on = info.config_on_notify if self.notifying else info.config_on
-
         if config_on:
             if __debug__:
                 logger.debug(

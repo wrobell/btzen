@@ -37,19 +37,16 @@ import asyncio
 import enum
 import logging
 import struct
-from functools import partial
 
-from .bus import Bus
 from .device import InfoCharacteristic, InfoEnvSensing, DeviceEnvSensing, \
     DeviceCharacteristic, Trigger, TriggerCondition
 from .device import to_uuid as to_bt_uuid
+from .util import to_int
 
 logger = logging.getLogger(__name__)
 
 # function to convert 16-bit UUID to full 128-bit Sensor Tag UUID
 to_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
-
-to_int = partial(int.from_bytes, byteorder='little')
 
 class DeviceSensorTag(DeviceEnvSensing):
     """

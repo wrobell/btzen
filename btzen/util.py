@@ -17,13 +17,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from functools import wraps, partial
+from inspect import iscoroutinefunction
+
+to_int = partial(int.from_bytes, byteorder='little')
+
 #
 # from https://github.com/agronholm/asyncio_extras/blob/master/asyncio_extras/contextmanager.py
 # MIT license
 #
-from functools import wraps
-from inspect import iscoroutinefunction
-
 class _AsyncContextManager:
     __slots__ = 'generator'
 

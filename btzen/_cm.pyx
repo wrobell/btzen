@@ -208,7 +208,11 @@ async def bt_connect(Bus bus, str path, str address):
         )
         _sd_bus.check_call('bt connect call prepare {}'.format(path), r)
 
-        r = sd_bus_message_append(msg, 'a{sv}', 2, 'Address', 's', addr_data, "AddressType", "s", "public")
+        r = sd_bus_message_append(
+            msg, 'a{sv}', 2,
+            'Address', 's', addr_data,
+            "AddressType", "s", "random"
+        )
         _sd_bus.check_call('bt connect call args {}'.format(path), r)
 
         r = sd_bus_call_async(bus.bus, NULL, msg, task_cb, <void*>task, 0)

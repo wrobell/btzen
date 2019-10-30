@@ -149,6 +149,7 @@ class ConnectionManager:
         # we will never connect
         try:
             path = FMT_PATH_ADAPTER(self._interface)
+            logger.info('connect device {} via controller {}'.format(mac, path))
             await _cm.bt_connect(bus.system_bus, path, mac)
         except Exception as ex:
             if str(ex) == 'Already Exists':
