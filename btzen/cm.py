@@ -140,6 +140,10 @@ class ConnectionManager:
     async def _reconnect(self, mac, devices):
         bus = self._get_bus()
 
+        # determine connection address type; this is a hack, we need better
+        # solution in the future
+        address_type = getattr(next(iter(devices)), 'ADDRESS_TYPE', 'public')
+
         # enable monitoring of the `ServicesResolved` property first
         bus._dev_property_start(mac, 'ServicesResolved')
 
@@ -149,8 +153,11 @@ class ConnectionManager:
         # we will never connect
         try:
             path = FMT_PATH_ADAPTER(self._interface)
-            logger.info('connect device {} via controller {}'.format(mac, path))
-            await _cm.bt_connect(bus.system_bus, path, mac)
+            logger.info(
+                'connect device {} via controller {}, address type {}'
+                .format(mac, path, address_type)
+            )
+            await _cm.bt_connect(bus.system_bus, path, mac, address_type)
         except Exception as ex:
             if str(ex) == 'Already Exists':
                 logger.info('connection for {} already exists'.format(mac))

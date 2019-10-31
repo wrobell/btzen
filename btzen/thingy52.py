@@ -67,6 +67,8 @@ class DeviceThingy52(DeviceEnvSensing):
     """
     Thingy:52 Bluetooth device sensor.
     """
+    ADDRESS_TYPE = 'random'
+
     # NOTE: the configuration is shared by all sensors per given device
     # (mac address)
     CONFIG = {}

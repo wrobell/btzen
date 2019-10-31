@@ -182,19 +182,23 @@ cdef int task_cb(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) 
 
     return _sd_bus.task_handle_message(bus_msg, task, ConnectionError, None)
 
-async def bt_connect(Bus bus, str path, str address):
+async def bt_connect(Bus bus, str path, str address, str address_type):
     """
     Connect to Bluetooth device.
 
     :param bus: D-Bus reference.
     :param path: D-Bus adapter path.
     :param address: Bluetooth device address.
+    :param address_type: Bluetooth device address type (public or random).
     """
     assert bus is not None
 
-    buff = address.encode()
+    buff_addr = address.encode()
+    buff_addr_type = address_type.encode()
+
     cdef sd_bus_message *msg = NULL
-    cdef unsigned char *addr_data = buff
+    cdef unsigned char *addr_data = buff_addr
+    cdef unsigned char *addr_type_data = buff_addr_type
 
     task = asyncio.get_event_loop().create_future()
     try:
@@ -211,7 +215,7 @@ async def bt_connect(Bus bus, str path, str address):
         r = sd_bus_message_append(
             msg, 'a{sv}', 2,
             'Address', 's', addr_data,
-            "AddressType", "s", "random"
+            "AddressType", "s", addr_type_data,
         )
         _sd_bus.check_call('bt connect call args {}'.format(path), r)
 
