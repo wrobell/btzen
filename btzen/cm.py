@@ -200,14 +200,18 @@ class ConnectionManager:
 
     async def _enable(self, mac, devices):
         # NOTE: some devices might deadlock when trying to enable multiple
-        # subsystems, i.e. sensor tag with button and temperatue only; use
+        # subsystems, i.e. sensor tag with button and temperature only; use
         # timeout to try to avoid the deadlock
         while self._process:
             timeout = self.enable_timeout
             try:
                 tasks = (dev.enable() for dev in devices)
                 tasks = (asyncio.wait_for(t, timeout=timeout) for t in tasks)
-                await asyncio.gather(*tasks)
+                # serialize enabling of devices as the devices might use
+                # the common bluetooth characteristics for configuration,
+                # i.e. thingy:52
+                for t in tasks:
+                    await t
                 break
             except asyncio.TimeoutError as ex:
                 logger.exception('enabling device %s failed due to timeout', mac)

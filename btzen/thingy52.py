@@ -29,6 +29,9 @@ notifying.
 
 import asyncio
 import logging
+import struct
+import typing as tp
+from dataclasses import dataclass, replace
 
 from .device import InfoEnvSensing, DeviceEnvSensing, \
     DeviceCharacteristic, Trigger, TriggerCondition
@@ -36,21 +39,64 @@ from .util import to_int
 
 logger = logging.getLogger(__name__)
 
+CONFIG_DATA_FMT = struct.Struct('<HHHHBBBB')
+
 # function to convert 16-bit UUID to full 128-bit Thingy:52 UUID
 to_uuid = 'ef68{:04x}-9b35-4933-9b10-52ffa9740042'.format
+
+@dataclass
+class Config:
+    """
+    Thingy:52 Bluetooth device configuration for the weather service
+    sensors.
+    """
+    # temperature sensor data read interval
+    temperature: float = 1.0
+    # pressure sensor data read interval
+    pressure: float = 1.0
+    # humidity sensor data read interval
+    humidity: float = 1.0
+    # color sensor data read interval
+    color: float = 1.0
+    # gas sensor data read interval (1 - 1s, 2 - 10s, 3 - 60s)
+    gas: int = 1
+    # color sensor LED calibration (RGB value)
+    rgb: tp.Tuple[int, int, int] = (0, 255, 0)
 
 class DeviceThingy52(DeviceEnvSensing):
     """
     Thingy:52 Bluetooth device sensor.
     """
+    # NOTE: the configuration is shared by all sensors per given device
+    # (mac address)
+    CONFIG = {}
+
     def __init__(self, mac, notifying=True):
         super().__init__(mac, notifying=notifying)
 
+        DeviceThingy52.CONFIG[mac] = Config()
         self.set_trigger(Trigger(TriggerCondition.FIXED_TIME, 1))
 
     def _trigger_data(self, trigger: Trigger) -> bytes:
         assert trigger.condition == TriggerCondition.FIXED_TIME
-        return bytes()
+
+        # replace configuration for given thingy52 device
+        mac = self.mac
+        data = {self.config_attr: trigger.operand}
+        config = replace(DeviceThingy52.CONFIG[self.mac], **data)
+        DeviceThingy52.CONFIG[mac] = config
+        logger.info('thingy52 configuration: {}'.format(config))
+
+        to_ms = lambda v: int(v * 1000)
+        data = CONFIG_DATA_FMT.pack(
+            to_ms(config.temperature),
+            to_ms(config.pressure),
+            to_ms(config.humidity),
+            to_ms(config.color),
+            config.gas,
+            *config.rgb,
+        )
+        return data
 
 class Temperature(DeviceThingy52):
     """
@@ -59,8 +105,10 @@ class Temperature(DeviceThingy52):
     info = InfoEnvSensing(
         to_uuid(0x0200),
         to_uuid(0x0201),
-        2
+        2,
+        uuid_trigger=to_uuid(0x0206),
     )
+    config_attr = 'temperature'
 
     def get_value(self, data):
         return data[0] + data[1] / 100
@@ -73,7 +121,9 @@ class Pressure(DeviceThingy52):
         to_uuid(0x0200),
         to_uuid(0x0202),
         5,
+        uuid_trigger=to_uuid(0x0206),
     )
+    config_attr = 'pressure'
 
     def get_value(self, data):
         return to_int(data[:4]) * 100 + data[4]
@@ -86,7 +136,9 @@ class Humidity(DeviceThingy52):
         to_uuid(0x0200),
         to_uuid(0x0203),
         1,
+        uuid_trigger=to_uuid(0x0206),
     )
+    config_attr = 'humidity'
 
     def get_value(self, data):
         return data[0]
