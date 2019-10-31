@@ -147,23 +147,13 @@ class ConnectionManager:
         # enable monitoring of the `ServicesResolved` property first
         bus._dev_property_start(mac, 'ServicesResolved')
 
-        # connect to a device
-        #
-        # NOTE: bluez 5.50 - scanning by external programs shall be off or
-        # we will never connect
-        try:
-            path = FMT_PATH_ADAPTER(self._interface)
-            logger.info(
-                'connect device {} via controller {}, address type {}'
-                .format(mac, path, address_type)
-            )
-            await _cm.bt_connect(bus.system_bus, path, mac, address_type)
-        except Exception as ex:
-            if str(ex) == 'Already Exists':
-                logger.info('connection for {} already exists'.format(mac))
-            else:
-                bus._dev_property_stop(mac, 'ServicesResolved')
-                raise
+        adapter_path = FMT_PATH_ADAPTER(self._interface)
+
+        # remove a device preemptively; if it is left in bluez daemon
+        # registry, then it might interfere with establishing of new
+        # connection
+        await self._preempt_remove_dev(bus, mac, adapter_path)
+        await self._connect_dev(bus, mac, adapter_path, address_type)
 
         try:
             await self._restart(mac, devices)
@@ -222,6 +212,35 @@ class ConnectionManager:
                 break
             except asyncio.TimeoutError as ex:
                 logger.exception('enabling device %s failed due to timeout', mac)
+
+    async def _connect_dev(self, bus, mac, adapter_path, address_type):
+        # connect to a device
+        #
+        # NOTE: bluez 5.50 - scanning by external programs shall be off or
+        # we will never connect
+        try:
+            logger.info(
+                'connect device {} via controller {}, address type {}'
+                .format(mac, adapter_path, address_type)
+            )
+            await _cm.bt_connect(bus.system_bus, adapter_path, mac, address_type)
+        except Exception as ex:
+            if str(ex) == 'Already Exists':
+                logger.info('connection for {} already exists'.format(mac))
+            else:
+                bus._dev_property_stop(mac, 'ServicesResolved')
+                raise
+
+    async def _preempt_remove_dev(self, bus, mac, adapter_path):
+        dev_path = bus.dev_path(mac)
+        try:
+            _cm.bt_remove(bus.system_bus, adapter_path, dev_path)
+        except:
+            if __debug__:
+                logger.exception(
+                    'preemptive removal of device {} failed, moving on'
+                    .format(mac)
+                )
 
     def _get_bus(self):
         return Bus.get_bus(self._interface)
