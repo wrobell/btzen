@@ -21,6 +21,7 @@
 
 from libc.stdio cimport perror
 from libc.string cimport strerror
+from libc.stdint cimport uint8_t
 from libc.errno cimport errno
 from cpython.bytes cimport PyBytes_FromStringAndSize
 
@@ -161,6 +162,7 @@ def msg_read_value(BusMessage bus_msg, str type):
 
     cdef bytes value_str
     cdef int value
+    cdef uint8_t value_byte
     cdef signed short value_short
     cdef const void *buff
     cdef size_t buff_size
@@ -180,7 +182,12 @@ def msg_read_value(BusMessage bus_msg, str type):
         check_msg_error(r)
         r_value = value_short
 
-    elif msg_type == b'ay' or msg_type == b'y':
+    elif msg_type == b'y':
+        r = sd_bus_message_read_basic(msg, 'y', &value_byte)
+        check_msg_error(r)
+        r_value = value_byte
+
+    elif msg_type == b'ay':
         r = sd_bus_message_read_array(msg, 'y', &buff, &buff_size)
         check_msg_error(r)
 

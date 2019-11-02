@@ -93,7 +93,7 @@ cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_er
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
     bus_msg.c_obj = msg
 
-    return _sd_bus.task_handle_message(bus_msg, task, DataReadError, 'y')
+    return _sd_bus.task_handle_message(bus_msg, task, DataReadError, 'ay')
 
 async def bt_read(Bus bus, str path, timeout=0):
     assert bus is not None
