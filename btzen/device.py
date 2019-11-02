@@ -183,6 +183,7 @@ class DeviceInterface(Device):
         self._read_data = None
 
     async def enable(self):
+        logger.info('enabling device: {}'.format(self))
         read_notify = partial(self._bus._dev_property_get, **self._params)
         read = partial(self._bus._property, **self._params, type=self.info.type)
         self._read_data = read_notify if self.notifying else read
