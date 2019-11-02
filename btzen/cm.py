@@ -141,8 +141,14 @@ class ConnectionManager:
         bus = self._get_bus()
 
         # determine connection address type; this is a hack, we need better
-        # solution in the future
-        address_type = getattr(next(iter(devices)), 'ADDRESS_TYPE', 'public')
+        # solution in the future; favour random address type; this is
+        # useful when battery level is used (specifies no address type, so
+        # defaults to "public) and thingy52 sensors (they require "random"
+        # address type)
+        address_types = set(
+            getattr(dev, 'ADDRESS_TYPE', 'public') for dev in devices
+        )
+        address_type = 'random' if 'random' in address_types else 'public'
 
         # enable monitoring of the `ServicesResolved` property first
         bus._dev_property_start(mac, 'ServicesResolved')
