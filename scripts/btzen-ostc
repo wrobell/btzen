@@ -74,7 +74,7 @@ async def display(dev, msg):
     value = await dev.read(1)
     assert value == b'\x4d'
 
-async def read_data(dev):
+async def read_data(dev, count):
     await start(dev)
     await display(dev, 'BTZen Connected')
 
@@ -89,7 +89,7 @@ async def read_data(dev):
         # also filter unused headers
         items = (bytes(v) for v in items if v[-1] != 0xff)
         items = (parse_header(v) for v in items)
-        items = itz.tail(20, items)
+        items = itz.tail(count, items)
         items = reversed(items)
 
         for k, header in enumerate(items, 1):
@@ -102,6 +102,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     '--verbose', default=False, action='store_true',
     help='show debug log'
+)
+parser.add_argument(
+    '-c', '--count', default=20, type=int,
+    help='number of dives to show'
 )
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
@@ -117,7 +121,7 @@ manager.add(dev)
 
 try:
     task = asyncio.wait(
-        [manager, read_data(dev)],
+        [manager, read_data(dev, args.count)],
         return_when=asyncio.FIRST_COMPLETED,
     )
     loop.run_until_complete(task)
