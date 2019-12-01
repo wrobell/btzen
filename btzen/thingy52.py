@@ -33,7 +33,8 @@ import struct
 import typing as tp
 from dataclasses import dataclass, replace
 
-from .device import InfoEnvSensing, DeviceEnvSensing, \
+from . import _btzen
+from .device import InfoCharacteristic, InfoEnvSensing, DeviceEnvSensing, \
     DeviceCharacteristic, Trigger, TriggerCondition
 from .util import to_int
 
@@ -63,7 +64,7 @@ class Config:
     # color sensor LED calibration (RGB value)
     rgb: tp.Tuple[int, int, int] = (0, 255, 0)
 
-class DeviceThingy52(DeviceEnvSensing):
+class DeviceThingy52EnvSensing(DeviceEnvSensing):
     """
     Thingy:52 Bluetooth device sensor.
     """
@@ -76,7 +77,7 @@ class DeviceThingy52(DeviceEnvSensing):
     def __init__(self, mac, notifying=True):
         super().__init__(mac, notifying=notifying)
 
-        DeviceThingy52.CONFIG[mac] = Config()
+        DeviceThingy52EnvSensing.CONFIG[mac] = Config()
         self.set_trigger(Trigger(TriggerCondition.FIXED_TIME, 1))
 
     def _trigger_data(self, trigger: Trigger) -> bytes:
@@ -85,8 +86,8 @@ class DeviceThingy52(DeviceEnvSensing):
         # replace configuration for given thingy52 device
         mac = self.mac
         data = {self.config_attr: trigger.operand}
-        config = replace(DeviceThingy52.CONFIG[self.mac], **data)
-        DeviceThingy52.CONFIG[mac] = config
+        config = replace(DeviceThingy52EnvSensing.CONFIG[self.mac], **data)
+        DeviceThingy52EnvSensing.CONFIG[mac] = config
         logger.info('thingy52 configuration: {}'.format(config))
 
         to_ms = lambda v: int(v * 1000)
@@ -100,7 +101,7 @@ class DeviceThingy52(DeviceEnvSensing):
         )
         return data
 
-class Temperature(DeviceThingy52):
+class Temperature(DeviceThingy52EnvSensing):
     """
     Thingy:52 Bluetooth device temperature sensor.
     """
@@ -115,7 +116,7 @@ class Temperature(DeviceThingy52):
     def get_value(self, data):
         return data[0] + data[1] / 100
 
-class Pressure(DeviceThingy52):
+class Pressure(DeviceThingy52EnvSensing):
     """
     Thingy:52 Bluetooth device pressure sensor.
     """
@@ -130,7 +131,7 @@ class Pressure(DeviceThingy52):
     def get_value(self, data):
         return to_int(data[:4]) * 100 + data[4]
 
-class Humidity(DeviceThingy52):
+class Humidity(DeviceThingy52EnvSensing):
     """
     Thingy:52 Bluetooth device humidity sensor.
     """
@@ -144,5 +145,34 @@ class Humidity(DeviceThingy52):
 
     def get_value(self, data):
         return data[0]
+
+class DeviceThingy52Configuration(DeviceCharacteristic):
+    """
+    Thingy:52 Bluetooth device configuration.
+    """
+    ADDRESS_TYPE = 'random'
+
+class ConnectionParameters(DeviceThingy52Configuration):
+    info = InfoCharacteristic(
+        to_uuid(0x0100),
+        to_uuid(0x0104),
+        8,
+    )
+    async def set_params(
+        self,
+        min_conn_interval,
+        max_conn_interval,
+        slave_latency,
+        supervision_timeout,
+    ):
+        system_bus = self._bus.system_bus
+        data = struct.pack(
+            '<HHHH',
+            min_conn_interval,
+            max_conn_interval,
+            slave_latency,
+            supervision_timeout,
+        )
+        await _btzen.bt_write(system_bus, self._path_data, data)
 
 # vim: sw=4:et:ai
