@@ -168,7 +168,7 @@ class ConnectionManager:
 
     async def _restart(self, mac, devices):
         """
-        Renable or hold Bluetooth device when property 'ServicesResolved`
+        Re-enable or hold Bluetooth device when property 'ServicesResolved`
         changes.
         """
         bus = self._get_bus()
@@ -176,10 +176,9 @@ class ConnectionManager:
         cn_clear = self._connected[mac].clear
         cn_set = self._connected[mac].set
 
-        while self._process:
-            # try to enable device first; if this fails, then wait for
-            # services to be resolved; this way we try to avoid connection
-            # race conditions
+        # the `ServicesResolved` property monitoring is started by a
+        # caller, so just wait for the service to be resolved
+        async for _ in self._resolve_services(mac):
             try:
                 logger.info('enabling device {}'.format(mac))
                 await enable()
@@ -194,12 +193,25 @@ class ConnectionManager:
             else:
                 cn_set()
 
+    async def _resolve_services(self, mac):
+        """
+        Asynchronous generator waiting for a Bluetooth device to be
+        resolved.
+        """
+        bus = self._get_bus()
+        cn_clear = self._connected[mac].clear
+        while self._process:
             logger.info(
                 'device {} waiting for services resolved status change'
                 .format(mac)
             )
             resolved = await bus._dev_property_get(mac, 'ServicesResolved')
             logger.info('device {} services resolved: {}'.format(mac, resolved))
+
+            if resolved:
+                yield
+            else:
+                cn_clear()
 
     async def _enable(self, mac, devices):
         # NOTE: some devices might deadlock when trying to enable multiple
