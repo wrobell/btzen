@@ -123,7 +123,7 @@ async def bt_read(Bus bus, str path, timeout=0):
         bus.bus, &slot,
         msg, task_cb_read,
         <void*>task,
-        1e9 * timeout
+        1e6 * timeout
     )
     _sd_bus.check_call('read data from {}'.format(path), r)
 
