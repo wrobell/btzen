@@ -76,7 +76,7 @@ class Bus:
     def dev_path(self, mac):
         return '/org/bluez/{}/dev_{}'.format(self.interface, _mac_to_path(mac))
 
-    async def _gatt_get(self, path, timeout=0):
+    async def _gatt_get(self, path):
         task = self._notifications.get(path, INTERFACE_GATT_CHR, 'Value')
         return (await task)
 
@@ -96,7 +96,6 @@ class Bus:
             mac,
             name,
             iface=INTERFACE_DEVICE,
-            timeout=0
         ):
         path = self.dev_path(mac)
         value = await self._notifications.get(path, iface, name)
@@ -106,7 +105,7 @@ class Bus:
         path = self.dev_path(mac)
         self._notifications.stop(path, iface)
 
-    async def _property(self, mac, iface, name, type='s', timeout=0):
+    async def _property(self, mac, iface, name, type='s'):
         bus = self.system_bus
         path = self.dev_path(mac)
         value = await _btzen.bt_property(bus, path, iface, name, type)

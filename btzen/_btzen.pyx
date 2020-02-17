@@ -95,7 +95,7 @@ cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_er
 
     return _sd_bus.task_handle_message(bus_msg, task, DataReadError, 'ay')
 
-async def bt_read(Bus bus, str path, timeout=0):
+async def bt_read(Bus bus, str path):
     assert bus is not None
 
     cdef sd_bus_message *msg = NULL
@@ -111,26 +111,26 @@ async def bt_read(Bus bus, str path, timeout=0):
         'org.bluez.GattCharacteristic1',
         'ReadValue'
     )
-    _sd_bus.check_call('prepare read data from {}'.format(path), r)
+    try:
+        _sd_bus.check_call('prepare read data from {}'.format(path), r)
 
-    r = sd_bus_message_open_container(msg, 'a', '{sv}')
-    _sd_bus.check_call('write data to {}'.format(path), r)
+        r = sd_bus_message_open_container(msg, 'a', '{sv}')
+        _sd_bus.check_call('bt read open container for {}'.format(path), r)
 
-    r = sd_bus_message_close_container(msg)
-    _sd_bus.check_call('write data to {}'.format(path), r)
+        r = sd_bus_message_close_container(msg)
+        _sd_bus.check_call('bt read close container for {}'.format(path), r)
 
-    r = sd_bus_call_async(
-        bus.bus, &slot,
-        msg, task_cb_read,
-        <void*>task,
-        1e6 * timeout
-    )
-    _sd_bus.check_call('read data from {}'.format(path), r)
+        r = sd_bus_call_async(bus.bus, &slot, msg, task_cb_read, <void*>task, 0)
+        _sd_bus.check_call('bt read call async for {}'.format(path), r)
+    finally:
+        sd_bus_message_unref(msg)
 
     try:
         return (await task)
+    except asyncio.CancelledError:
+        logger.info('bt read task cancelled')
+        raise
     finally:
-        sd_bus_message_unref(msg)
         sd_bus_slot_unref(slot)
 
 cdef int task_cb_write(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
@@ -158,32 +158,37 @@ async def bt_write(Bus bus, str path, bytes data):
     cdef char* buff = data
 
     task = asyncio.get_event_loop().create_future()
+    r = sd_bus_message_new_method_call(
+        bus.bus,
+        &msg,
+        'org.bluez',
+        path.encode(),
+        'org.bluez.GattCharacteristic1',
+        'WriteValue'
+    )
     try:
-        r = sd_bus_message_new_method_call(
-            bus.bus,
-            &msg,
-            'org.bluez',
-            path.encode(),
-            'org.bluez.GattCharacteristic1',
-            'WriteValue'
-        )
         _sd_bus.check_call('write data to {}'.format(path), r)
 
         r = sd_bus_message_append_array(msg, 'y', buff, len(data))
-        _sd_bus.check_call('write data to {}'.format(path), r)
+        _sd_bus.check_call('bt write message append for {}'.format(path), r)
 
         r = sd_bus_message_open_container(msg, 'a', '{sv}')
-        _sd_bus.check_call('write data to {}'.format(path), r)
+        _sd_bus.check_call('bt write open container for {}'.format(path), r)
 
         r = sd_bus_message_close_container(msg)
-        _sd_bus.check_call('write data to {}'.format(path), r)
+        _sd_bus.check_call('bt write close container for {}'.format(path), r)
 
         r = sd_bus_call_async(bus.bus, &slot, msg, task_cb_write, <void*>task, 0)
-        _sd_bus.check_call('write data to {}'.format(path), r)
-
-        return (await task)
+        _sd_bus.check_call('bt write call async for {}'.format(path), r)
     finally:
         sd_bus_message_unref(msg)
+
+    try:
+        return (await task)
+    except asyncio.CancelledError:
+        logger.info('bt write task cancelled')
+        raise
+    finally:
         sd_bus_slot_unref(slot)
 
 def bt_write_sync(Bus bus, str path, bytes data):
