@@ -157,23 +157,23 @@ def cm_close(Bus bus, str path, handle):
 
     handle.stop()
 
-    r = sd_bus_call_method(
-        bus.bus,
-        'org.bluez',
-        path.encode(),
-        'org.bluez.GattManager1',
-        'UnregisterApplication',
-        &error,
-        &msg,
-         'o',
-         '/',
-         NULL
-    )
-
-    sd_bus_error_free(&error);
-    sd_bus_message_unref(msg);
-
-    _sd_bus.check_call('unregister application call', r)
+    try:
+        r = sd_bus_call_method(
+            bus.bus,
+            'org.bluez',
+            path.encode(),
+            'org.bluez.GattManager1',
+            'UnregisterApplication',
+            &error,
+            &msg,
+             'o',
+             '/',
+             NULL
+        )
+        _sd_bus.check_call('unregister application call', r)
+    finally:
+        sd_bus_error_free(&error);
+        sd_bus_message_unref(msg);
 
 cdef int task_cb(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object task = <object>user_data
@@ -267,21 +267,22 @@ def bt_disconnect(Bus bus, str path):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 
-    r = sd_bus_call_method(
-        bus.bus,
-        'org.bluez',
-        path.encode(),
-        "org.bluez.Device1",
-        'Disconnect',
-        &error,
-        &msg,
-        NULL,
-        NULL
-    )
-    sd_bus_error_free(&error);
-    sd_bus_message_unref(msg);
-
-    _sd_bus.check_call('disconnect device', r)
+    try:
+        r = sd_bus_call_method(
+            bus.bus,
+            'org.bluez',
+            path.encode(),
+            "org.bluez.Device1",
+            'Disconnect',
+            &error,
+            &msg,
+            NULL,
+            NULL
+        )
+        _sd_bus.check_call('disconnect device', r)
+    finally:
+        sd_bus_error_free(&error);
+        sd_bus_message_unref(msg);
 
 def bt_remove(Bus bus, str adapter, str device):
     """
@@ -299,21 +300,22 @@ def bt_remove(Bus bus, str adapter, str device):
     buff = device.encode()
     cdef unsigned char *dev_data = buff
 
-    r = sd_bus_call_method(
-        bus.bus,
-        'org.bluez',
-        adapter.encode(),
-        "org.bluez.Adapter1",
-        'RemoveDevice',
-        &error,
-        &msg,
-        'o',
-        dev_data
-    )
-    sd_bus_error_free(&error);
-    sd_bus_message_unref(msg);
-
-    _sd_bus.check_call('remove device', r)
+    try:
+        r = sd_bus_call_method(
+            bus.bus,
+            'org.bluez',
+            adapter.encode(),
+            "org.bluez.Adapter1",
+            'RemoveDevice',
+            &error,
+            &msg,
+            'o',
+            dev_data
+        )
+        _sd_bus.check_call('remove device', r)
+    finally:
+        sd_bus_error_free(&error);
+        sd_bus_message_unref(msg);
 
 async def bt_register_agent(Bus bus):
     """
@@ -399,21 +401,22 @@ def bt_unregister_agent(Bus bus):
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
 
-    r = sd_bus_call_method(
-        bus.bus,
-        'org.bluez',
-        '/org/bluez',
-        "org.bluez.AgentManager1",
-        'UnregisterAgent',
-        &error,
-        &msg,
-        'o',
-        '/org/btzen/Agent',
-        NULL
-    )
-    sd_bus_error_free(&error);
-    sd_bus_message_unref(msg);
-
-    _sd_bus.check_call('unregister agent', r)
+    try:
+        r = sd_bus_call_method(
+            bus.bus,
+            'org.bluez',
+            '/org/bluez',
+            "org.bluez.AgentManager1",
+            'UnregisterAgent',
+            &error,
+            &msg,
+            'o',
+            '/org/btzen/Agent',
+            NULL
+        )
+        _sd_bus.check_call('unregister agent', r)
+    finally:
+        sd_bus_error_free(&error);
+        sd_bus_message_unref(msg);
 
 # vim: sw=4:et:ai
