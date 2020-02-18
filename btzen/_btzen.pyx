@@ -288,22 +288,24 @@ async def bt_property(Bus bus, str path, str iface, str name, str type):
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
 
-    r = sd_bus_get_property(
-        bus.bus,
-        'org.bluez',
-        path.encode(),
-        iface.encode(),
-        name.encode(),
-        &error,
-        &msg,
-        type.encode()
-    )
-    _sd_bus.check_call('getting property {}'.format(name), r)
+    try:
+        r = sd_bus_get_property(
+            bus.bus,
+            'org.bluez',
+            path.encode(),
+            iface.encode(),
+            name.encode(),
+            &error,
+            &msg,
+            type.encode()
+        )
+        _sd_bus.check_call('getting property {}'.format(name), r)
 
-    bus_msg.c_obj = msg
-    value =_sd_bus.msg_read_value(bus_msg, type)
-    sd_bus_message_unref(msg)
-    sd_bus_error_free(&error)
+        bus_msg.c_obj = msg
+        value =_sd_bus.msg_read_value(bus_msg, type)
+    finally:
+        sd_bus_message_unref(msg)
+        sd_bus_error_free(&error)
 
     return value
 
@@ -322,21 +324,22 @@ def bt_notify_start(Bus bus, str path):
 
     iface = 'org.bluez.GattCharacteristic1'
 
-    r = sd_bus_call_method(
-        bus.bus,
-        'org.bluez',
-        path.encode(),
-        iface.encode(),
-        'StartNotify',
-        &error,
-        &msg,
-        NULL,
-        NULL
-    )
-    sd_bus_error_free(&error);
-    sd_bus_message_unref(msg);
-
-    _sd_bus.check_call('start notification', r)
+    try:
+        r = sd_bus_call_method(
+            bus.bus,
+            'org.bluez',
+            path.encode(),
+            iface.encode(),
+            'StartNotify',
+            &error,
+            &msg,
+            NULL,
+            NULL
+        )
+        _sd_bus.check_call('start notification', r)
+    finally:
+        sd_bus_error_free(&error);
+        sd_bus_message_unref(msg);
 
 def bt_notify_stop(Bus bus, str path):
     """
