@@ -35,9 +35,10 @@ When starting and running connection manager
 3. Create connection manager object on D-Bus event bus and register UUIDs
    of services of devices to be managed by the connection manager.
 4. For each device
-4.1. Use `ConnectDevice` method of adapter interface to connect to the
-     device.
-4.2. Wait for `ServicesResolved` property to be changed.
+4.1. Remove device preemptively to allow new connection.
+4.2. Use `ConnectDevice` method of adapter interface to connect to the
+     device. If fails, then move to 4.1 above.
+4.3. Wait for `ServicesResolved` property to be changed.
 4.3.1. If the property is set to true enable Bluetooth device.
 4.3.2. If the property is set to false, then disable Bluetooth device.
 
@@ -158,8 +159,10 @@ class ConnectionManager:
         # remove a device preemptively; if it is left in bluez daemon
         # registry, then it might interfere with establishing of new
         # connection
-        await self._preempt_remove_dev(bus, mac, adapter_path)
-        await self._connect_dev(bus, mac, adapter_path, address_type)
+        connected = False
+        while not connected:
+            await self._preempt_remove_dev(bus, mac, adapter_path)
+            connected = await self._connect_dev(bus, mac, adapter_path, address_type)
 
         try:
             await self._restart(mac, devices)
@@ -236,6 +239,7 @@ class ConnectionManager:
         #
         # NOTE: bluez 5.50 - scanning by external programs shall be off or
         # we will never connect
+        connected = False
         try:
             logger.info(
                 'connect device {} via controller {}, address type {}'
@@ -244,20 +248,27 @@ class ConnectionManager:
             await _cm.bt_connect(bus.system_bus, adapter_path, mac, address_type)
         except Exception as ex:
             if str(ex) == 'Already Exists':
-                logger.info('connection for {} already exists'.format(mac))
+                connected = True
             else:
-                bus._dev_property_stop(mac, 'ServicesResolved')
-                raise
+                logger.info(
+                    'connection for {} failed: {}, sleep for 1s'
+                    .format(mac, ex)
+                )
+                await asyncio.sleep(1)
+        else:
+            connected = True
+        return connected
+
 
     async def _preempt_remove_dev(self, bus, mac, adapter_path):
         dev_path = bus.dev_path(mac)
         try:
             _cm.bt_remove(bus.system_bus, adapter_path, dev_path)
-        except:
+        except Exception as ex:
             if __debug__:
-                logger.exception(
-                    'preemptive removal of device {} failed, moving on'
-                    .format(mac)
+                logger.debug(
+                    'preemptive removal of device {} failed: {}'
+                    .format(mac, ex)
                 )
 
     def _get_bus(self):
