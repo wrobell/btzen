@@ -84,12 +84,17 @@ cdef int cm_property(
     cdef object cm = <object>user_data
     cdef int r
 
-    uuids = set(dev.info.service.encode() for dev in flatten(cm._devices.values()))
+    uuids = set(dev.info.service for dev in flatten(cm._devices.values()))
     size = len(uuids) + 1
+
+    for u in sorted(uuids):
+        logger.info('register reconnection for service: {}'.format(u))
+
     cdef char **arr = <char**>malloc(size * sizeof(char*))
 
-    for i, uv in enumerate(uuids):
-        arr[i] = uv
+    items = (u.encode() for u in uuids)
+    for i, u in enumerate(items):
+        arr[i] = u
     arr[size - 1] = NULL
 
     r = sd_bus_message_append_strv(reply, arr)
