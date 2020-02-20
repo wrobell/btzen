@@ -108,6 +108,7 @@ async def cm_init(Bus bus, str path, cm):
     Initialize connection manager.
     """
     cdef sd_bus_slot *slot
+    cdef sd_bus_slot *handle_slot
 
     handle = ConnectionManagerHandle()
     create_vtable(cm_release, cm_property, &handle.vtable)
@@ -119,7 +120,7 @@ async def cm_init(Bus bus, str path, cm):
 
     r = sd_bus_add_object_vtable(
         bus.bus,
-        &slot,
+        &handle_slot,
         '/org/btzen/ConnectionManager',
         'org.bluez.GattProfile1',
         handle.vtable,
@@ -129,26 +130,30 @@ async def cm_init(Bus bus, str path, cm):
 
     r = sd_bus_call_method_async(
         bus.bus,
-        NULL,
+        &slot,
         'org.bluez',
         path.encode(),
         'org.bluez.GattManager1',
         'RegisterApplication',
         task_cb,
         <void*>task,
-         'oa{sv}',
-         '/',
-         0
+        'oa{sv}',
+        '/',
+        0
     )
     try:
         _sd_bus.check_call('register application call', r)
     except Exception as ex:
-        sd_bus_slot_unref(slot)
+        sd_bus_slot_unref(handle_slot)
         raise
     else:
-        handle.slot = slot
+        handle.slot = handle_slot
 
-    await task
+    try:
+        await task
+    finally:
+        sd_bus_slot_unref(slot)
+
     return handle
 
 def cm_close(Bus bus, str path, handle):
