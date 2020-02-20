@@ -232,35 +232,6 @@ async def bt_connect(Bus bus, str path, str address, str address_type):
     finally:
         sd_bus_slot_unref(slot)
 
-async def bt_start_discovery(Bus bus, str path):
-    """
-    Start device discovery.
-
-    :param bus: D-Bus reference.
-    :param path: D-Bus adapter path.
-    """
-    assert bus is not None
-    cdef sd_bus_message *msg = NULL
-
-    task = asyncio.get_event_loop().create_future()
-    try:
-        r = sd_bus_message_new_method_call(
-            bus.bus,
-            &msg,
-            'org.bluez',
-            path.encode(),
-            'org.bluez.Adapter1',
-            'StartDiscovery'
-        )
-        _sd_bus.check_call('bt start discovery call prepare {}'.format(path), r)
-
-        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb, <void*>task, 0)
-        _sd_bus.check_call('bt start discovery call {}'.format(path), r)
-
-        return (await task)
-    finally:
-        sd_bus_message_unref(msg)
-
 def bt_disconnect(Bus bus, str path):
     """
     Disconnect Bluetooth device.

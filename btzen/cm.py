@@ -30,17 +30,15 @@ NOTE: Discovery is still required on devices like Raspberry Pi to reconnect
 When starting and running connection manager
 
 1. Register Bluetooth agent.
-2. Start discovery (it seems to be still required on devices like Raspberry
-   Pi in order to reconnect disconnected devices).
-3. Create connection manager object on D-Bus event bus and register UUIDs
+2. Create connection manager object on D-Bus event bus and register UUIDs
    of services of devices to be managed by the connection manager.
-4. For each device
-4.1. Remove device preemptively to allow new connection.
-4.2. Use `ConnectDevice` method of adapter interface to connect to the
+3. For each device
+3.1. Remove device preemptively to allow new connection.
+3.2. Use `ConnectDevice` method of adapter interface to connect to the
      device. If fails, then move to 4.1 above.
-4.3. Wait for `ServicesResolved` property to be changed.
-4.3.1. If the property is set to true enable Bluetooth device.
-4.3.2. If the property is set to false, then disable Bluetooth device.
+3.3. Wait for `ServicesResolved` property to be changed.
+3.3.1. If the property is set to true enable Bluetooth device.
+3.3.2. If the property is set to false, then disable Bluetooth device.
 
 When connection manager is closed
 
@@ -127,7 +125,6 @@ class ConnectionManager:
         path = FMT_PATH_ADAPTER(self._interface)
 
         yield from _cm.bt_register_agent(bus.system_bus).__await__()
-        yield from _cm.bt_start_discovery(bus.system_bus, path).__await__()
 
         # TODO: if bluez daemon is restarted, the connection manager needs
         # to be reinitialized
