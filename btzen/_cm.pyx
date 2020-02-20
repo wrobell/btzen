@@ -196,20 +196,23 @@ async def bt_connect(Bus bus, str path, str address, str address_type):
     buff_addr = address.encode()
     buff_addr_type = address_type.encode()
 
+    cdef sd_bus_slot *slot = NULL
     cdef sd_bus_message *msg = NULL
     cdef unsigned char *addr_data = buff_addr
     cdef unsigned char *addr_type_data = buff_addr_type
 
     task = asyncio.get_event_loop().create_future()
+
+    r = sd_bus_message_new_method_call(
+        bus.bus,
+        &msg,
+        'org.bluez',
+        path.encode(),
+        'org.bluez.Adapter1',
+        'ConnectDevice'
+    )
+
     try:
-        r = sd_bus_message_new_method_call(
-            bus.bus,
-            &msg,
-            'org.bluez',
-            path.encode(),
-            'org.bluez.Adapter1',
-            'ConnectDevice'
-        )
         _sd_bus.check_call('bt connect call prepare {}'.format(path), r)
 
         r = sd_bus_message_append(
@@ -219,12 +222,15 @@ async def bt_connect(Bus bus, str path, str address, str address_type):
         )
         _sd_bus.check_call('bt connect call args {}'.format(path), r)
 
-        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb, <void*>task, 0)
+        r = sd_bus_call_async(bus.bus, &slot, msg, task_cb, <void*>task, 0)
         _sd_bus.check_call('bt connect call {}'.format(path), r)
-
-        return (await task)
     finally:
         sd_bus_message_unref(msg)
+
+    try:
+        return (await task)
+    finally:
+        sd_bus_slot_unref(slot)
 
 async def bt_start_discovery(Bus bus, str path):
     """
