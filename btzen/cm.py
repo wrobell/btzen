@@ -173,12 +173,12 @@ class ConnectionManager:
         """
         bus = self._get_bus()
         enable = partial(self._enable, mac, devices)
-        cn_clear = self._connected[mac].clear
+        disable = partial(self._disable, mac, devices)
         cn_set = self._connected[mac].set
 
         # the `ServicesResolved` property monitoring is started by a
         # caller, so just wait for the service to be resolved
-        async for _ in self._resolve_services(mac):
+        async for _ in self._resolve_services(mac, devices):
             try:
                 logger.info('enabling device {}'.format(mac))
                 await enable()
@@ -189,17 +189,22 @@ class ConnectionManager:
                 )
                 if __debug__:
                     logger.exception('error when enabling %s', mac)
-                cn_clear()
+
+                # disable devices; while a device itself might be
+                # disconneted, we might need to release d-bus related
+                # resources
+                disable()
             else:
                 cn_set()
 
-    async def _resolve_services(self, mac):
+    async def _resolve_services(self, mac, devices):
         """
         Asynchronous generator waiting for a Bluetooth device to be
         resolved.
         """
         bus = self._get_bus()
-        cn_clear = self._connected[mac].clear
+        disable = partial(self._disable, mac, devices)
+
         while self._process:
             logger.info(
                 'device {} waiting for services resolved status change'
@@ -211,7 +216,10 @@ class ConnectionManager:
             if resolved:
                 yield
             else:
-                cn_clear()
+                # disable devices; while a device itself might be
+                # disconneted, we might need to release d-bus related
+                # resources
+                disable()
 
     async def _enable(self, mac, devices):
         # NOTE: some devices might deadlock when trying to enable multiple
@@ -230,6 +238,13 @@ class ConnectionManager:
                 break
             except asyncio.TimeoutError as ex:
                 logger.exception('enabling device %s failed due to timeout', mac)
+
+    def _disable(self, mac, devices):
+        self._connected[mac].clear()
+        # no exception checks as the disable methods should not raise
+        # exceptions on failure
+        for dev in devices:
+            dev.disable()
 
     async def _connect_dev(self, bus, mac, adapter_path, address_type):
         # connect to a device

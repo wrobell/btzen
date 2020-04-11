@@ -56,6 +56,7 @@ cdef class PropertyNotification:
     def __init__(self, path):
         self.queues = {}
         self.path = path
+        self.slot = NULL
 
     def register(self, name):
         assert name not in self.queues
@@ -75,17 +76,27 @@ cdef class PropertyNotification:
         assert self.slot is not NULL
         return (await self.queues[name].get())
 
-    def size(self, name) -> int:
+    def size(self, name: str) -> int:
         return self.queues[name].qsize()
 
     def stop(self):
+        names = list(self.queues)
         self.queues.clear()
-        sd_bus_slot_unref(self.slot)
+        if self.slot is not NULL:
+            sd_bus_slot_unref(self.slot)
+            self.slot = NULL
 
-cdef fmt_rule(iface, path):
+        logger.info(
+            'notifications for path {} stopped, names: {}'.format(
+            self.path, ', '.join(names)
+        ))
+
+cdef str fmt_rule(str iface, str path):
+    assert path is not None
+
     rule = FMT_RULE.format(path, iface)
     rule = rule.strip().replace('\n', '')
-    return rule.encode()
+    return rule
 
 cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
     cdef object task = <object>user_data
@@ -97,6 +108,7 @@ cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_er
 
 async def bt_read(Bus bus, str path):
     assert bus is not None
+    assert path is not None
 
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_slot *slot = NULL
@@ -152,6 +164,7 @@ async def bt_write(Bus bus, str path, bytes data):
     :param data: Data to write.
     """
     assert bus is not None
+    assert path is not None
 
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_slot *slot = NULL
@@ -200,6 +213,7 @@ def bt_write_sync(Bus bus, str path, bytes data):
     :param data: Data to write.
     """
     assert bus is not None
+    assert path is not None
 
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_message *ret_msg = NULL
@@ -262,6 +276,8 @@ def bt_property_monitor_start(Bus bus, str path, str iface):
     :param iface: Device interface.
     """
     assert bus is not None
+    assert path is not None
+    assert iface is not None
 
     cdef sd_bus_slot *slot
 
@@ -271,7 +287,7 @@ def bt_property_monitor_start(Bus bus, str path, str iface):
     r = sd_bus_add_match(
         bus.bus,
         &slot,
-        rule,
+        rule.encode(),
         task_cb_property_monitor,
         <void*>data
     )
@@ -283,6 +299,10 @@ def bt_property_monitor_start(Bus bus, str path, str iface):
 
 async def bt_property(Bus bus, str path, str iface, str name, str type):
     assert bus is not None
+    assert path is not None
+    assert iface is not None
+    assert name is not None
+    assert type is not None
 
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
@@ -318,6 +338,7 @@ def bt_notify_start(Bus bus, str path):
     :param path: GATT characteristics path of the device.
     """
     assert bus is not None
+    assert path is not None
 
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
@@ -350,6 +371,7 @@ def bt_notify_stop(Bus bus, str path):
     :param path: GATT characteristics path of the device.
     """
     assert bus is not None
+    assert path is not None
 
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL
@@ -388,6 +410,8 @@ def bt_characteristic(Bus bus, str prefix, str uuid):
     UUID.
     """
     assert bus is not None
+    assert prefix is not None
+    assert uuid is not None
 
     cdef sd_bus_message *msg = NULL
     cdef sd_bus_error error = SD_BUS_ERROR_NULL

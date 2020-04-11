@@ -25,6 +25,7 @@ See also
     https://www.bluetooth.com/specifications/gatt/characteristics
 """
 
+import asyncio
 import enum
 import logging
 import typing as tp
@@ -115,7 +116,7 @@ class Device:
         self._bus = None
         self._cm = None
         self._task = None
-        self._read_data = None
+        self._is_disabled = False
 
     async def enable(self):
         """
@@ -130,11 +131,25 @@ class Device:
         """
         Read data from Bluetooth device.
         """
-        await self._cm.connected(self.mac)
-        self._task = self._read_data()
-        data = await self._task
-        self._task = None
-        return self.get_value(data)
+        while True:
+            await self._cm.connected(self.mac)
+            assert self._task is None
+            self._task = asyncio.create_task(self._read_data())
+            try:
+                data = await self._task
+                return self.get_value(data)
+            except asyncio.CancelledError as ex:
+                if self._is_disabled:
+                    continue
+                raise
+            finally:
+                self._task = None
+
+    async def _read_data(self):
+        """
+        Low-level method to read data from Bluetooth device.
+        """
+        raise NotImplementedError('Read data method is not implemented')
 
     def get_value(self, data):
         """
@@ -144,15 +159,31 @@ class Device:
         """
         return data
 
+    def disable(self):
+        """
+        Disable Bluetooth device.
+
+        If a Bluetooth device is disconnected, then disable method shall be
+        called to release any resources held by the device.
+        """
+        self._is_disabled = True
+        if self._task is not None:
+            self._task.cancel()
+
+        self._task = None
+
+        logger.info('device {} disabled'.format(self))
+
     def close(self):
         """
         Disable device and stop reading its data.
 
         Pending, asynchronous coroutines are closed.
         """
+        self.disable()
         task = self._task
         if task is not None:
-            task.close()
+            task.cancel()
             self._task = None
 
         logger.info('device {} closed'.format(self))
@@ -174,20 +205,27 @@ class DeviceInterface(Device):
             'name': self.info.property,
             'iface': self.info.interface,
         }
-        self._read_data = None
 
     async def enable(self):
         logger.info('enabling device: {}'.format(self))
-        read_notify = partial(self._bus._dev_property_get, **self._params)
-        read = partial(self._bus._property, **self._params, type=self.info.type)
-        self._read_data = read_notify if self.notifying else read
         if self.notifying:
             self._bus._dev_property_start(**self._params)
 
-    def close(self):
+    async def _read_data(self):
         if self.notifying:
-            self._bus._dev_property_stop(**self._params)
-        super().close()
+            task = self._bus._property(**self._params, type=self.info.type)
+        else:
+            task = self._bus._dev_property_get(**self._params)
+        return (await task)
+
+    def disable(self):
+        if self.notifying:
+            try:
+                self._bus._dev_property_stop(**self._params)
+            except Exception as ex:
+                logger.warning('cannot stop notifications: {}'.format(ex))
+
+        super().disable()
 
 class DeviceCharacteristic(Device):
     """
@@ -195,39 +233,35 @@ class DeviceCharacteristic(Device):
     """
     info: InfoCharacteristic
 
-    def __init__(self, mac, notifying=False):
-        super().__init__(mac, notifying=notifying)
-
-        self._path_data = None
-
     async def enable(self):
         logger.info('enabling device: {}'.format(self))
-        notify = self.notifying
-
-        self._path_data = path = self._get_path(self.info.uuid_data)
-
-        read = partial(_btzen.bt_read, self._bus.system_bus, path)
-        read_notify = partial(self._bus._gatt_get, path)
-        self._read_data = read_notify if notify else read
 
         await self._configure()
-
-        if notify:
+        if self.notifying:
+            path = self._get_path(self.info.uuid_data)
             self._bus._gatt_start(path)
 
         logger.info('enabled device: {}'.format(self))
 
-    def close(self):
+    def disable(self):
         if self.notifying:
             try:
-                self._bus._gatt_stop(self._path_data)
+                path = self._get_path(self.info.uuid_data)
+                self._bus._gatt_stop(path)
             except Exception as ex:
                 logger.warning('cannot stop notifications: {}'.format(ex))
-
-        super().close()
+        super().disable()
 
     async def _configure(self):
         return None
+
+    async def _read_data(self):
+        path = self._get_path(self.info.uuid_data)
+        if self.notifying:
+            task = self._bus._gatt_get(path)
+        else:
+            task = _btzen.bt_read(self._bus.system_bus, path)
+        return (await task)
 
     def _get_path(self, uuid):
         return self._bus.characteristic_path(self.mac, uuid)
@@ -282,7 +316,8 @@ class DeviceEnvSensing(DeviceCharacteristic):
     async def _configure(self):
         info = self.info
 
-        self._path_conf = self._get_path(info.uuid_conf)
+        if info.uuid_conf is not None:
+            self._path_conf = self._get_path(info.uuid_conf)
         self._path_trigger = self._get_path(info.uuid_trigger)
 
         config_on = info.config_on_notify if self.notifying else info.config_on
@@ -301,7 +336,7 @@ class DeviceEnvSensing(DeviceCharacteristic):
         else:
             logger.warning('setting trigger for {} not supported'.format(self))
 
-    def _trigger_data(self, trigger: 'Trigger') -> bytes:
+    def _trigger_data(self, trigger: 'Trigger') -> tp.Optional[bytes]:
         """
         Convert Bluetooth Environmental Sensing device trigger information
         into raw data.

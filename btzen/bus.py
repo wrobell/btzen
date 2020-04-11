@@ -124,15 +124,14 @@ class Notifications:
 
     def start(self, path, iface, name):
         key = path, iface
-        data = self._data.get(key)
-        if data is None:
-            bus = self._bus.system_bus
-            data = _btzen.bt_property_monitor_start(bus, path, iface)
-            self._data[key] = data
+        bus = self._bus.system_bus
+
+        assert key not in self._data
+        data = _btzen.bt_property_monitor_start(bus, path, iface)
+        self._data[key] = data
 
         assert key in self._data
-        if not data.is_registered(name):
-            data.register(name)
+        data.register(name)
 
     def size(self, path, iface, name):
         key = path, iface
@@ -147,6 +146,9 @@ class Notifications:
         # TODO: add name and call PropertyNotification.stop when no
         # properties monitored
         key = path, iface
-        data = self._data[key].stop()
+        self._data[key].stop()
+        del self._data[key]
+
+        assert key not in self._data
 
 # vim: sw=4:et:ai

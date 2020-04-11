@@ -74,7 +74,8 @@ class DeviceThingy52EnvSensing(DeviceEnvSensing):
     # (mac address)
     CONFIG = {}
 
-    def __init__(self, mac, notifying=True):
+    def __init__(self, mac, notifying=False):
+        assert notifying, 'non-notifying thingy52 device not supported yet'
         super().__init__(mac, notifying=notifying)
 
         DeviceThingy52EnvSensing.CONFIG[mac] = Config()
@@ -173,6 +174,7 @@ class ConnectionParameters(DeviceThingy52Configuration):
             slave_latency,
             supervision_timeout,
         )
-        await _btzen.bt_write(system_bus, self._path_data, data)
+        path = self._get_path(self.info.uuid_data)
+        await _btzen.bt_write(system_bus, path, data)
 
 # vim: sw=4:et:ai
