@@ -20,6 +20,7 @@
 import asyncio
 import contextvars
 import logging
+import typing as tp
 from functools import partial
 
 from . import _btzen
@@ -31,11 +32,11 @@ logger = logging.getLogger(__name__)
 INTERFACE_DEVICE = 'org.bluez.Device1'
 INTERFACE_GATT_CHR = 'org.bluez.GattCharacteristic1'
 
-def _mac_to_path(mac):
+def _mac_to_path(mac: str) -> str:
     return mac.replace(':', '_').upper()
 
 class Bus:
-    bus = contextvars.ContextVar('bus', default=None)
+    bus = contextvars.ContextVar[tp.Optional['Bus']]('bus', default=None)
 
     def __init__(self, system_bus, interface):
         self.system_bus = system_bus

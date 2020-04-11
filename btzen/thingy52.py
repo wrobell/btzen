@@ -72,7 +72,8 @@ class DeviceThingy52EnvSensing(DeviceEnvSensing):
 
     # NOTE: the configuration is shared by all sensors per given device
     # (mac address)
-    CONFIG = {}
+    CONFIG: tp.Dict[str, Config] = {}
+    config_attr: str
 
     def __init__(self, mac, notifying=False):
         assert notifying, 'non-notifying thingy52 device not supported yet'
@@ -86,8 +87,8 @@ class DeviceThingy52EnvSensing(DeviceEnvSensing):
 
         # replace configuration for given thingy52 device
         mac = self.mac
-        data = {self.config_attr: trigger.operand}
-        config = replace(DeviceThingy52EnvSensing.CONFIG[self.mac], **data)
+        params = {self.config_attr: trigger.operand}
+        config = replace(DeviceThingy52EnvSensing.CONFIG[self.mac], **params)
         DeviceThingy52EnvSensing.CONFIG[mac] = config
         logger.info('thingy52 configuration: {}'.format(config))
 

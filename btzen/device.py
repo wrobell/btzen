@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 # function to convert 16-bit UUID to full 128-bit Bluetooth normative UUID
 # string
-to_uuid = '0000{:04x}-0000-1000-8000-00805f9b34fb'.format
+to_uuid: tp.Callable[[int], str] = '0000{:04x}-0000-1000-8000-00805f9b34fb'.format
 
 @dataclass(frozen=True)
 class Info:
