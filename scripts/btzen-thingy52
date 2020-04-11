@@ -75,7 +75,7 @@ uvloop.install()
 loop = asyncio.get_event_loop()
 
 # initialize all Thingy52 sensors
-items = [(name, cls(args.device)) for name, cls in SENSORS]
+items = [(name, cls(args.device, notifying=True)) for name, cls in SENSORS]
 sensors =  [sensor for _, sensor in items]
 for s in sensors:
     s.set_interval(args.interval)
@@ -83,7 +83,7 @@ for s in sensors:
 # create tasks reading the sensor data
 tasks = [read_sensor(name, sensor) for name, sensor in items]
 
-battery = btzen.BatteryLevel(args.device)
+battery = btzen.BatteryLevel(args.device, notifying=True)
 tasks.append(battery_level(battery))
 
 # create connection manager
