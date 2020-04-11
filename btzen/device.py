@@ -233,21 +233,25 @@ class DeviceCharacteristic(Device):
     """
     info: InfoCharacteristic
 
+    def __init__(self, mac, *, notifying=False):
+        super().__init__(mac, notifying=notifying)
+
+        self._path_data = None
+
     async def enable(self):
         logger.info('enabling device: {}'.format(self))
+        self._path_data = self._get_path(self.info.uuid_data)
 
         await self._configure()
         if self.notifying:
-            path = self._get_path(self.info.uuid_data)
-            self._bus._gatt_start(path)
+            self._bus._gatt_start(self._path_data)
 
         logger.info('enabled device: {}'.format(self))
 
     def disable(self):
         if self.notifying:
             try:
-                path = self._get_path(self.info.uuid_data)
-                self._bus._gatt_stop(path)
+                self._bus._gatt_stop(self._path_data)
             except Exception as ex:
                 logger.warning('cannot stop notifications: {}'.format(ex))
         super().disable()
@@ -256,11 +260,10 @@ class DeviceCharacteristic(Device):
         return None
 
     async def _read_data(self):
-        path = self._get_path(self.info.uuid_data)
         if self.notifying:
-            task = self._bus._gatt_get(path)
+            task = self._bus._gatt_get(self._path_data)
         else:
-            task = _btzen.bt_read(self._bus.system_bus, path)
+            task = _btzen.bt_read(self._bus.system_bus, self._path_data)
         return (await task)
 
     def _get_path(self, uuid):
