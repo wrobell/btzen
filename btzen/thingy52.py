@@ -76,7 +76,11 @@ class DeviceThingy52EnvSensing(DeviceEnvSensing):
     config_attr: str
 
     def __init__(self, mac, notifying=False):
-        assert notifying, 'non-notifying thingy52 device not supported yet'
+        if not notifying:
+            raise ValueError(
+                'Thingy:52 Bluetooth environmental sensors can be used in'
+                ' notification mode only'
+            )
         super().__init__(mac, notifying=notifying)
 
         DeviceThingy52EnvSensing.CONFIG[mac] = Config()
