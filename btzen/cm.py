@@ -97,13 +97,7 @@ class ConnectionManager:
 
         adapter_path = FMT_PATH_ADAPTER(self._interface)
         for mac in self._devices:
-            dev_path = bus.dev_path(mac)
-
-            _cm.bt_disconnect(bus.system_bus, dev_path)
-            logger.info('device {} disconnected'.format(mac))
-
-            _cm.bt_remove(bus.system_bus, adapter_path, dev_path)
-            logger.info('device {} removed'.format(mac))
+            self._disconnect(mac)
 
         _cm.bt_unregister_agent(bus.system_bus)
 
@@ -239,13 +233,6 @@ class ConnectionManager:
             except asyncio.TimeoutError as ex:
                 logger.exception('enabling device %s failed due to timeout', mac)
 
-    def _disable(self, mac, devices):
-        self._connected[mac].clear()
-        # no exception checks as the disable methods should not raise
-        # exceptions on failure
-        for dev in devices:
-            dev.disable()
-
     async def _connect_dev(self, bus, mac, adapter_path, address_type):
         # connect to a device
         #
@@ -282,6 +269,26 @@ class ConnectionManager:
                     'preemptive removal of device {} failed: {}'
                     .format(mac, ex)
                 )
+
+    def _disable(self, mac, devices):
+        self._connected[mac].clear()
+        # no exception checks as the disable methods should not raise
+        # exceptions on failure
+        for dev in devices:
+            dev.disable()
+
+    def _disconnect(self, mac: str) -> None:
+        bus = self._get_bus()
+        dev_path = bus.dev_path(mac)
+        adapter_path = FMT_PATH_ADAPTER(self._interface)
+        try:
+            _cm.bt_disconnect(bus.system_bus, dev_path)
+            logger.info('device {} disconnected'.format(mac))
+
+            _cm.bt_remove(bus.system_bus, adapter_path, dev_path)
+            logger.info('device {} removed'.format(mac))
+        except Exception as ex:
+            logger.warning('error when disconnecting {}: {}'.format(mac, ex))
 
     def _get_bus(self):
         return Bus.get_bus(self._interface)
