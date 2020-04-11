@@ -95,13 +95,13 @@ class ConnectionManager:
         for dev in flatten(self._devices.values()):
             dev.close()
 
-        adapter_path = FMT_PATH_ADAPTER(self._interface)
         for mac in self._devices:
             self._disconnect(mac)
 
         _cm.bt_unregister_agent(bus.system_bus)
 
         if self._handle is not None:
+            adapter_path = FMT_PATH_ADAPTER(self._interface)
             _cm.cm_close(bus.system_bus, adapter_path, self._handle)
         logger.info('connection manager closed')
 
