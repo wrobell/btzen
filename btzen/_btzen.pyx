@@ -87,7 +87,7 @@ cdef class PropertyNotification:
             self.slot = NULL
 
         logger.info(
-            'notifications for path {} stopped, names: {}'.format(
+            'notifications for path {} stopped, properties: {}'.format(
             self.path, ', '.join(names)
         ))
 
