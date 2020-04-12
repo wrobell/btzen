@@ -52,6 +52,7 @@ When connection manager is closed
 
 import asyncio
 import logging
+import typing as tp
 from collections import defaultdict
 from functools import partial
 from itertools import chain
@@ -60,6 +61,9 @@ from operator import attrgetter
 from .bus import Bus
 from .device import Device
 from . import _cm
+
+DeviceDict = tp.DefaultDict[str, tp.Set[Device]]
+Devices = tp.Iterable[Device]
 
 flatten = chain.from_iterable
 
@@ -70,7 +74,7 @@ FMT_PATH_ADAPTER = '/org/bluez/{}'.format
 class ConnectionManager:
     def __init__(self, interface='hci0'):
         self._interface = interface
-        self._devices = defaultdict(set)
+        self._devices: DeviceDict = defaultdict(set)
         self._connected = {}
         self._process = False
         self._handle = None
@@ -130,7 +134,7 @@ class ConnectionManager:
         tasks = (f(mac, devs) for mac, devs in self._devices.items())
         yield from asyncio.gather(*tasks).__await__()
 
-    async def _reconnect(self, mac: str, devices):
+    async def _reconnect(self, mac: str, devices: Devices) -> None:
         bus = self._get_bus()
 
         # determine connection address type; this is a hack, we need better
@@ -161,7 +165,7 @@ class ConnectionManager:
         finally:
             bus._dev_property_stop(mac, 'ServicesResolved')
 
-    async def _restart(self, mac, devices):
+    async def _restart(self, mac: str, devices: Devices):
         """
         Re-enable or hold Bluetooth device when property 'ServicesResolved`
         changes.
@@ -192,7 +196,11 @@ class ConnectionManager:
             else:
                 cn_set()
 
-    async def _resolve_services(self, mac: str, devices):
+    async def _resolve_services(
+            self,
+            mac: str,
+            devices: Devices,
+        ) -> tp.AsyncGenerator[None, None]:
         """
         Asynchronous generator waiting for a Bluetooth device to be
         resolved.
@@ -216,7 +224,7 @@ class ConnectionManager:
                 # resources
                 disable()
 
-    async def _enable(self, mac: str, devices):
+    async def _enable(self, mac: str, devices: Devices) -> None:
         # NOTE: some devices might deadlock when trying to enable multiple
         # subsystems, i.e. sensor tag with button and temperature only; use
         # timeout to try to avoid the deadlock
@@ -240,7 +248,7 @@ class ConnectionManager:
             mac: str,
             adapter_path: str,
             address_type: str,
-        ):
+        ) -> bool:
         # connect to a device
         #
         # NOTE: bluez 5.50 - scanning by external programs shall be off or
