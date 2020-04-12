@@ -58,6 +58,7 @@ from itertools import chain
 from operator import attrgetter
 
 from .bus import Bus
+from .device import Device
 from . import _cm
 
 flatten = chain.from_iterable
@@ -76,7 +77,7 @@ class ConnectionManager:
 
         self.enable_timeout = 30
 
-    def add(self, *devices):
+    def add(self, *devices: Device) -> None:
         for dev in devices:
             self._devices[dev.mac].add(dev)
             dev._cm = self
@@ -84,7 +85,7 @@ class ConnectionManager:
         for mac in self._devices:
             self._connected[mac] = asyncio.Event()
 
-    def close(self):
+    def close(self) -> None:
         """
         Close connection manager.
 
@@ -105,7 +106,7 @@ class ConnectionManager:
             _cm.cm_close(bus.system_bus, adapter_path, self._handle)
         logger.info('connection manager closed')
 
-    async def connected(self, mac):
+    async def connected(self, mac: str) -> None:
         if not mac in self._connected:
             raise ValueError(
                 'Device with address {} not managed by the connection manager'
@@ -129,7 +130,7 @@ class ConnectionManager:
         tasks = (f(mac, devs) for mac, devs in self._devices.items())
         yield from asyncio.gather(*tasks).__await__()
 
-    async def _reconnect(self, mac, devices):
+    async def _reconnect(self, mac: str, devices):
         bus = self._get_bus()
 
         # determine connection address type; this is a hack, we need better
@@ -191,7 +192,7 @@ class ConnectionManager:
             else:
                 cn_set()
 
-    async def _resolve_services(self, mac, devices):
+    async def _resolve_services(self, mac: str, devices):
         """
         Asynchronous generator waiting for a Bluetooth device to be
         resolved.
@@ -215,7 +216,7 @@ class ConnectionManager:
                 # resources
                 disable()
 
-    async def _enable(self, mac, devices):
+    async def _enable(self, mac: str, devices):
         # NOTE: some devices might deadlock when trying to enable multiple
         # subsystems, i.e. sensor tag with button and temperature only; use
         # timeout to try to avoid the deadlock
@@ -233,7 +234,13 @@ class ConnectionManager:
             except asyncio.TimeoutError as ex:
                 logger.exception('enabling device %s failed due to timeout', mac)
 
-    async def _connect_dev(self, bus, mac, adapter_path, address_type):
+    async def _connect_dev(
+            self,
+            bus: Bus,
+            mac: str,
+            adapter_path: str,
+            address_type: str,
+        ):
         # connect to a device
         #
         # NOTE: bluez 5.50 - scanning by external programs shall be off or
@@ -259,7 +266,7 @@ class ConnectionManager:
         return connected
 
 
-    async def _preempt_remove_dev(self, bus, mac, adapter_path):
+    async def _preempt_remove_dev(self, bus: Bus, mac: str, adapter_path: str):
         dev_path = bus.dev_path(mac)
         try:
             _cm.bt_remove(bus.system_bus, adapter_path, dev_path)
@@ -270,7 +277,7 @@ class ConnectionManager:
                     .format(mac, ex)
                 )
 
-    def _disable(self, mac, devices):
+    def _disable(self, mac: str, devices) -> None:
         self._connected[mac].clear()
         # no exception checks as the disable methods should not raise
         # exceptions on failure
@@ -290,7 +297,7 @@ class ConnectionManager:
         except Exception as ex:
             logger.warning('error when disconnecting {}: {}'.format(mac, ex))
 
-    def _get_bus(self):
+    def _get_bus(self) -> Bus:
         return Bus.get_bus(self._interface)
 
 # vim: sw=4:et:ai
