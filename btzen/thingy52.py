@@ -41,6 +41,7 @@ from .util import to_int
 logger = logging.getLogger(__name__)
 
 CONFIG_DATA_FMT = struct.Struct('<HHHHBBBB')
+SENSOR_COLOR_FMT = struct.Struct('<HHHH')
 
 # function to convert 16-bit UUID to full 128-bit Thingy:52 UUID
 to_uuid = 'ef68{:04x}-9b35-4933-9b10-52ffa9740042'.format
@@ -63,6 +64,13 @@ class Config:
     gas: int = 1
     # color sensor LED calibration (RGB value)
     rgb: tp.Tuple[int, int, int] = (0, 255, 0)
+
+@dataclass(frozen=True)
+class LightColor:
+    red: int
+    blue: int
+    green: int
+    clear: int
 
 class DeviceThingy52EnvSensing(DeviceEnvSensing):
     """
@@ -151,6 +159,21 @@ class Humidity(DeviceThingy52EnvSensing):
 
     def get_value(self, data):
         return data[0]
+
+class Light(DeviceThingy52EnvSensing):
+    """
+    Thingy:52 Bluetooth device humidity sensor.
+    """
+    info = InfoEnvSensing(
+        to_uuid(0x0200),
+        to_uuid(0x0205),
+        8,
+        uuid_trigger=to_uuid(0x0206),
+    )
+    config_attr = 'color'
+
+    def get_value(self, data):
+        return LightColor(*SENSOR_COLOR_FMT.unpack(data))
 
 class DeviceThingy52Configuration(DeviceCharacteristic):
     """

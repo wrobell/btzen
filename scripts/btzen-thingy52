@@ -30,7 +30,10 @@ import btzen.thingy52
 async def read_sensor(name, sensor):
     while True:
         value = await sensor.read()
-        print_data(name, '{:.1f}'.format(value))
+        if isinstance(value, (float, int)):
+            print_data(name, '{:.1f}'.format(value))
+        else:
+            print_data(name, '{}'.format(value))
 
 async def battery_level(battery):
     while True:
@@ -49,6 +52,7 @@ SENSORS = [
     ('pressure', btzen.thingy52.Pressure),
     ('temperature', btzen.thingy52.Temperature),
     ('humidity', btzen.thingy52.Humidity),
+    ('light', btzen.thingy52.Light),
 ]
 
 parser = argparse.ArgumentParser()
