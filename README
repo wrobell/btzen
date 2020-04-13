@@ -72,6 +72,19 @@ Please note
 - if a device is disconnected with an external program, the external program
   has to be used to reconnect
 
+Bluetooth Connection Parameters
+===============================
+The following connection parameters might need to be set for a HCI
+subsystem in `/sys/kernel/debug/bluetooth` directory
+
+`conn_min_interval`, `conn_max_interval`
+    Set the parameters to low value (i.e. `6`) if reading data frequently
+    (i.e. once per second) and/or from multiple devices.
+
+`supervision_timeout`
+    Keep default, low value. Low supervision timeout allows BTZen
+    connection manager to immediately disable a disconnected device.
+
 Obtaining MAC Address
 =====================
 If Bluetooth device MAC address is not known
@@ -102,7 +115,7 @@ Requirements
 ============
 BTZen library requires the following software components
 
-- Python 3.7
+- Python 3.8
 - bluez 5.52
 - `sd-bus` (part of `systemd`)
 - Cython 0.29
