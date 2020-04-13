@@ -86,14 +86,10 @@ cdef int cm_property(
 
     uuids = set(dev.info.service for dev in flatten(cm._devices.values()))
     size = len(uuids) + 1
-
-    for u in sorted(uuids):
-        logger.info('register reconnection for service: {}'.format(u))
-
     cdef char **arr = <char**>malloc(size * sizeof(char*))
 
-    items = (u.encode() for u in uuids)
-    for i, u in enumerate(items):
+    for i, u in enumerate(sorted(uuids)):
+        logger.info('register reconnection for service: {}'.format(u))
         arr[i] = u
     arr[size - 1] = NULL
 
