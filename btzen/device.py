@@ -116,7 +116,7 @@ class Device:
         self._bus = None
         self._cm = None
         self._task = None
-        self._is_disabled = False
+        self._is_closed = False
 
     async def enable(self):
         """
@@ -139,7 +139,7 @@ class Device:
                 data = await self._task
                 return self.get_value(data)
             except asyncio.CancelledError as ex:
-                if self._is_disabled:
+                if not self._is_closed:
                     continue
                 raise
             finally:
@@ -166,12 +166,10 @@ class Device:
         If a Bluetooth device is disconnected, then disable method shall be
         called to release any resources held by the device.
         """
-        self._is_disabled = True
         if self._task is not None:
             self._task.cancel()
 
         self._task = None
-
         logger.info('device {} disabled'.format(self))
 
     def close(self):
@@ -180,12 +178,8 @@ class Device:
 
         Pending, asynchronous coroutines are closed.
         """
+        self._is_closed = True
         self.disable()
-        task = self._task
-        if task is not None:
-            task.cancel()
-            self._task = None
-
         logger.info('device {} closed'.format(self))
 
     def __repr__(self):
@@ -254,6 +248,7 @@ class DeviceCharacteristic(Device):
                 self._bus._gatt_stop(self._path_data)
             except Exception as ex:
                 logger.warning('cannot stop notifications: {}'.format(ex))
+
         super().disable()
 
     async def _configure(self):
