@@ -320,12 +320,10 @@ class DeviceEnvSensing(DeviceCharacteristic):
     async def _configure(self):
         info = self.info
 
-        if info.uuid_conf is not None:
-            self._path_conf = self._get_path(info.uuid_conf)
-        self._path_trigger = self._get_path(info.uuid_trigger)
-
         config_on = info.config_on_notify if self.notifying else info.config_on
         if config_on:
+            self._path_conf = self._get_path(info.uuid_conf)
+
             if __debug__:
                 logger.debug(
                     'writing {} configuration data to {}'
@@ -333,7 +331,7 @@ class DeviceEnvSensing(DeviceCharacteristic):
                 )
             await self._write(self._path_conf, config_on)
 
-        path = self._path_trigger
+        path = self._path_trigger = self._get_path(info.uuid_trigger)
         data = self._trigger_data(self._trigger)
         if path is not None and data is not None:
             await self._write(path, data)

@@ -56,7 +56,7 @@ async def read_accelerometer(name, sensor):
 async def read_button(name, button):
     while True:
         async with read_data(button) as value:
-            value = await button.read()
+            print('button', value)
 
 async def battery_level(battery):
     while True:
