@@ -22,18 +22,26 @@ import argparse
 import asyncio
 import logging
 import uvloop
+from contextlib import asynccontextmanager
 from datetime import datetime
 
 import btzen
 import btzen.sensortag
 
-async def read_sensor(name, sensor):
+@asynccontextmanager
+async def read_data(dev):
     while True:
         try:
-            value = await sensor.read()
+            value = await dev.read()
         except asyncio.CancelledError:
-            print('{}: cancelled'.format(sensor))
+            print('{}: cancelled'.format(dev))
         else:
+            yield value
+            break
+
+async def read_sensor(name, sensor):
+    while True:
+        async with read_data(sensor) as value:
             print_data(name, '{:.1f}'.format(value))
 
         await asyncio.sleep(-loop.time() % 1)
@@ -41,30 +49,18 @@ async def read_sensor(name, sensor):
 async def read_accelerometer(name, sensor):
     sensor.set_interval(0.1)
     while True:
-        try:
-            values = await sensor.read()
-        except asyncio.CancelledError:
-            print('{}: cancelled'.format(sensor))
-        else:
+        async with read_data(sensor) as values:
             values = ', '.join('{:.4f}'.format(v) for v in values)
             print_data(name, values)
 
 async def read_button(name, button):
     while True:
-        try:
+        async with read_data(button) as value:
             value = await button.read()
-        except asyncio.CancelledError:
-            print('{}: cancelled'.format(button))
-        else:
-            print_data(name, value)
 
 async def battery_level(battery):
     while True:
-        try:
-            value = await battery.read()
-        except asyncio.CancelledError:
-            print('{}: cancelled'.format(battery))
-        else:
+        async with read_data(battery) as value:
             print_data('battery level', value)
 
         await asyncio.sleep(60)
