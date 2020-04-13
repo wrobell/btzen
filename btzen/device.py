@@ -34,6 +34,7 @@ from functools import partial
 
 from . import _btzen
 from .bus import Bus
+from .error import CallError
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +117,6 @@ class Device:
         self._bus = None
         self._cm = None
         self._task = None
-        self._is_closed = False
 
     async def enable(self):
         """
@@ -127,23 +127,30 @@ class Device:
         """
         raise NotImplementedError('Enable method is not implemented')
 
-    async def read(self):
+    async def read(self) -> tp.Any:
         """
         Read data from Bluetooth device.
+
+        The coroutine can raise cancellation error (`asyncio.CancelledError`),
+        i.e. when the device is disconnected. The caller should handle the
+        error, if it wants to continue reading data when the device is
+        reconnected.
         """
-        while True:
-            await self._cm.connected(self.mac)
-            assert self._task is None
-            self._task = asyncio.create_task(self._read_data())
-            try:
-                data = await self._task
-                return self.get_value(data)
-            except asyncio.CancelledError as ex:
-                if not self._is_closed:
-                    continue
-                raise
-            finally:
-                self._task = None
+        await self._cm.connected(self.mac)
+
+        if self._task is not None:
+            raise CallError('device {} is still executing'.format(self))
+
+        self._task = asyncio.create_task(self._read_data())
+        try:
+            data = await self._task
+        except asyncio.CancelledError as ex:
+            logger.info('{} cancelled'.format(self))
+            raise
+        else:
+            return self.get_value(data)
+        finally:
+            self._task = None
 
     async def _read_data(self):
         """
@@ -178,7 +185,6 @@ class Device:
 
         Pending, asynchronous coroutines are closed.
         """
-        self._is_closed = True
         self.disable()
         logger.info('device {} closed'.format(self))
 
