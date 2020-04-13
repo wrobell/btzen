@@ -60,7 +60,7 @@ from operator import attrgetter
 
 from .bus import Bus
 from .device import Device
-from . import _cm
+from . import _cm  # type: ignore
 
 DeviceDict = tp.DefaultDict[str, tp.Set[Device]]
 Devices = tp.Iterable[Device]

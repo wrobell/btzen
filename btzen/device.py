@@ -32,7 +32,7 @@ import typing as tp
 from dataclasses import dataclass
 from functools import partial
 
-from . import _btzen
+from . import _btzen  # type: ignore
 from .bus import Bus
 from .error import CallError
 

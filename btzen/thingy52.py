@@ -33,7 +33,7 @@ import struct
 import typing as tp
 from dataclasses import dataclass, replace
 
-from . import _btzen
+from . import _btzen  # type: ignore
 from .device import InfoCharacteristic, InfoEnvSensing, DeviceEnvSensing, \
     DeviceCharacteristic, Trigger, TriggerCondition
 from .util import to_int

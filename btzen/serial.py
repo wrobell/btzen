@@ -32,7 +32,7 @@ import logging
 from binascii import hexlify
 from functools import partial
 
-from . import _btzen
+from . import _btzen  # type: ignore
 from .bus import Bus
 from .device import Device, Info, to_uuid
 from .util import contextmanager

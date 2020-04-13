@@ -23,8 +23,8 @@ import logging
 import typing as tp
 from functools import partial
 
-from . import _btzen
-from . import _sd_bus
+from . import _btzen  # type: ignore
+from . import _sd_bus  # type: ignore
 from .error import ConnectionError
 
 logger = logging.getLogger(__name__)
