@@ -210,12 +210,13 @@ class DeviceInterface(Device):
         logger.info('enabling device: {}'.format(self))
         if self.notifying:
             self._bus._dev_property_start(**self._params)
+        logger.info('enabled device: {}'.format(self))
 
     async def _read_data(self):
         if self.notifying:
-            task = self._bus._property(**self._params, type=self.info.type)
-        else:
             task = self._bus._dev_property_get(**self._params)
+        else:
+            task = self._bus._property(**self._params, type=self.info.type)
         return (await task)
 
     def disable(self):
