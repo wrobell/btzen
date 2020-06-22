@@ -77,13 +77,21 @@ Bluetooth Connection Parameters
 The following connection parameters might need to be set for a HCI
 subsystem in `/sys/kernel/debug/bluetooth` directory
 
-`conn_min_interval`, `conn_max_interval`
-    Set the parameters to low value (i.e. `6`) if reading data frequently
-    (i.e. once per second) and/or from multiple devices.
-
+`conn_min_interval`
+    Set the parameter to a low value (i.e. `6` or 7.25 ms) if reading data
+    frequently (i.e. once per second) and/or from multiple devices.
+`conn_max_interval`
+    Set the parameter to a value to allow transmitting data without your
+    application timeout. Consider sequential reads, i.e. reading data from
+    multiple Sensor Tag device sensors and parallel reads, i.e. reading
+    data from two Sensor Tag devices.
 `supervision_timeout`
-    Keep default, low value. Low supervision timeout allows BTZen
-    connection manager to immediately disable a disconnected device.
+    Set the parameter to as low value as possible to allow BTZen connection
+    manager to disable disconnected device as soon as possible. It needs to
+    be high enough to avoid disabling devices, which are affected by an
+    interference (this includes high load on host device or running
+    Bluetooh NAP server on the same Bluetooh device). Value of 100
+    or 1000 ms seems to be a good compromise.
 
 Obtaining MAC Address
 =====================
