@@ -238,6 +238,31 @@ async def bt_connect(Bus bus, str path, str address, str address_type):
     finally:
         sd_bus_slot_unref(slot)
 
+def bt_device_set_trusted(Bus bus, str path):
+    """
+    Set Bluetooth device to be seen as trusted.
+
+    :param bus: D-Bus reference.
+    :param path: D-Bus device path.
+    """
+    cdef sd_bus_error error = SD_BUS_ERROR_NULL
+
+    try:
+        r = sd_bus_set_property(
+            bus.bus,
+            'org.bluez',
+            path.encode(),
+            'org.bluez.Device1',
+            'Trusted',
+            &error,
+            'b',
+            1,
+            NULL
+        );
+        _sd_bus.check_call('trust device', r)
+    finally:
+        sd_bus_error_free(&error);
+
 def bt_disconnect(Bus bus, str path):
     """
     Disconnect Bluetooth device.
@@ -255,7 +280,7 @@ def bt_disconnect(Bus bus, str path):
             bus.bus,
             'org.bluez',
             path.encode(),
-            "org.bluez.Device1",
+            'org.bluez.Device1',
             'Disconnect',
             &error,
             &msg,

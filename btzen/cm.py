@@ -35,10 +35,11 @@ When starting and running connection manager
 3. For each device
 3.1. Remove device preemptively to allow new connection.
 3.2. Use `ConnectDevice` method of adapter interface to connect to the
-     device. If fails, then move to 4.1 above.
-3.3. Wait for `ServicesResolved` property to be changed.
-3.3.1. If the property is set to true enable Bluetooth device.
-3.3.2. If the property is set to false, then disable Bluetooth device.
+     device. If fails, then move to 3.1 above.
+3.3. Set the device to be seen as trusted.
+3.4. Wait for `ServicesResolved` property to be changed.
+3.4.1. If the property is set to true enable Bluetooth device.
+3.4.2. If the property is set to false, then disable Bluetooth device.
 
 When connection manager is closed
 
@@ -170,7 +171,6 @@ class ConnectionManager:
         Re-enable or hold Bluetooth device when property 'ServicesResolved`
         changes.
         """
-        bus = self._get_bus()
         enable = partial(self._enable, mac, devices)
         disable = partial(self._disable, mac, devices)
         cn_set = self._connected[mac].set
@@ -254,6 +254,7 @@ class ConnectionManager:
         # NOTE: bluez 5.50 - scanning by external programs shall be off or
         # we will never connect
         connected = False
+        dev_path = bus.dev_path(mac)
         try:
             logger.info(
                 'connect device {} via controller {}, address type {}'
@@ -270,6 +271,7 @@ class ConnectionManager:
                 )
                 await asyncio.sleep(1)
         else:
+            _cm.bt_device_set_trusted(bus.system_bus, dev_path)
             connected = True
         return connected
 

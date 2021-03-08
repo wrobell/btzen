@@ -60,6 +60,7 @@ cdef extern from "<systemd/sd-bus.h>":
     int sd_bus_message_open_container(sd_bus_message*, char, const char*)
     int sd_bus_message_close_container(sd_bus_message*)
 
+    int sd_bus_set_property(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, const char*, ...)
     int sd_bus_get_property(sd_bus*, const char*, const char*, const char*, const char*, sd_bus_error*, sd_bus_message**, const char*)
 
     const sd_bus_error *sd_bus_message_get_error(sd_bus_message*)
