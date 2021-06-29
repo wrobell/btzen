@@ -157,7 +157,7 @@ class ConnectionManager:
         # registry, then it might interfere with establishing of new
         # connection
         connected = False
-        while not connected:
+        while not connected and self._process:
             await self._preempt_remove_dev(bus, mac, adapter_path)
             connected = await self._connect_dev(bus, mac, adapter_path, address_type)
 
@@ -181,6 +181,8 @@ class ConnectionManager:
             try:
                 logger.info('enabling device {}'.format(mac))
                 await enable()
+            except asyncio.CancelledError as ex:
+                raise
             except Exception as ex:
                 logger.info(
                     'enabling device %s failed, seems to be not connected',
@@ -261,6 +263,8 @@ class ConnectionManager:
                 .format(mac, adapter_path, address_type)
             )
             await _cm.bt_connect(bus.system_bus, adapter_path, mac, address_type)
+        except asyncio.CancelledError as ex:
+            raise
         except Exception as ex:
             if str(ex) == 'Already Exists':
                 connected = True
@@ -280,6 +284,8 @@ class ConnectionManager:
         dev_path = bus.dev_path(mac)
         try:
             _cm.bt_remove(bus.system_bus, adapter_path, dev_path)
+        except asyncio.CancelledError as ex:
+            raise
         except Exception as ex:
             if __debug__:
                 logger.debug(

@@ -117,6 +117,7 @@ class Device:
         self._bus = None
         self._cm = None
         self._task = None
+        self._cm_task = None
 
     async def enable(self):
         """
@@ -136,7 +137,9 @@ class Device:
         error, if it wants to continue reading data when the device is
         reconnected.
         """
-        await self._cm.connected(self.mac)
+        self._cm_task = asyncio.create_task(self._cm.connected(self.mac))
+        await self._cm_task
+        self._cm_task = None
 
         if self._task is not None:
             raise CallError('device {} is still executing'.format(self))
@@ -175,8 +178,8 @@ class Device:
         """
         if self._task is not None:
             self._task.cancel()
-
         self._task = None
+
         logger.info('device {} disabled'.format(self))
 
     def close(self):
@@ -186,6 +189,11 @@ class Device:
         Pending, asynchronous coroutines are closed.
         """
         self.disable()
+
+        if self._cm_task is not None:
+            self._cm_task.cancel()
+        self._cm_task = None
+
         logger.info('device {} closed'.format(self))
 
     def __repr__(self):
