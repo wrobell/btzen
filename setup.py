@@ -18,51 +18,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 """
 Build setup for the BTZen library.
 """
 
-import ast
-import sys
-from setuptools import setup, find_packages, Extension
-
-VERSION = ast.parse(
-    next(l for l in open('btzen/__init__.py') if l.startswith('__version__'))
-).body[0].value.s
-
-try:
-    from Cython.Build import cythonize
-except:
-    sys.exit(
-        '\ncython is required, please install it with: pip install cython'
-    )
+from setuptools import setup, Extension
+from Cython.Build import cythonize
 
 setup(
-    name='btzen',
-    version=VERSION,
-    author='Artur Wroblewski',
-    author_email='wrobell@riseup.net',
-    url='https://github.com/wrobell/btzen',
-    description='BTZen - library to asynchronously access Bluetooth devices',
-    setup_requires = ['setuptools_git >= 1.0',],
-    classifiers=[
-        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
-        'Development Status :: 3 - Alpha',
-        'Topic :: Software Development :: Libraries',
-    ],
     ext_modules=cythonize([
         Extension('btzen._sd_bus', ['btzen/_sd_bus.pyx'], libraries=['systemd']),
         Extension('btzen._btzen', ['btzen/_btzen.pyx'], libraries=['systemd']),
         Extension('btzen._cm', ['btzen/_cm.pyx'], libraries=['systemd']),
-    ]),
-    packages=find_packages('.'),
-    include_package_data=True,
-    long_description=open('README').read(),
-    long_description_content_type='text/x-rst',
+    ])
 )
 
 # vim: sw=4:et:ai
-

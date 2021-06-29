@@ -17,12 +17,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import pkg_resources
+
 from .btweight import WeightFlags, WeightData, WeightMeasurement
 from .device import BatteryLevel, Device, Info, Trigger, TriggerCondition
 from .cm import ConnectionManager
 from .serial import Serial
 from .error import *
 
-__version__ = '0.5.1'
+__version__ = pkg_resources.get_distribution('btzen').version
 
 # vim: sw=4:et:ai

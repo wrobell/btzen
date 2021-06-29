@@ -2,10 +2,11 @@ dist: xenial
 language: python
 sudo: required
 python:
-  - "3.7-dev"
+  - "3.9-dev"
 install:
   - sudo apt-get -qq update
   - sudo apt-get install -y libsystemd-dev
-  - pip install 'cython>=0.29.4'
+  - pip install build
 script:
+  - pip -m build
   - pip install .
