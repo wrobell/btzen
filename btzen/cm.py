@@ -96,20 +96,24 @@ class ConnectionManager:
 
         All managed devices are closed and disconnected.
         """
-        bus = self._get_bus()
-        self._process = False
-        for dev in flatten(self._devices.values()):
-            dev.close()
+        try:
+            bus = self._get_bus()
+            self._process = False
+            for dev in flatten(self._devices.values()):
+                dev.close()
 
-        for mac in self._devices:
-            self._disconnect(mac)
+            for mac in self._devices:
+                self._disconnect(mac)
 
-        _cm.bt_unregister_agent(bus.system_bus)
+            _cm.bt_unregister_agent(bus.system_bus)
 
-        if self._handle is not None:
-            adapter_path = FMT_PATH_ADAPTER(self._interface)
-            _cm.cm_close(bus.system_bus, adapter_path, self._handle)
-        logger.info('connection manager closed')
+            if self._handle is not None:
+                adapter_path = FMT_PATH_ADAPTER(self._interface)
+                _cm.cm_close(bus.system_bus, adapter_path, self._handle)
+        except Exception as ex:
+            logger.warning('error when closing connection manager: {}'.format(ex))
+        else:
+            logger.info('connection manager closed')
 
     async def connected(self, mac: str) -> None:
         if not mac in self._connected:
