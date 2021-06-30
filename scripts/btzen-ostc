@@ -98,10 +98,45 @@ async def read_data(dev, count):
     finally:
         await stop(dev)
 
+async def run_single(dev, count):
+    """
+    Download dives from a dive computer and exit.
+    """
+    manager = ConnectionManager()
+    manager.add(dev)
+    task_manager = asyncio.create_task(manager.__await__())
+    try:
+        await read_data(dev, count)
+    finally:
+        manager.close()
+        task_manager.cancel()
+
+async def run_loop(dev, count):
+    """
+    Download dives from a dive computer in a loop.
+    """
+    manager = ConnectionManager()
+    manager.add(dev)
+    task_manager = asyncio.create_task(manager.__await__())
+    try:
+        while True:
+            await read_data(dev, count)
+
+            # TODO: we need to wait for dive computer disconnection; let's
+            # figure out better mechanism in the future
+            await asyncio.sleep(10)
+    finally:
+        manager.close()
+        task_manager.cancel()
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     '--verbose', default=False, action='store_true',
     help='show debug log'
+)
+parser.add_argument(
+    '-l', '--loop', action='store_true',
+    help='restart download after dives are downloaded'
 )
 parser.add_argument(
     '-c', '--count', default=20, type=int,
@@ -113,20 +148,9 @@ args = parser.parse_args()
 if args.verbose:
     logging.basicConfig(level=logging.DEBUG)
 
-loop = asyncio.get_event_loop()
+runner = run_loop if args.loop else run_single
 
 dev = Serial(args.device)
-manager = ConnectionManager()
-manager.add(dev)
-
-try:
-    task = asyncio.wait(
-        [manager, read_data(dev, args.count)],
-        return_when=asyncio.FIRST_COMPLETED,
-    )
-    loop.run_until_complete(task)
-finally:
-    # connection manager closes all devices
-    manager.close()
+asyncio.run(runner(dev, args.count))
 
 # vim: sw=4:et:ai
