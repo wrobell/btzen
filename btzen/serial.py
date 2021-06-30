@@ -79,6 +79,11 @@ class Serial(Device):
         value = await self._tx_credit()
         logger.debug('got tx credits on enable: {}'.format(value))
 
+    def disable(self):
+        self._disable_notification(self._tx_credit_path)
+        self._disable_notification(self._tx_uart_path)
+        super().disable()
+
     async def read(self, n):
         await self._cm.connected(self.mac)
         data = bytearray(self._buffer)
@@ -146,5 +151,16 @@ class Serial(Device):
         self._tx_uart_path = None
         self._rx_credit_path = None
         self._rx_uart_path = None
+
+    def _disable_notification(self, path: str) -> None:
+        """
+        Disable notifications.
+        """
+        try:
+            self._bus._gatt_stop(path)
+        except Exception as ex:
+            logger.warning('cannot disable notification for {}: {}'.format(
+                path, ex
+            ))
 
 # vim: sw=4:et:ai
