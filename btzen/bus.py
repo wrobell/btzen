@@ -72,7 +72,12 @@ class Bus:
         # TODO: creates notification session; if another session started,
         # then we get notifications twice; this needs to be fixed
         self._notifications.start(path, INTERFACE_GATT_CHR, 'Value')
-        _btzen.bt_notify_start(self.system_bus, path)
+        try:
+            _btzen.bt_notify_start(self.system_bus, path)
+        except Exception as ex:
+            logger.warning('cannot start notification for {}: {}'.format(path, ex))
+            self._notifications.stop(path, INTERFACE_GATT_CHR)
+            raise
 
     def dev_path(self, mac):
         return '/org/bluez/{}/dev_{}'.format(self.interface, _mac_to_path(mac))
@@ -82,8 +87,12 @@ class Bus:
         return (await task)
 
     def _gatt_stop(self, path):
-        _btzen.bt_notify_stop(self.system_bus, path)
-        self._notifications.stop(path, INTERFACE_GATT_CHR)
+        try:
+            _btzen.bt_notify_stop(self.system_bus, path)
+        except Exception as ex:
+            logger.warning('cannot stop notification for {}: {}'.format(path, ex))
+        finally:
+            self._notifications.stop(path, INTERFACE_GATT_CHR)
 
     def _gatt_size(self, path) -> int:
         return self._notifications.size(path, INTERFACE_GATT_CHR, 'Value')

@@ -104,12 +104,11 @@ async def run_single(dev, count):
     """
     manager = ConnectionManager()
     manager.add(dev)
-    task_manager = asyncio.create_task(manager.__await__())
+    asyncio.create_task(manager.__await__())
     try:
         await read_data(dev, count)
     finally:
         manager.close()
-        task_manager.cancel()
 
 async def run_loop(dev, count):
     """
@@ -117,7 +116,7 @@ async def run_loop(dev, count):
     """
     manager = ConnectionManager()
     manager.add(dev)
-    task_manager = asyncio.create_task(manager.__await__())
+    asyncio.create_task(manager.__await__())
     try:
         while True:
             await read_data(dev, count)
@@ -127,7 +126,6 @@ async def run_loop(dev, count):
             await asyncio.sleep(10)
     finally:
         manager.close()
-        task_manager.cancel()
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

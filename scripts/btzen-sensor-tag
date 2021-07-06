@@ -18,56 +18,77 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+BTZen demo using SensorTag Bluetooth device.
+
+The demo supports reconnection of device.
+"""
+
 import argparse
 import asyncio
 import logging
 import uvloop
-from contextlib import asynccontextmanager
 from datetime import datetime
 
 import btzen
 import btzen.sensortag
 
-@asynccontextmanager
+logger = logging.getLogger()
+
+async def read_sensors(args):
+    # initialize all Sensor Tag sensors
+    items = [
+        (name, reader, cls(args.device, notifying=notifying))
+        for name, cls, notifying, reader in SENSORS
+    ]
+    sensors =  [sensor for _, _, sensor in items]
+
+    # create tasks reading the sensor data
+    tasks = [reader(name, sensor) for name, reader, sensor in items]
+
+    battery = btzen.BatteryLevel(args.device, notifying=True)
+    tasks.append(battery_level(battery))
+
+    # create connection manager
+    manager = btzen.ConnectionManager(interface=args.interface)
+    manager.add(battery, *sensors)
+    try:
+        await asyncio.gather(manager, *tasks)
+    finally:
+        # connection manager closes all sensors
+        manager.close()
+
 async def read_data(dev):
-    while True:
+    while not dev.is_closed:
         try:
             value = await dev.read()
         except asyncio.CancelledError:
-            print('{}: cancelled'.format(dev))
+            logger.info('{}: cancelled'.format(dev))
         else:
             yield value
-            break
 
 async def read_sensor(name, sensor):
-    while True:
-        async with read_data(sensor) as value:
-            print_data(name, '{:.1f}'.format(value))
-
+    loop = asyncio.get_event_loop()
+    async for value in read_data(sensor):
+        print_data(name, '{:.1f}'.format(value))
         await asyncio.sleep(-loop.time() % 1)
 
 async def read_accelerometer(name, sensor):
     sensor.set_interval(0.1)
-    while True:
-        async with read_data(sensor) as values:
-            values = ', '.join('{:.4f}'.format(v) for v in values)
-            print_data(name, values)
+    async for values in read_data(sensor):
+        values = ', '.join('{:.4f}'.format(v) for v in values)
+        print_data(name, values)
 
 async def read_button(name, button):
-    while True:
-        async with read_data(button) as value:
-            print_data('button', value)
+    async for value in read_data(button):
+        print_data('button', value)
 
 async def battery_level(battery):
-    while True:
-        async with read_data(battery) as value:
-            print_data('battery level', value)
-
-        await asyncio.sleep(60)
+    async for value in read_data(battery):
+        print_data('battery level', value)
 
 def print_data(name, value):
     print('{} {}: {}'.format(datetime.now(), name, value))
-
 
 #
 # sensor definitions
@@ -97,31 +118,7 @@ args = parser.parse_args()
 level = logging.DEBUG if args.verbose else logging.INFO
 logging.basicConfig(level=level)
 
-# get the loop first
 uvloop.install()
-loop = asyncio.get_event_loop()
-
-# initialize all Sensor Tag sensors
-items = [
-    (name, reader, cls(args.device, notifying=notifying))
-    for name, cls, notifying, reader in SENSORS
-]
-sensors =  [sensor for _, _, sensor in items]
-
-# create tasks reading the sensor data
-tasks = [reader(name, sensor) for name, reader, sensor in items]
-
-battery = btzen.BatteryLevel(args.device, notifying=True)
-tasks.append(battery_level(battery))
-
-# create connection manager
-manager = btzen.ConnectionManager(interface=args.interface)
-manager.add(battery, *sensors)
-
-try:
-    loop.run_until_complete(asyncio.gather(manager, *tasks))
-finally:
-    # connection manager closes all sensors
-    manager.close()
+asyncio.run(read_sensors(args))
 
 # vim: sw=4:et:ai

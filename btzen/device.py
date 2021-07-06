@@ -107,12 +107,17 @@ class Device:
     """
     Base class for all Bluetooth devices.
 
+    If device is closed, then reading data is no longer possible and
+    CallError exception is raised when data reading is attempted.
+
     :var mac: Address of Bluetooth device.
     :var notifying: Indicates if data is read in notifying mode.
+    :var is_closed: True if device is closed.
     """
     def __init__(self, mac, *, notifying=False):
         self.mac = mac
         self.notifying = notifying
+        self.is_closed = False
 
         self._bus = None
         self._cm = None
@@ -137,6 +142,10 @@ class Device:
         error, if it wants to continue reading data when the device is
         reconnected.
         """
+        if self.is_closed:
+            raise CallError('device {} already closed'.format(self))
+
+        # wait for connection
         self._cm_task = asyncio.create_task(self._cm.connected(self.mac))
         await self._cm_task
         self._cm_task = None
@@ -188,6 +197,8 @@ class Device:
 
         Pending, asynchronous coroutines are closed.
         """
+        self.is_closed = True
+
         self.disable()
 
         if self._cm_task is not None:
@@ -197,7 +208,9 @@ class Device:
         logger.info('device {} closed'.format(self))
 
     def __repr__(self):
-        return '{}/{}'.format(self.mac, self.__class__.__name__)
+        return '{}/{}, closed={}'.format(
+            self.mac, self.__class__.__name__, self.is_closed
+        )
 
 class DeviceInterface(Device):
     """
@@ -221,6 +234,10 @@ class DeviceInterface(Device):
         logger.info('enabled device: {}'.format(self))
 
     async def _read_data(self):
+        # this coroutine is executed as task, so check if device is closed
+        if self.is_closed:
+            raise asyncio.CancelledError('device {} already closed'.format(self))
+
         if self.notifying:
             task = self._bus._dev_property_get(**self._params)
         else:
@@ -270,6 +287,10 @@ class DeviceCharacteristic(Device):
         return None
 
     async def _read_data(self):
+        # this coroutine is executed as task, so check if device is closed
+        if self.is_closed:
+            raise asyncio.CancelledError('device {} already closed'.format(self))
+
         if self.notifying:
             task = self._bus._gatt_get(self._path_data)
         else:

@@ -80,6 +80,8 @@ class ConnectionManager:
         self._process = False
         self._handle = None
 
+        self._connection_tasks = []
+
         self.enable_timeout = 30
 
     def add(self, *devices: Device) -> None:
@@ -114,6 +116,9 @@ class ConnectionManager:
             logger.warning('error when closing connection manager: {}'.format(ex))
         else:
             logger.info('connection manager closed')
+        finally:
+            for t in self._connection_tasks:
+                t.cancel()
 
     async def connected(self, mac: str) -> None:
         if not mac in self._connected:
@@ -123,7 +128,7 @@ class ConnectionManager:
             )
         await self._connected[mac].wait()
 
-    def __await__(self):
+    def __await__(self) -> tp.Generator:
         self._process = True
         bus = self._get_bus()
         path = FMT_PATH_ADAPTER(self._interface)
@@ -135,9 +140,11 @@ class ConnectionManager:
         handle = yield from _cm.cm_init(bus.system_bus, path, self).__await__()
         self._handle = handle
 
-        f = self._reconnect
-        tasks = (f(mac, devs) for mac, devs in self._devices.items())
-        yield from asyncio.gather(*tasks).__await__()
+        self._connection_tasks = [
+            asyncio.create_task(self._reconnect(mac, devs))
+            for mac, devs in self._devices.items()
+        ]
+        yield from asyncio.gather(*self._connection_tasks).__await__()
 
     async def _reconnect(self, mac: str, devices: Devices) -> None:
         bus = self._get_bus()
@@ -186,6 +193,7 @@ class ConnectionManager:
                 logger.info('enabling device {}'.format(mac))
                 await enable()
             except asyncio.CancelledError as ex:
+                logger.info('restart loop cancelled for {}'.format(mac))
                 raise
             except Exception as ex:
                 logger.info(
@@ -268,6 +276,7 @@ class ConnectionManager:
             )
             await _cm.bt_connect(bus.system_bus, adapter_path, mac, address_type)
         except asyncio.CancelledError as ex:
+            logger.info('connection attempt cancelled for {}'.format(mac))
             raise
         except Exception as ex:
             if str(ex) == 'Already Exists':
@@ -289,6 +298,7 @@ class ConnectionManager:
         try:
             _cm.bt_remove(bus.system_bus, adapter_path, dev_path)
         except asyncio.CancelledError as ex:
+            logger.info('pre-emptive removal of device cancelled for {}'.format(mac))
             raise
         except Exception as ex:
             if __debug__:
