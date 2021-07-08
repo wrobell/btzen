@@ -74,6 +74,8 @@ cdef extern from "<systemd/sd-bus.h>":
     int sd_bus_message_get_type(sd_bus_message*, unsigned char*)
     int sd_bus_message_peek_type(sd_bus_message*, char*, const char**)
 
+    int sd_bus_error_get_errno(sd_bus_error*)
+
     int sd_bus_add_match(sd_bus*, sd_bus_slot**, const char*, sd_bus_message_handler_t, void*)
 
     sd_bus *sd_bus_unref(sd_bus*)

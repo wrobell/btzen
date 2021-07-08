@@ -20,9 +20,7 @@
 # distutils: language = c
 # cython: c_string_type=unicode, c_string_encoding=utf8, language_level=3str
 
-from libc.stdio cimport perror
 from libc.string cimport strerror
-from libc.errno cimport errno
 
 import asyncio
 import logging
