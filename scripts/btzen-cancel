@@ -138,7 +138,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '-t', '--timeout', default=0.001, type=float,
-    help='task timeout'
+    help='Sensor read timeout'
 )
 parser.add_argument(
     '-i', '--interface', default='hci0',
