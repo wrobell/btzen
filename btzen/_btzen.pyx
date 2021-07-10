@@ -143,6 +143,11 @@ async def bt_read(Bus bus, str path):
         logger.info('bt read task cancelled: {}'.format(ex))
         raise
     finally:
+        # this cancels call on sd-bus side, but not on d-bus server side,
+        # it seems; next call can still fail with ENOBUFS if max reply
+        # limit is reached server side; call timeout, passed to
+        # sd_bus_call_async, cleans cancelled call server side; this means
+        # timeout and buffer space errors need to be handled properly
         sd_bus_slot_unref(slot)
 
 cdef int task_cb_write(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
