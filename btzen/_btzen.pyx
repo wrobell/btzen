@@ -31,7 +31,7 @@ from .error import *
 
 logger = logging.getLogger(__name__)
 
-FMT_RULE = """
+DEF FMT_RULE = """
 type='signal',
 sender='org.bluez',
 interface='org.freedesktop.DBus.Properties',
@@ -39,6 +39,8 @@ member='PropertiesChanged',
 path='{}',
 arg0='{}'
 """
+
+DEF DEFAULT_WRITE_TIMEOUT = 10 * 1000 ** 2  # 20 seconds
 
 cdef class PropertyNotification:
     """
@@ -130,15 +132,15 @@ async def bt_read(Bus bus, str path):
         r = sd_bus_message_close_container(msg)
         _sd_bus.check_call('bt read close container for {}'.format(path), r)
 
-        r = sd_bus_call_async(bus.bus, &slot, msg, task_cb_read, <void*>task, 0)
+        r = sd_bus_call_async(bus.bus, &slot, msg, task_cb_read, <void*>task, 1000000)
         _sd_bus.check_call('bt read call async for {}'.format(path), r)
     finally:
         sd_bus_message_unref(msg)
 
     try:
         return (await task)
-    except asyncio.CancelledError:
-        logger.info('bt read task cancelled')
+    except asyncio.CancelledError as ex:
+        logger.info('bt read task cancelled: {}'.format(ex))
         raise
     finally:
         sd_bus_slot_unref(slot)
@@ -189,15 +191,15 @@ async def bt_write(Bus bus, str path, bytes data):
         r = sd_bus_message_close_container(msg)
         _sd_bus.check_call('bt write close container for {}'.format(path), r)
 
-        r = sd_bus_call_async(bus.bus, &slot, msg, task_cb_write, <void*>task, 0)
+        r = sd_bus_call_async(bus.bus, &slot, msg, task_cb_write, <void*>task, DEFAULT_WRITE_TIMEOUT)
         _sd_bus.check_call('bt write call async for {}'.format(path), r)
     finally:
         sd_bus_message_unref(msg)
 
     try:
         return (await task)
-    except asyncio.CancelledError:
-        logger.info('bt write task cancelled')
+    except asyncio.CancelledError as ex:
+        logger.info('bt write task cancelled: '.format(ex))
         raise
     finally:
         sd_bus_slot_unref(slot)

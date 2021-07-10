@@ -19,7 +19,7 @@
 # distutils: language = c
 # cython: c_string_type=unicode, c_string_encoding=utf8, language_level=3str
 
-from libc.errno cimport ENOBUFS
+from libc.errno cimport ENOBUFS, ETIMEDOUT
 from libc.string cimport strerror
 from libc.stdint cimport uint8_t
 from cpython.bytes cimport PyBytes_FromStringAndSize
@@ -32,7 +32,9 @@ from .error import *
 
 logger = logging.getLogger(__name__)
 
-ERROR_HINTS = {
+CANCEL_ERROR = {
+    ENOBUFS: 'No buffer space, call cancelled ({})'.format,
+    ETIMEDOUT: 'Timeout, call cancelled ({})'.format,
 }
 
 cdef class Bus:
@@ -57,15 +59,14 @@ def check_call(msg_err, code):
     """
     Raise call error if a D-Bus call has failed.
     """
-    if code == ENOBUFS:
-        raise asyncio.CancelledError(
-            'No buffer space, call cancelled ({})'.format(code)
-        )
-    elif code < 0:
+    error_code = -code
+    if error_code in CANCEL_ERROR:
+        fmt = CANCEL_ERROR[error_code]
+        raise asyncio.CancelledError(fmt(error_code))
+    elif error_code > 0:
         msg_err = 'Call failed - {}: {} ({})'.format(
-            msg_err, strerror(-code), code
+            msg_err, strerror(error_code), error_code
         )
-        logger.debug('got error code {}: '.format(code, strerror(-code)))
         raise CallError(msg_err)
 
 #
@@ -92,23 +93,21 @@ def task_handle_message(BusMessage bus_msg, task, cls_err, value_type: str):
     :param value_type: Type of value to be read from D-Bus message.
     """
     cdef const sd_bus_error *error = sd_bus_message_get_error(bus_msg.c_obj)
-    cdef int code
+    cdef int error_code
 
     if task.done():
         return 0
     elif error:
-        code = sd_bus_error_get_errno(error)
+        error_code = sd_bus_error_get_errno(error)
 
-        if code == ENOBUFS:
-            ex = asyncio.CancelledError(
-                'No buffer space, call cancelled ({})'.format(code)
-            )
+        if error_code in CANCEL_ERROR:
+            fmt = CANCEL_ERROR[error_code]
+            task.cancel(msg=fmt(error_code))
         elif error.message:
-            ex = cls_err(error.message)
+            task.set_exception(cls_err(error.message))
         else:
-            ex = cls_err('Unknown error')
+            task.set_exception(cls_err('Unknown error'))
 
-        task.set_exception(ex)
     elif value_type is None:
         task.set_result(None)
     else:
