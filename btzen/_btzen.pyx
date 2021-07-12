@@ -20,6 +20,7 @@
 # distutils: language = c
 # cython: c_string_type=unicode, c_string_encoding=utf8, language_level=3str
 
+from libc.stdint cimport uint64_t
 from libc.string cimport strerror
 
 import asyncio
@@ -39,8 +40,6 @@ member='PropertiesChanged',
 path='{}',
 arg0='{}'
 """
-
-DEF DEFAULT_WRITE_TIMEOUT = 10 * 1000 ** 2  # 20 seconds
 
 cdef class PropertyNotification:
     """
@@ -106,7 +105,14 @@ cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_er
 
     return _sd_bus.task_handle_message(bus_msg, task, DataReadError, 'ay')
 
-async def bt_read(Bus bus, str path):
+async def bt_read(Bus bus, str path, uint64_t timeout):
+    """
+    Read data from Bluetooth device.
+
+    :param bus: D-Bus reference.
+    :param path: GATT characteristics path of the device.
+    :param timeout: Call timeout in microseconds.
+    """
     assert bus is not None
     assert path is not None
 
@@ -132,7 +138,9 @@ async def bt_read(Bus bus, str path):
         r = sd_bus_message_close_container(msg)
         _sd_bus.check_call('bt read close container for {}'.format(path), r)
 
-        r = sd_bus_call_async(bus.bus, &slot, msg, task_cb_read, <void*>task, 1000000)
+        r = sd_bus_call_async(
+            bus.bus, &slot, msg, task_cb_read, <void*>task, timeout
+        )
         _sd_bus.check_call('bt read call async for {}'.format(path), r)
     finally:
         sd_bus_message_unref(msg)
@@ -160,13 +168,14 @@ cdef int task_cb_write(sd_bus_message *msg, void *user_data, sd_bus_error *ret_e
 
     return _sd_bus.task_handle_message(bus_msg, task, DataWriteError, None)
 
-async def bt_write(Bus bus, str path, bytes data):
+async def bt_write(Bus bus, str path, bytes data, uint64_t timeout):
     """
     Write data to Bluetooth device.
 
     :param bus: D-Bus reference.
     :param path: GATT characteristics path of the device.
     :param data: Data to write.
+    :param timeout: Call timeout in microseconds.
     """
     assert bus is not None
     assert path is not None
@@ -196,7 +205,9 @@ async def bt_write(Bus bus, str path, bytes data):
         r = sd_bus_message_close_container(msg)
         _sd_bus.check_call('bt write close container for {}'.format(path), r)
 
-        r = sd_bus_call_async(bus.bus, &slot, msg, task_cb_write, <void*>task, DEFAULT_WRITE_TIMEOUT)
+        r = sd_bus_call_async(
+            bus.bus, &slot, msg, task_cb_write, <void*>task, timeout
+        )
         _sd_bus.check_call('bt write call async for {}'.format(path), r)
     finally:
         sd_bus_message_unref(msg)

@@ -103,16 +103,14 @@ def task_handle_message(BusMessage bus_msg, task, cls_err, value_type: str):
         if error_code in CANCEL_ERROR:
             fmt = CANCEL_ERROR[error_code]
             task.cancel(msg=fmt(error_code))
-        elif error.message:
-            task.set_exception(cls_err(error.message))
         else:
-            task.set_exception(cls_err('Unknown error'))
-
+            task.set_exception(cls_err(strerror(error_code)))
     elif value_type is None:
         task.set_result(None)
     else:
         value = msg_read_value(bus_msg, value_type)
         task.set_result(value)
+
     return 0
 
 @contextmanager

@@ -60,6 +60,7 @@ from itertools import chain
 from operator import attrgetter
 
 from .bus import Bus
+from .config import DEFAULT_DBUS_TIMEOUT
 from .device import Device
 from . import _cm  # type: ignore
 
@@ -79,6 +80,7 @@ class ConnectionManager:
         self._connected = {}
         self._process = False
         self._handle = None
+        self._dbus_timeout = DEFAULT_DBUS_TIMEOUT
 
         self._connection_tasks = []
 
@@ -133,7 +135,9 @@ class ConnectionManager:
         bus = self._get_bus()
         path = FMT_PATH_ADAPTER(self._interface)
 
-        yield from _cm.bt_register_agent(bus.system_bus).__await__()
+        yield from _cm.bt_register_agent(
+            bus.system_bus, self._dbus_timeout
+        ).__await__()
 
         # TODO: if bluez daemon is restarted, the connection manager needs
         # to be reinitialized
@@ -193,8 +197,12 @@ class ConnectionManager:
                 logger.info('enabling device {}'.format(mac))
                 await enable()
             except asyncio.CancelledError as ex:
-                logger.info('restart loop cancelled for {}'.format(mac))
-                raise
+                logger.info(
+                    'enabling device %s failed, seems to be not connected',
+                    mac
+                )
+                if not self._process:
+                    raise
             except Exception as ex:
                 logger.info(
                     'enabling device %s failed, seems to be not connected',
@@ -274,24 +282,33 @@ class ConnectionManager:
                 'connect device {} via controller {}, address type {}'
                 .format(mac, adapter_path, address_type)
             )
-            await _cm.bt_connect(bus.system_bus, adapter_path, mac, address_type)
+            await _cm.bt_connect(
+                bus.system_bus, adapter_path, mac, address_type,
+                self._dbus_timeout
+            )
         except asyncio.CancelledError as ex:
-            logger.info('connection attempt cancelled for {}'.format(mac))
-            raise
+            if self._process:
+                await self._handle_connection_error(mac, ex)
+            else:
+                logger.info('connection attempt cancelled for {}'.format(mac))
+                raise
         except Exception as ex:
             if str(ex) == 'Already Exists':
                 connected = True
             else:
-                logger.info(
-                    'connection for {} failed: {}, sleep for 1s'
-                    .format(mac, ex)
-                )
-                await asyncio.sleep(1)
+                await self._handle_connection_error(mac, ex)
         else:
             _cm.bt_device_set_trusted(bus.system_bus, dev_path)
             connected = True
         return connected
 
+    async def _handle_connection_error(self, mac, ex: BaseException) -> None:
+        sleep = int(self._dbus_timeout / 1e6)
+        logger.info(
+            'connection for {} failed: {}, sleep for {}s'
+            .format(mac, ex, sleep)
+        )
+        await asyncio.sleep(sleep)
 
     async def _preempt_remove_dev(self, bus: Bus, mac: str, adapter_path: str):
         dev_path = bus.dev_path(mac)

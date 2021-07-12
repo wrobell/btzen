@@ -24,6 +24,7 @@
 Bluetooth connection management.
 """
 
+from libc.stdint cimport uint64_t
 from libc.stdlib cimport malloc, free
 
 import asyncio
@@ -188,7 +189,9 @@ cdef int task_cb(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) 
 
     return _sd_bus.task_handle_message(bus_msg, task, ConnectionError, None)
 
-async def bt_connect(Bus bus, str path, str address, str address_type):
+async def bt_connect(
+        Bus bus, str path, str address, str address_type, uint64_t timeout
+    ):
     """
     Connect to Bluetooth device.
 
@@ -196,6 +199,7 @@ async def bt_connect(Bus bus, str path, str address, str address_type):
     :param path: D-Bus adapter path.
     :param address: Bluetooth device address.
     :param address_type: Bluetooth device address type (public or random).
+    :param timeout: Call timeout in microseconds.
     """
     assert bus is not None
 
@@ -228,7 +232,9 @@ async def bt_connect(Bus bus, str path, str address, str address_type):
         )
         _sd_bus.check_call('bt connect call args {}'.format(path), r)
 
-        r = sd_bus_call_async(bus.bus, &slot, msg, task_cb, <void*>task, 0)
+        r = sd_bus_call_async(
+            bus.bus, &slot, msg, task_cb, <void*>task, timeout
+        )
         _sd_bus.check_call('bt connect call {}'.format(path), r)
     finally:
         sd_bus_message_unref(msg)
@@ -325,21 +331,23 @@ def bt_remove(Bus bus, str adapter, str device):
         sd_bus_error_free(&error);
         sd_bus_message_unref(msg);
 
-async def bt_register_agent(Bus bus):
+async def bt_register_agent(Bus bus, uint64_t timeout):
     """
     Register pairing agent for BTZen library.
 
     :param bus: D-Bus reference.
+    :param timeout: Call timeout in microseconds.
     """
     assert bus is not None
-    await _bt_agent_register_agent(bus)
-    await _bt_agent_request_default_agent(bus)
+    await _bt_agent_register_agent(bus, timeout)
+    await _bt_agent_request_default_agent(bus, timeout)
 
-async def _bt_agent_register_agent(Bus bus):
+async def _bt_agent_register_agent(Bus bus, uint64_t timeout):
     """
     Register auto pair Bluetooth agent.
 
     :param bus: D-Bus reference.
+    :param timeout: Call timeout in microseconds.
     """
     assert bus is not None
     cdef sd_bus_message *msg = NULL
@@ -359,18 +367,21 @@ async def _bt_agent_register_agent(Bus bus):
         r = sd_bus_message_append(msg, 'os', '/org/btzen/Agent', 'NoInputNoOutput')
         _sd_bus.check_call('agent registration params', r)
 
-        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb, <void*>task, 0)
+        r = sd_bus_call_async(
+            bus.bus, NULL, msg, task_cb, <void*>task, timeout
+        )
         _sd_bus.check_call('agent registration call', r)
 
         return (await task)
     finally:
         sd_bus_message_unref(msg)
 
-async def _bt_agent_request_default_agent(Bus bus):
+async def _bt_agent_request_default_agent(Bus bus, uint64_t timeout):
     """
     Request Bluetooth default agent.
 
     :param bus: D-Bus reference.
+    :param timeout: Call timeout in microseconds.
     """
     assert bus is not None
     cdef sd_bus_message *msg = NULL
@@ -391,7 +402,9 @@ async def _bt_agent_request_default_agent(Bus bus):
         r = sd_bus_message_append(msg, 'o', '/org/btzen/Agent')
         _sd_bus.check_call('agent registration params', r)
 
-        r = sd_bus_call_async(bus.bus, NULL, msg, task_cb, <void*>task, 0)
+        r = sd_bus_call_async(
+            bus.bus, NULL, msg, task_cb, <void*>task, timeout
+        )
         _sd_bus.check_call('agent registration call', r)
 
         return (await task)

@@ -34,6 +34,7 @@ from functools import partial
 
 from . import _btzen  # type: ignore
 from .bus import Bus
+from .config import DEFAULT_DBUS_TIMEOUT
 from .error import CallError
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,8 @@ class Device:
         self._cm = None
         self._task = None
         self._cm_task = None
+
+        self._dbus_timeout = DEFAULT_DBUS_TIMEOUT
 
     async def enable(self):
         """
@@ -294,7 +297,9 @@ class DeviceCharacteristic(Device):
         if self.notifying:
             task = self._bus._gatt_get(self._path_data)
         else:
-            task = _btzen.bt_read(self._bus.system_bus, self._path_data)
+            task = _btzen.bt_read(
+                self._bus.system_bus, self._path_data, self._dbus_timeout
+            )
         return (await task)
 
     def _get_path(self, uuid):
@@ -378,7 +383,9 @@ class DeviceEnvSensing(DeviceCharacteristic):
         return None
 
     async def _write(self, path: str, data: bytes) -> None:
-        await _btzen.bt_write(self._bus.system_bus, path, data)
+        await _btzen.bt_write(
+            self._bus.system_bus, path, data, self._dbus_timeout
+        )
 
 
 class BatteryLevel(DeviceInterface):
