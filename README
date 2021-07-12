@@ -109,8 +109,8 @@ Requirements
 ============
 BTZen library requires the following software components
 
-- Python 3.8
-- bluez 5.56
+- Python 3.9
+- bluez 5.60
 - `sd-bus` (part of `systemd`)
 - Cython 0.29
 

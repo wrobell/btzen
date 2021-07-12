@@ -109,6 +109,10 @@ class ConnectionManager:
             for mac in self._devices:
                 self._disconnect(mac)
 
+            # wake up any device waiting for connection
+            for mac in self._devices:
+                self._connected[mac].set()
+
             _cm.bt_unregister_agent(bus.system_bus)
 
             if self._handle is not None:
@@ -314,10 +318,7 @@ class ConnectionManager:
         dev_path = bus.dev_path(mac)
         try:
             _cm.bt_remove(bus.system_bus, adapter_path, dev_path)
-        except asyncio.CancelledError as ex:
-            logger.info('pre-emptive removal of device cancelled for {}'.format(mac))
-            raise
-        except Exception as ex:
+        except (Exception, asyncio.CancelledError) as ex:
             if __debug__:
                 logger.debug(
                     'preemptive removal of device {} failed: {}'

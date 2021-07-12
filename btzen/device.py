@@ -123,7 +123,6 @@ class Device:
         self._bus = None
         self._cm = None
         self._task = None
-        self._cm_task = None
 
         self._dbus_timeout = DEFAULT_DBUS_TIMEOUT
 
@@ -149,20 +148,13 @@ class Device:
             raise CallError('device {} already closed'.format(self))
 
         # wait for connection
-        self._cm_task = asyncio.create_task(self._cm.connected(self.mac))
-        await self._cm_task
-        self._cm_task = None
+        await self._cm.connected(self.mac)
+        if self.is_closed:
+            return
 
-        if self._task is not None:
-            raise CallError('device {} is still executing'.format(self))
-
-        self._task = asyncio.create_task(self._read_data())
+        self._task = asyncio.ensure_future(self._read_data())
         try:
             data = await self._task
-        except asyncio.CancelledError as ex:
-            logger.info('{} cancelled'.format(self))
-            raise
-        else:
             return self.get_value(data)
         finally:
             self._task = None
@@ -189,7 +181,7 @@ class Device:
         called to release any resources held by the device.
         """
         if self._task is not None:
-            self._task.cancel()
+            self._task.cancel('disable')
         self._task = None
 
         logger.info('device {} disabled'.format(self))
@@ -201,13 +193,7 @@ class Device:
         Pending, asynchronous coroutines are closed.
         """
         self.is_closed = True
-
         self.disable()
-
-        if self._cm_task is not None:
-            self._cm_task.cancel()
-        self._cm_task = None
-
         logger.info('device {} closed'.format(self))
 
     def __repr__(self):
@@ -237,10 +223,6 @@ class DeviceInterface(Device):
         logger.info('enabled device: {}'.format(self))
 
     async def _read_data(self):
-        # this coroutine is executed as task, so check if device is closed
-        if self.is_closed:
-            raise asyncio.CancelledError('device {} already closed'.format(self))
-
         if self.notifying:
             task = self._bus._dev_property_get(**self._params)
         else:
@@ -290,10 +272,6 @@ class DeviceCharacteristic(Device):
         return None
 
     async def _read_data(self):
-        # this coroutine is executed as task, so check if device is closed
-        if self.is_closed:
-            raise asyncio.CancelledError('device {} already closed'.format(self))
-
         if self.notifying:
             task = self._bus._gatt_get(self._path_data)
         else:

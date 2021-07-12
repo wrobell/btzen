@@ -62,8 +62,8 @@ async def read_data(dev):
     while not dev.is_closed:
         try:
             value = await dev.read()
-        except asyncio.CancelledError:
-            logger.info('{}: cancelled'.format(dev))
+        except asyncio.CancelledError as ex:
+            logger.info('{}: {}'.format(dev, ex))
         else:
             yield value
 

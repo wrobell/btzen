@@ -19,11 +19,12 @@
 # distutils: language = c
 # cython: c_string_type=unicode, c_string_encoding=utf8, language_level=3str
 
-from libc.errno cimport ENOBUFS, ETIMEDOUT
+from libc.errno cimport ENOBUFS, ETIMEDOUT, EIO
 from libc.string cimport strerror
 from libc.stdint cimport uint8_t
 from cpython.bytes cimport PyBytes_FromStringAndSize
 
+import asyncio
 import logging
 from contextlib import contextmanager
 
@@ -35,6 +36,7 @@ logger = logging.getLogger(__name__)
 CANCEL_ERROR = {
     ENOBUFS: 'No buffer space, call cancelled ({})'.format,
     ETIMEDOUT: 'Timeout, call cancelled ({})'.format,
+    EIO: 'Input/output error, call cancelled ({})'.format,
 }
 
 cdef class Bus:
