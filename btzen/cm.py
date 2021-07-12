@@ -205,7 +205,9 @@ class ConnectionManager:
                     'enabling device %s failed, seems to be not connected',
                     mac
                 )
-                if not self._process:
+                if self._process:
+                    disable()
+                else:
                     raise
             except Exception as ex:
                 logger.info(
