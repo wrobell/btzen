@@ -30,9 +30,14 @@ parser.add_argument(
     '--verbose', default=False, action='store_true',
     help='show debug log'
 )
-parser.add_argument('service', help='Bluetooth service UUID')
 parser.add_argument(
-    'devices', nargs='+',
+    '-s', '--service',
+    # TODO: use btzen.Battery.service
+    default='0000180f-0000-1000-8000-00805f9b34f',
+    help='Bluetooth service UUID'
+)
+parser.add_argument(
+    'device', nargs='+',
     help='List of MAC addresses of devices to connect'
 )
 args = parser.parse_args()
@@ -40,25 +45,14 @@ args = parser.parse_args()
 level = logging.DEBUG if args.verbose else logging.INFO
 logging.basicConfig(level=level)
 
-class Device(btzen.Device):
-    info = btzen.Info(args.service)
+async def connect_devices(service: str, devices: list[str]) -> None:
+    async with btzen.connect():
+        items = [btzen.ndevice(mac, btzen.Info(service)) for mac in devices]
+        while True:
+            await asyncio.sleep(5)
 
-    async def enable(self): pass
-
-# get the loop first
 uvloop.install()
-loop = asyncio.get_event_loop()
 
-devices = (Device(mac) for mac in args.devices)
-
-# create connection manager
-manager = btzen.ConnectionManager()
-manager.add(*devices)
-
-try:
-    loop.run_until_complete(manager)
-finally:
-    # connection manager closes all devices
-    manager.close()
+asyncio.run(connect_devices(args.service, args.device))
 
 # vim: sw=4:et:ai

@@ -79,6 +79,9 @@ class Bus:
             self._notifications.stop(path, INTERFACE_GATT_CHR)
             raise
 
+    def adapter_path(self):
+        return '/org/bluez/{}'.format(self.interface)
+
     def dev_path(self, mac):
         return '/org/bluez/{}/dev_{}'.format(self.interface, _mac_to_path(mac))
 

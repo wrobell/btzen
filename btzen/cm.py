@@ -55,6 +55,8 @@ import asyncio
 import logging
 import typing as tp
 from collections import defaultdict
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from functools import partial
 from itertools import chain
 from operator import attrgetter
@@ -70,6 +72,9 @@ Devices = tp.Iterable[Device]
 flatten = chain.from_iterable
 
 logger = logging.getLogger(__name__)
+
+CM_NOTIFICATION = ContextVar[asyncio.Queue]('CM_NOTIFICATION')
+CM_STOP = ContextVar[bool]('CM_STOP')
 
 FMT_PATH_ADAPTER = '/org/bluez/{}'.format
 
@@ -349,5 +354,231 @@ class ConnectionManager:
 
     def _get_bus(self) -> Bus:
         return Bus.get_bus(self._interface)
+
+@asynccontextmanager
+async def connect(*, interface: str='hci0'):
+    bus = Bus.get_bus(interface)
+    adapter_path = bus.adapter_path()
+
+    queue: asyncio.Queue = asyncio.Queue()
+    CM_NOTIFICATION.set(queue)
+
+    CM_STOP.set(False)
+
+    to_uuid = '0000{:04x}-0000-1000-8000-00805f9b34fb'.format
+    #to_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
+
+    _dbus_timeout = DEFAULT_DBUS_TIMEOUT
+    await _cm.bt_register_agent(bus.system_bus, _dbus_timeout)
+
+    # TODO: if bluez daemon is restarted, the connection manager needs
+    # to be reinitialized
+    services = {to_uuid(0x180f)}
+    #services = {to_uuid(0xaa40)}
+    cm_handle = await _cm.cm_init(bus.system_bus, adapter_path, services)
+
+    task_connection = asyncio.create_task(connect_devices(bus, queue))
+    try:
+        yield
+    finally:
+        CM_STOP.set(True)
+        task_connection.cancel()
+
+        disarm(
+            'agent unregistered',
+            'agent failed to unregister',
+            _cm.bt_unregister_agent,
+            bus.system_bus
+        )
+
+        disarm(
+            'connection manager unregistered',
+            'connection manager failed to unregister',
+            _cm.cm_close,
+            bus.system_bus,
+            adapter_path,
+            cm_handle
+        )
+
+        # for each device:
+#       msg = 'device {} disconnected'.format(mac)
+#       warn = 'cannot disconnect device {}'.format(mac)
+#       disarm(msg, warn, _cm.bt_disconnect, bus.system_bus, dev_path)
+#
+#       msg = 'device {} removed'.format(mac)
+#       warn = 'cannot remove device {}'.format(mac)
+#       disarm(msg, warn, _cm.bt_remove, bus.system_bus, adapter_path, dev_path)
+
+async def connect_devices(bus: Bus, queue: asyncio.Queue) -> None:
+    tasks = {}
+    try:
+        while True:
+            mac, device = await queue.get()
+            if mac not in tasks:
+                coro = reconnect_device(bus, mac, device)
+                tasks[mac] = asyncio.create_task(coro)
+    finally:
+        for t in tasks.values():
+            t.cancel()
+
+async def reconnect_device(bus: Bus, mac: str, device) -> None:
+    # determine connection address type; this is a hack, we need better
+    # solution in the future; favour random address type; this is useful
+    # when battery level is used (specifies no address type, so defaults to
+    # "public) and thingy52 sensors (they require "random" address type)
+    address_type = 'random' # if 'random' in address_types else 'public'
+    address_type = 'public' # if 'random' in address_types else 'public'
+
+    # enable monitoring of the `ServicesResolved` property first
+    bus._dev_property_start(mac, 'ServicesResolved')
+
+    # remove connection to a device preemptively; if it exists in bluez
+    # daemon registry, then it might interfere when establishing new
+    # connection
+    created = False
+    while not created:
+        await remove_connection(bus, mac)
+        created = await create_connection(bus, mac, address_type)
+
+    try:
+        await restart_devices(bus, mac)
+    finally:
+        bus._dev_property_stop(mac, 'ServicesResolved')
+        await remove_connection(bus, mac)
+
+# TODO: make real async
+async def remove_connection(bus: Bus, mac: str):
+    disarm(
+        'connection for device {} removed'.format(mac),
+        'preemptive removal of connection failed for device {}'.format(mac),
+        _cm.bt_remove,
+        bus.system_bus,
+        bus.adapter_path(),
+        bus.dev_path(mac)
+    )
+
+async def create_connection(
+        bus: Bus,
+        mac: str,
+        address_type: str,
+    ) -> bool:
+    # create connection to a device
+    #
+    # NOTE: bluez 5.50 - scanning by external programs shall be off or we
+    # will never connect
+
+    _dbus_timeout = DEFAULT_DBUS_TIMEOUT
+
+    created = False
+    dev_path = bus.dev_path(mac)
+    try:
+        logger.info(
+            'connect device {} via controller {}, address type {}'
+            .format(mac, bus.adapter_path(), address_type)
+        )
+        await _cm.bt_connect(
+            bus.system_bus, bus.adapter_path(), mac, address_type,
+            _dbus_timeout
+        )
+#   except asyncio.CancelledError as ex:
+#       if self._process:
+#           await self._handle_connection_error(mac, ex)
+#       else:
+#           logger.info('connection attempt cancelled for {}'.format(mac))
+#           raise
+    except Exception as ex:
+        if str(ex) == 'Already Exists':
+            created = True
+        else:
+#            await self._handle_connection_error(mac, ex)
+            sleep = int(_dbus_timeout / 1e6)
+            logger.info(
+                'connection for {} failed: {}, sleep for {}s'
+                .format(mac, ex, sleep)
+            )
+            await asyncio.sleep(sleep)
+    else:
+        created = True
+
+    if created:
+        _cm.bt_device_set_trusted(bus.system_bus, dev_path)
+    return created
+
+async def restart_devices(bus: Bus, mac: str) -> None: # , devices: Devices) -> None:
+    """
+    Re-enable or hold Bluetooth device when property 'ServicesResolved`
+    changes.
+    """
+#    enable = partial(self._enable, mac, devices)
+#    disable = partial(self._disable, mac, devices)
+#    cn_set = self._connected[mac].set
+
+    # the `ServicesResolved` property monitoring is started by a
+    # caller, so just wait for the service to be resolved
+    async for _ in resolve_services(bus, mac):
+        try:
+            logger.info('enabling device {}'.format(mac))
+            #await enable()
+        except asyncio.CancelledError as ex:
+            logger.info(
+                'enabling device %s failed, seems to be not connected',
+                mac
+            )
+            #if self._process:
+            #    disable()
+            #else:
+            #    raise
+        except Exception as ex:
+            logger.info(
+                'enabling device %s failed, seems to be not connected',
+                mac
+            )
+            if __debug__:
+                logger.exception('error when enabling %s', mac)
+
+            # disable devices; while a device itself might be
+            # disconneted, we might need to release d-bus related
+            # resources
+            #disable()
+        else:
+            pass
+            #cn_set()
+
+async def resolve_services(bus: Bus, mac: str) -> tp.AsyncGenerator[None, None]:
+    """
+    Asynchronous generator waiting for a Bluetooth device to be
+    resolved.
+    """
+    #disable = partial(self._disable, mac, devices)
+
+    while True:
+        logger.info(
+            'device {} waiting for services resolved status change'
+            .format(mac)
+        )
+        resolved = await bus._dev_property_get(mac, 'ServicesResolved')
+        logger.info('device {} services resolved: {}'.format(mac, resolved))
+
+        if resolved:
+            yield
+        else:
+            # disable devices; while a device itself might be
+            # disconneted, we might need to release d-bus related
+            # resources
+            #disable()
+            pass
+
+def disarm(msg: str, warn: str, f: tp.Callable, *args: tp.Any) -> None:
+    try:
+        f(*args)
+    except asyncio.CancelledError as ex:
+        if CM_STOP.get():
+            raise
+        else:
+            logger.warning(warn + ': ' + str(ex))
+    except Exception as ex:
+        logger.warning(warn + ': ' + str(ex))
+    else:
+        logger.info(msg)
 
 # vim: sw=4:et:ai

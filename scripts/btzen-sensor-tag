@@ -28,79 +28,68 @@ import argparse
 import asyncio
 import logging
 import uvloop
+import typing as tp
 from datetime import datetime
 
 import btzen
-import btzen.sensortag
 
 logger = logging.getLogger()
 
-async def read_sensors(args):
-    # initialize all Sensor Tag sensors
-    items = [
-        (name, reader, cls(args.device, notifying=notifying))
-        for name, cls, notifying, reader in SENSORS
-    ]
-    sensors =  [sensor for _, _, sensor in items]
+async def read_sensors(args) -> None:
+    #battery = btzen.BatteryLevel(args.device, notifying=True)
+    #tasks.append(battery_level(battery))
 
-    # create tasks reading the sensor data
-    tasks = [reader(name, sensor) for name, reader, sensor in items]
+    async with btzen.connect(interface=args.interface) as conn:
+        tasks = (
+            reader(name, ctor(make=btzen.Make.SensorTag))
+            for name, ctor, reader in SENSORS
+        )
+        await asyncio.gather(*tasks)
 
-    battery = btzen.BatteryLevel(args.device, notifying=True)
-    tasks.append(battery_level(battery))
-
-    # create connection manager
-    manager = btzen.ConnectionManager(interface=args.interface)
-    manager.add(battery, *sensors)
-    try:
-        await asyncio.gather(manager, *tasks)
-    finally:
-        # connection manager closes all sensors
-        manager.close()
-
-async def read_data(dev):
-    while not dev.is_closed:
+async def read_data(sensor) -> tp.Any:
+    while not bzen.is_closed(sensor):
         try:
-            value = await dev.read()
+            value = await btzen.read(sensor)
         except asyncio.CancelledError as ex:
-            logger.info('{}: {}'.format(dev, ex))
+            # cancelled calls happen on device disconnection
+            logger.info('{}: {}'.format(sensor, ex))
         else:
             yield value
 
-async def read_sensor(name, sensor):
+async def read_sensor(name: str, sensor) -> None:
     loop = asyncio.get_event_loop()
     async for value in read_data(sensor):
         print_data(name, '{:.1f}'.format(value))
         await asyncio.sleep(-loop.time() % 1)
 
-async def read_accelerometer(name, sensor):
+async def read_accelerometer(name: str, sensor) -> None:
     sensor.set_interval(0.1)
     async for values in read_data(sensor):
         values = ', '.join('{:.4f}'.format(v) for v in values)
         print_data(name, values)
 
-async def read_button(name, button):
+async def read_button(name: str, button) -> None:
     async for value in read_data(button):
         print_data('button', value)
 
-async def battery_level(battery):
+async def battery_level(battery) -> None:
     async for value in read_data(battery):
         print_data('battery level', value)
 
-def print_data(name, value):
+def print_data(name: str, value: tp.Union[str, int, float]) -> None:
     print('{} {}: {}'.format(datetime.now(), name, value))
 
 #
 # sensor definitions
 #
 SENSORS = [
-    ('pressure', btzen.sensortag.Pressure, False, read_sensor),
-    ('temperature', btzen.sensortag.Temperature, False, read_sensor),
-    ('humidity', btzen.sensortag.Humidity, False, read_sensor),
-    ('light', btzen.sensortag.Light, False, read_sensor),
-    # notifying readers
-    ('button', btzen.sensortag.Button, True, read_button),
-    ('accelerometer', btzen.sensortag.Accelerometer, True, read_accelerometer),
+    ('pressure', btzen.pressure, read_sensor),
+#    ('temperature', btzen.temperature, read_sensor),
+#    ('humidity', btzen.humidity, read_sensor),
+#    ('light', btzen.light, read_sensor),
+#    # notifying readers
+#    ('button', btzen.button, read_button),
+#    ('accelerometer', btzen.accelerometer, read_accelerometer),
 ]
 
 parser = argparse.ArgumentParser()

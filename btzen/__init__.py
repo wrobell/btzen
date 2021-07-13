@@ -21,9 +21,15 @@ import pkg_resources
 
 from .btweight import WeightFlags, WeightData, WeightMeasurement
 from .device import BatteryLevel, Device, Info, Trigger, TriggerCondition
-from .cm import ConnectionManager
+from .cm import ConnectionManager, connect
 from .serial import Serial
 from .error import *
+
+def ndevice(mac: str, device) -> None:
+    from .cm import CM_NOTIFICATION
+    queue = CM_NOTIFICATION.get()
+    queue.put_nowait((mac, device))
+    return None
 
 __version__ = pkg_resources.get_distribution('btzen').version
 

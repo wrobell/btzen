@@ -29,14 +29,11 @@ from libc.stdlib cimport malloc, free
 
 import asyncio
 import logging
-from itertools import chain
 
 from ._sd_bus cimport *
 from . import _sd_bus
 
 logger = logging.getLogger(__name__)
-
-flatten = chain.from_iterable
 
 cdef extern from *:
     # cdef sd_bus_vtable *cm_vtable = [
@@ -82,14 +79,13 @@ cdef int cm_property(
         sd_bus_error *error
     ) with gil:
 
-    cdef object cm = <object>user_data
+    cdef set services = <object>user_data
     cdef int r
 
-    uuids = set(dev.info.service for dev in flatten(cm._devices.values()))
-    size = len(uuids) + 1
+    size = len(services) + 1
     cdef char **arr = <char**>malloc(size * sizeof(char*))
 
-    for i, u in enumerate(sorted(uuids)):
+    for i, u in enumerate(sorted(services)):
         logger.info('register reconnection for service: {}'.format(u))
         arr[i] = u
     arr[size - 1] = NULL
@@ -97,10 +93,10 @@ cdef int cm_property(
     r = sd_bus_message_append_strv(reply, arr)
     free(arr)
 
-    _sd_bus.check_call('adding uuids', r)
+    _sd_bus.check_call('adding services uuids', r)
     return 0
 
-async def cm_init(Bus bus, str path, cm):
+async def cm_init(Bus bus, str path, set services):
     """
     Initialize connection manager.
     """
@@ -121,7 +117,7 @@ async def cm_init(Bus bus, str path, cm):
         '/org/btzen/ConnectionManager',
         'org.bluez.GattProfile1',
         handle.vtable,
-        <void*>cm
+        <void*>services
     )
     _sd_bus.check_call('add cm vtable', r)
 
