@@ -17,16 +17,25 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pkg_resources
+import typing as tp
+from dataclasses import dataclass
 
-from .btweight import WeightFlags, WeightData, WeightMeasurement
-from .ndevice import Device, register_device
-from .cm import ConnectionManager, connect
-from .serial import Serial
-from .error import *
+AddressType = tp.Literal['public', 'random']
 
-__version__ = pkg_resources.get_distribution('btzen').version
+@dataclass(frozen=True)
+class Device:
+    """
+    Bluetooth device information.
 
-__all__ = ['Device', 'register_device']
+    :var service: UUID of Bluetooth service.
+    :var address_type: Bluetooth device address type.
+    """
+    service: str
+    address_type: AddressType='public'
+
+def register_device(mac: str, device: Device):
+    from .cm import CM_REGISTER
+    queue = CM_REGISTER.get()
+    queue.put_nowait((mac, device))
 
 # vim: sw=4:et:ai

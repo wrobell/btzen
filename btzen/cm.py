@@ -63,7 +63,8 @@ from operator import attrgetter
 
 from .bus import Bus
 from .config import DEFAULT_DBUS_TIMEOUT
-from .device import Device
+#from .device import Device
+from .ndevice import Device, AddressType
 from . import _cm  # type: ignore
 
 DeviceDict = tp.DefaultDict[str, tp.Set[Device]]
@@ -73,7 +74,7 @@ flatten = chain.from_iterable
 
 logger = logging.getLogger(__name__)
 
-CM_NOTIFICATION = ContextVar[asyncio.Queue]('CM_NOTIFICATION')
+CM_REGISTER = ContextVar[asyncio.Queue]('CM_REGISTER')
 CM_STOP = ContextVar[bool]('CM_STOP')
 
 FMT_PATH_ADAPTER = '/org/bluez/{}'.format
@@ -361,7 +362,7 @@ async def connect(*, interface: str='hci0'):
     adapter_path = bus.adapter_path()
 
     queue: asyncio.Queue = asyncio.Queue()
-    CM_NOTIFICATION.set(queue)
+    CM_REGISTER.set(queue)
 
     CM_STOP.set(False)
 
@@ -426,15 +427,13 @@ async def reconnect_device(bus: Bus, mac: str, device) -> None:
     # solution in the future; favour random address type; this is useful
     # when battery level is used (specifies no address type, so defaults to
     # "public) and thingy52 sensors (they require "random" address type)
-    address_type = 'random' # if 'random' in address_types else 'public'
-    address_type = 'public' # if 'random' in address_types else 'public'
+    address_type = device.address_type
 
     # enable monitoring of the `ServicesResolved` property first
     bus._dev_property_start(mac, 'ServicesResolved')
 
     # remove connection to a device preemptively; if it exists in bluez
-    # daemon registry, then it might interfere when establishing new
-    # connection
+    # daemon registry, then creating new connection blocks
     created = False
     while not created:
         await remove_connection(bus, mac)
@@ -450,7 +449,7 @@ async def reconnect_device(bus: Bus, mac: str, device) -> None:
 async def remove_connection(bus: Bus, mac: str):
     disarm(
         'connection for device {} removed'.format(mac),
-        'preemptive removal of connection failed for device {}'.format(mac),
+        'removal of connection failed for device {}'.format(mac),
         _cm.bt_remove,
         bus.system_bus,
         bus.adapter_path(),
@@ -460,7 +459,7 @@ async def remove_connection(bus: Bus, mac: str):
 async def create_connection(
         bus: Bus,
         mac: str,
-        address_type: str,
+        address_type: AddressType,
     ) -> bool:
     # create connection to a device
     #

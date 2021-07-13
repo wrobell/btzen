@@ -47,7 +47,10 @@ logging.basicConfig(level=level)
 
 async def connect_devices(service: str, devices: list[str]) -> None:
     async with btzen.connect():
-        items = [btzen.ndevice(mac, btzen.Info(service)) for mac in devices]
+        items = [
+            btzen.register_device(mac, btzen.Device(service))
+            for mac in devices
+        ]
         while True:
             await asyncio.sleep(5)
 
