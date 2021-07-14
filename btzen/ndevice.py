@@ -20,6 +20,21 @@
 import enum
 import typing as tp
 import dataclasses as dtc
+from functools import singledispatch
+
+from . import _btzen  # type: ignore
+from .bus import Bus
+from .config import DEFAULT_DBUS_TIMEOUT
+from .error import CallError
+from .util import to_int
+
+class Make(enum.Enum):
+    """
+    Bluetooth device make.
+    """
+    STANDARD = enum.auto()
+    SENSOR_TAG = enum.auto()
+    THINGY52 = enum.auto()
 
 class AddressType(enum.Enum):
     """
@@ -34,7 +49,6 @@ class AddressType(enum.Enum):
     PUBLIC = 'public'
     RANDOM = 'random'
 
-
 @dtc.dataclass(frozen=True)
 class Device:
     """
@@ -43,6 +57,39 @@ class Device:
     :var service: UUID of Bluetooth service.
     """
     service: str
+
+@dtc.dataclass(frozen=True)
+class DeviceCharacteristic(Device):
+    """
+    Bluetooth device information for device providing data via Bluetooth
+    characteristic.
+
+    :var uuid_data: UUID of characteristic to read data from.
+    :var size: Length of data received from Bluetooth characteristic on
+        read.
+    """
+    uuid_data: str
+    size: int
+
+@dtc.dataclass(frozen=True)
+class DeviceEnvSensing(DeviceCharacteristic):
+    """
+    Bluetooth device information for device providing data via Bluetooth
+    Environmental Sensing characteristic.
+
+    :var uuid_conf: UUID of characteristic to write and read device
+        configuration.
+    :var uuid_trigger: UUID of characteristic to write and read device
+        trigger data.
+    :var config_on: Default configuration of device to switch device on.
+    :var config_notify_on: Default configuration of device to switch device
+        on in notifying mode. If none, then `config_on` is used.
+    :var config_off: Default configuration of device to switch device off.
+    """
+    uuid_conf: tp.Optional[str] = None
+    uuid_trigger: tp.Optional[str] = None
+    config_on: tp.Optional[bytes] = None
+    config_off: tp.Optional[bytes] = None
 
 @dtc.dataclass(frozen=True)
 class DeviceRegistration:
@@ -57,9 +104,57 @@ class DeviceRegistration:
     """
     device: Device
     mac: str
-    address_type: AddressType=AddressType.PUBLIC
+    address_type: AddressType = AddressType.PUBLIC
 
 def register_device(device: Device, mac: str) -> DeviceRegistration:
     return DeviceRegistration(device, mac)
+
+def pressure(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
+    # function to convert 16-bit UUID to full 128-bit Sensor Tag UUID
+    to_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
+    return DeviceRegistration(
+        DeviceEnvSensing(
+            to_uuid(0xaa40),
+            to_uuid(0xaa41),
+            6,
+            to_uuid(0xaa42),
+            to_uuid(0xaa44),
+            b'\x01',
+            b'\x00',
+        ),
+        mac,
+        address_type=AddressType.PUBLIC,
+    )
+
+@singledispatch
+async def read(device: DeviceRegistration) -> tp.Any:
+    from .cm import CM_STOP, connected
+    bus = Bus.get_bus('hci0')
+    mac = device.mac
+
+    if CM_STOP.get():
+        raise CallError('btzen is not running for device {}'.format(device))
+
+    await connected(mac)
+    if CM_STOP.get():
+        return
+
+    path = bus.characteristic_path(mac, device.device.uuid_data)
+    data = await _btzen.bt_read(bus.system_bus, path, DEFAULT_DBUS_TIMEOUT)
+    return to_int(data[3:])
+    #await asyncio.ensure_future(self._read_data())
+
+async def enable(mac: str, device: DeviceEnvSensing):
+    await write_config(mac, device.uuid_conf, device.config_on)
+
+async def disable(mac: str, device: DeviceEnvSensing):
+    await write_config(mac, device.uuid_conf, device.config_off)
+
+async def write_config(mac: str, uuid_conf: str, data: bytes):
+    bus = Bus.get_bus('hci0')
+    path = bus.characteristic_path(mac, uuid_conf)
+    await _btzen.bt_write(
+        bus.system_bus, path, data, DEFAULT_DBUS_TIMEOUT
+    )
 
 # vim: sw=4:et:ai

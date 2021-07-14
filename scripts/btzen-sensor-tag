@@ -36,18 +36,17 @@ import btzen
 logger = logging.getLogger()
 
 async def read_sensors(args) -> None:
-    #battery = btzen.BatteryLevel(args.device, notifying=True)
+    #battery = btzen.BatteryLevel(args.mac, notifying=True)
     #tasks.append(battery_level(battery))
 
-    async with btzen.connect(interface=args.interface) as conn:
-        tasks = (
-            reader(name, ctor(make=btzen.Make.SensorTag))
-            for name, ctor, reader in SENSORS
-        )
+    devices = [ctor(args.mac, make=btzen.Make.SENSOR_TAG) for _, ctor, _ in SENSORS]
+    async with btzen.connect(devices, interface=args.interface):
+        items = zip(SENSORS, devices)
+        tasks = (reader(name, dev) for (name, _, reader), dev in items)
         await asyncio.gather(*tasks)
 
 async def read_data(sensor) -> tp.Any:
-    while not bzen.is_closed(sensor):
+    while btzen.is_running():
         try:
             value = await btzen.read(sensor)
         except asyncio.CancelledError as ex:
@@ -101,7 +100,7 @@ parser.add_argument(
     '-i', '--interface', default='hci0',
     help='Host controller interface (HCI)'
 )
-parser.add_argument('device', help='MAC address of device')
+parser.add_argument('mac', help='MAC address of device')
 args = parser.parse_args()
 
 level = logging.DEBUG if args.verbose else logging.INFO

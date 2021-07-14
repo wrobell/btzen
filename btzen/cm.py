@@ -76,6 +76,7 @@ RDevices = tp.Iterable[DeviceRegistration]
 
 logger = logging.getLogger(__name__)
 
+CM_CONNECTION = ContextVar[dict[str, asyncio.Event]]('CM_CONNECTION')
 CM_STOP = ContextVar[bool]('CM_STOP')
 
 FMT_PATH_ADAPTER = '/org/bluez/{}'.format
@@ -371,6 +372,8 @@ async def connect(devices: RDevices, *, interface: str='hci0'):
     for dev in devices:
         by_mac[dev.mac].add(dev)
 
+    CM_CONNECTION.set({mac: asyncio.Event() for mac in by_mac})
+
     # TODO: if bluez daemon is restarted, the connection manager needs
     # to be reinitialized
     bt_services = set(dev.device.service for dev in concat(by_mac.values()))
@@ -495,53 +498,47 @@ async def create_connection(
         _cm.bt_device_set_trusted(bus.system_bus, dev_path)
     return created
 
+from .ndevice import enable, disable
+
+async def enable_devices(mac: str, devices: RDevices):
+    for dev in devices:
+        await enable(mac, dev.device)
+    CM_CONNECTION.get()[mac].set()
+
+async def disable_devices(mac: str, devices: RDevices):
+    for dev in devices:
+        # no exception checks as the disable functions should not raise
+        # exceptions on failure
+        await disable(mac, dev.device)
+    CM_CONNECTION.get()[mac].clear()
+
 async def restart_devices(bus: Bus, mac: str, devices: RDevices) -> None:
     """
     Re-enable or hold Bluetooth device when property 'ServicesResolved`
     changes.
     """
-#    enable = partial(self._enable, mac, devices)
-#    disable = partial(self._disable, mac, devices)
-#    cn_set = self._connected[mac].set
 
     # the `ServicesResolved` property monitoring is started by a
     # caller, so just wait for the service to be resolved
     async for _ in resolve_services(bus, mac):
         try:
             logger.info('enabling device {}'.format(mac))
-            #await enable()
+            await enable_devices(mac, devices)
         except asyncio.CancelledError as ex:
             logger.info(
                 'enabling device %s failed, seems to be not connected',
                 mac
             )
-            #if self._process:
-            #    disable()
-            #else:
-            #    raise
-        except Exception as ex:
-            logger.info(
-                'enabling device %s failed, seems to be not connected',
-                mac
-            )
-            if __debug__:
-                logger.exception('error when enabling %s', mac)
-
-            # disable devices; while a device itself might be
-            # disconneted, we might need to release d-bus related
-            # resources
-            #disable()
-        else:
-            pass
-            #cn_set()
+            # some devices might be enabled, so try to disable them
+            await disable_devices(mac, devices)
+            if CM_STOP.get():
+                raise
 
 async def resolve_services(bus: Bus, mac: str) -> tp.AsyncGenerator[None, None]:
     """
     Asynchronous generator waiting for a Bluetooth device to be
     resolved.
     """
-    #disable = partial(self._disable, mac, devices)
-
     while True:
         logger.info(
             'device {} waiting for services resolved status change'
@@ -552,12 +549,11 @@ async def resolve_services(bus: Bus, mac: str) -> tp.AsyncGenerator[None, None]:
 
         if resolved:
             yield
-        else:
-            # disable devices; while a device itself might be
-            # disconneted, we might need to release d-bus related
-            # resources
-            #disable()
-            pass
+        #else:
+        #    # disable devices; while a device itself might be
+        #    # disconneted, we might need to release d-bus related
+        #    # resources
+        #    await disable_devices(mac, devices)
 
 def stop_tasks(task: asyncio.Task):
     """
@@ -582,5 +578,17 @@ def disarm(msg: str, warn: str, f: tp.Callable, *args: tp.Any) -> None:
         logger.warning(warn + ': ' + str(ex))
     else:
         logger.info(msg)
+
+def is_running() -> bool:
+    return not CM_STOP.get()
+
+async def connected(mac: str) -> None:
+    cm = CM_CONNECTION.get()    
+    if not mac in cm:
+        raise ValueError(
+            'Device with address {} not managed by BTZen connection manager'
+            .format(mac)
+        )
+    await cm[mac].wait()
 
 # vim: sw=4:et:ai
