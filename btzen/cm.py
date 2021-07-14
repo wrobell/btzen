@@ -58,23 +58,24 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from functools import partial
-from itertools import chain
 from operator import attrgetter
 
 from .bus import Bus
+from .error import BTZenError
 from .config import DEFAULT_DBUS_TIMEOUT
-#from .device import Device
-from .ndevice import Device, AddressType
+from .device import Device
+from .ndevice import DeviceRegistration, AddressType
 from . import _cm  # type: ignore
+from .util import concat
 
 DeviceDict = tp.DefaultDict[str, tp.Set[Device]]
 Devices = tp.Iterable[Device]
 
-flatten = chain.from_iterable
+RDeviceDict = tp.DefaultDict[str, set[DeviceRegistration]]
+RDevices = tp.Iterable[DeviceRegistration]
 
 logger = logging.getLogger(__name__)
 
-CM_REGISTER = ContextVar[asyncio.Queue]('CM_REGISTER')
 CM_STOP = ContextVar[bool]('CM_STOP')
 
 FMT_PATH_ADAPTER = '/org/bluez/{}'.format
@@ -109,7 +110,7 @@ class ConnectionManager:
         try:
             bus = self._get_bus()
             self._process = False
-            for dev in flatten(self._devices.values()):
+            for dev in concat(self._devices.values()):
                 dev.close()
 
             for mac in self._devices:
@@ -357,33 +358,36 @@ class ConnectionManager:
         return Bus.get_bus(self._interface)
 
 @asynccontextmanager
-async def connect(*, interface: str='hci0'):
+async def connect(devices: RDevices, *, interface: str='hci0'):
     bus = Bus.get_bus(interface)
     adapter_path = bus.adapter_path()
 
-    queue: asyncio.Queue = asyncio.Queue()
-    CM_REGISTER.set(queue)
-
     CM_STOP.set(False)
-
-    to_uuid = '0000{:04x}-0000-1000-8000-00805f9b34fb'.format
-    #to_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
 
     _dbus_timeout = DEFAULT_DBUS_TIMEOUT
     await _cm.bt_register_agent(bus.system_bus, _dbus_timeout)
 
+    by_mac: RDeviceDict = defaultdict(set)
+    for dev in devices:
+        by_mac[dev.mac].add(dev)
+
     # TODO: if bluez daemon is restarted, the connection manager needs
     # to be reinitialized
-    services = {to_uuid(0x180f)}
-    #services = {to_uuid(0xaa40)}
-    cm_handle = await _cm.cm_init(bus.system_bus, adapter_path, services)
+    bt_services = set(dev.device.service for dev in concat(by_mac.values()))
+    cm_handle = await _cm.cm_init(bus.system_bus, adapter_path, bt_services)
 
-    task_connection = asyncio.create_task(connect_devices(bus, queue))
+    conn_tasks = [
+        asyncio.create_task(manage_connection(bus, m, devs))
+        for m, devs in by_mac.items()
+    ]
+    for t in conn_tasks:
+        t.add_done_callback(stop_tasks)
     try:
         yield
     finally:
         CM_STOP.set(True)
-        task_connection.cancel()
+        for t in conn_tasks:
+            t.cancel()
 
         disarm(
             'agent unregistered',
@@ -401,48 +405,42 @@ async def connect(*, interface: str='hci0'):
             cm_handle
         )
 
-        # for each device:
-#       msg = 'device {} disconnected'.format(mac)
-#       warn = 'cannot disconnect device {}'.format(mac)
-#       disarm(msg, warn, _cm.bt_disconnect, bus.system_bus, dev_path)
-#
-#       msg = 'device {} removed'.format(mac)
-#       warn = 'cannot remove device {}'.format(mac)
-#       disarm(msg, warn, _cm.bt_remove, bus.system_bus, adapter_path, dev_path)
-
-async def connect_devices(bus: Bus, queue: asyncio.Queue) -> None:
-    tasks = {}
-    try:
-        while True:
-            mac, device = await queue.get()
-            if mac not in tasks:
-                coro = reconnect_device(bus, mac, device)
-                tasks[mac] = asyncio.create_task(coro)
-    finally:
-        for t in tasks.values():
-            t.cancel()
-
-async def reconnect_device(bus: Bus, mac: str, device) -> None:
-    # determine connection address type; this is a hack, we need better
-    # solution in the future; favour random address type; this is useful
-    # when battery level is used (specifies no address type, so defaults to
-    # "public) and thingy52 sensors (they require "random" address type)
-    address_type = device.address_type
+async def manage_connection(bus: Bus, mac: str, devices: RDevices) -> None:
+    """
+    Manage Bluetooth connection for the devices.
+    """
+    # determine connection address type; favour random one; is there a
+    # better way? thingy52 requires random address type, but its battery
+    # service public only (FIXME: check that again)
+    address_types = set(dev.address_type for dev in devices)
+    has_random = AddressType.RANDOM in address_types
+    address_type = AddressType.RANDOM if has_random else AddressType.PUBLIC
 
     # enable monitoring of the `ServicesResolved` property first
     bus._dev_property_start(mac, 'ServicesResolved')
 
-    # remove connection to a device preemptively; if it exists in bluez
-    # daemon registry, then creating new connection blocks
+    # create connection to a device; if it exists already, then remove it
+    # first; if it exists in bluez daemon registry, then creating new
+    # connection blocks
     created = False
     while not created:
         await remove_connection(bus, mac)
         created = await create_connection(bus, mac, address_type)
 
     try:
-        await restart_devices(bus, mac)
+        await restart_devices(bus, mac, devices)
     finally:
         bus._dev_property_stop(mac, 'ServicesResolved')
+
+        # TODO: make async
+        disarm(
+            'device {} disconnected'.format(mac),
+            'device {} failed to disconnect'.format(mac),
+            _cm.bt_disconnect,
+            bus.system_bus,
+            bus.dev_path(mac),
+        )
+
         await remove_connection(bus, mac)
 
 # TODO: make real async
@@ -476,20 +474,14 @@ async def create_connection(
             .format(mac, bus.adapter_path(), address_type)
         )
         await _cm.bt_connect(
-            bus.system_bus, bus.adapter_path(), mac, address_type,
+            bus.system_bus, bus.adapter_path(), mac, address_type.value,
             _dbus_timeout
         )
-#   except asyncio.CancelledError as ex:
-#       if self._process:
-#           await self._handle_connection_error(mac, ex)
-#       else:
-#           logger.info('connection attempt cancelled for {}'.format(mac))
-#           raise
-    except Exception as ex:
-        if str(ex) == 'Already Exists':
+    except (BTZenError, asyncio.CancelledError) as ex:
+        stop = CM_STOP.get()
+        if not stop and str(ex) == 'Already Exists':
             created = True
-        else:
-#            await self._handle_connection_error(mac, ex)
+        elif not stop:
             sleep = int(_dbus_timeout / 1e6)
             logger.info(
                 'connection for {} failed: {}, sleep for {}s'
@@ -503,7 +495,7 @@ async def create_connection(
         _cm.bt_device_set_trusted(bus.system_bus, dev_path)
     return created
 
-async def restart_devices(bus: Bus, mac: str) -> None: # , devices: Devices) -> None:
+async def restart_devices(bus: Bus, mac: str, devices: RDevices) -> None:
     """
     Re-enable or hold Bluetooth device when property 'ServicesResolved`
     changes.
@@ -566,6 +558,17 @@ async def resolve_services(bus: Bus, mac: str) -> tp.AsyncGenerator[None, None]:
             # resources
             #disable()
             pass
+
+def stop_tasks(task: asyncio.Task):
+    """
+    Stop BTZen connection tasks if a task is in error.
+    """
+    if task.done() and not task.cancelled() and task.exception():
+        CM_STOP.set(True)
+        try:
+            task.result()
+        except:
+            logger.critical('Error in connection task', exc_info=True) 
 
 def disarm(msg: str, warn: str, f: tp.Callable, *args: tp.Any) -> None:
     try:

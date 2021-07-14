@@ -18,6 +18,24 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+Test connection and reconnection of Bluetooth devices.
+
+Bluez, and as a consequence BTZen library, requires a Bluetooth service to
+reconnect Bluetooth devices. The script uses Bluetooth Battery Service by
+default. Specify some other primary service if Bluetooth Battery Service is
+not available.
+
+This script is tested with some other services (although connecting with
+their Bluetooth Battery Service works as well)
+
+- SensorTag::
+
+    f000aa40-0451-4000-b000-000000000000
+    f000aa00-0451-4000-b000-000000000000
+
+"""
+
 import argparse
 import asyncio
 import logging
@@ -33,11 +51,11 @@ parser.add_argument(
 parser.add_argument(
     '-s', '--service',
     # TODO: use btzen.Battery.service
-    default='0000180f-0000-1000-8000-00805f9b34f',
+    default='0000180f-0000-1000-8000-00805f9b34fb',
     help='Bluetooth service UUID'
 )
 parser.add_argument(
-    'device', nargs='+',
+    'mac', nargs='+',
     help='List of MAC addresses of devices to connect'
 )
 args = parser.parse_args()
@@ -45,17 +63,15 @@ args = parser.parse_args()
 level = logging.DEBUG if args.verbose else logging.INFO
 logging.basicConfig(level=level)
 
-async def connect_devices(service: str, devices: list[str]) -> None:
-    async with btzen.connect():
-        items = [
-            btzen.register_device(mac, btzen.Device(service))
-            for mac in devices
-        ]
+async def connect_devices(service: str, mac: list[str]) -> None:
+    dev = btzen.Device(service)
+    devices = [btzen.register_device(dev, m) for m in mac]
+    async with btzen.connect(devices):
         while True:
             await asyncio.sleep(5)
 
 uvloop.install()
 
-asyncio.run(connect_devices(args.service, args.device))
+asyncio.run(connect_devices(args.service, args.mac))
 
 # vim: sw=4:et:ai

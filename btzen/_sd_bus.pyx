@@ -74,7 +74,7 @@ def check_call(msg_err, code):
 #
 # sd-bus message parsing
 #
-class BusMessageError(Error):
+class BusMessageError(BTZenError):
     """
     Bus message parsing error.
     """

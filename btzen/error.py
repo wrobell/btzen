@@ -17,32 +17,32 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-class Error(Exception):
+class BTZenError(Exception):
     """
     Base, abstract BTZen exception.
     """
 
-class CallError(Error):
+class CallError(BTZenError):
     """
     Error when starting an asynchronous call is not possible.
     """
 
-class ConnectionError(Error):
+class ConnectionError(BTZenError):
     """
     Connection error.
     """
 
-class ConfigurationError(Error):
+class ConfigurationError(BTZenError):
     """
     Device configuration error.
     """
 
-class DataReadError(Error):
+class DataReadError(BTZenError):
     """
     Device data reading error.
     """
 
-class DataWriteError(Error):
+class DataWriteError(BTZenError):
     """
     Device data wrte error.
     """

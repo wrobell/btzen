@@ -30,12 +30,12 @@ import asyncio
 import math
 import logging
 from binascii import hexlify
+from contextlib import asynccontextmanager
 from functools import partial
 
 from . import _btzen  # type: ignore
 from .bus import Bus
 from .device import Device, Info, to_uuid
-from .util import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ class Serial(Device):
             self._bus._gatt_stop(self._tx_uart_path)
         self._init_paths()
 
-    @contextmanager
+    @asynccontextmanager
     async def _rx_credits_mgr(self, n):
         if self._rx_credits < 1:
             await self._add_rx_credits(credits_for(n))

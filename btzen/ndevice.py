@@ -17,25 +17,49 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import enum
 import typing as tp
-from dataclasses import dataclass
+import dataclasses as dtc
 
-AddressType = tp.Literal['public', 'random']
+class AddressType(enum.Enum):
+    """
+    Bluetooth device address type.
 
-@dataclass(frozen=True)
+
+    .. seealso::
+
+        `ConnectDevice` method documentation at
+        https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/doc/adapter-api.txt.
+    """
+    PUBLIC = 'public'
+    RANDOM = 'random'
+
+
+@dtc.dataclass(frozen=True)
 class Device:
     """
-    Bluetooth device information.
+    Bluetooth device descriptor.
 
     :var service: UUID of Bluetooth service.
-    :var address_type: Bluetooth device address type.
     """
     service: str
-    address_type: AddressType='public'
 
-def register_device(mac: str, device: Device):
-    from .cm import CM_REGISTER
-    queue = CM_REGISTER.get()
-    queue.put_nowait((mac, device))
+@dtc.dataclass(frozen=True)
+class DeviceRegistration:
+    """
+    Bluetooth device connection information.
+
+    Associates Bluetooth device MAC address and address type with a device.
+
+    :var device: Bluetooth device descriptor.
+    :var mac: MAC address of Bluetooth device.
+    :var address_type: Bluetooth device address type.
+    """
+    device: Device
+    mac: str
+    address_type: AddressType=AddressType.PUBLIC
+
+def register_device(device: Device, mac: str) -> DeviceRegistration:
+    return DeviceRegistration(device, mac)
 
 # vim: sw=4:et:ai
