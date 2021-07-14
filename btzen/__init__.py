@@ -21,18 +21,26 @@ import pkg_resources
 
 from .btweight import WeightFlags, WeightData, WeightMeasurement
 from .ndevice import Make, Device, DeviceRegistration, read, pressure, temperature, \
-    humidity, light, register_device, accelerometer
+    humidity, light, register_device, accelerometer, button
 from .cm import connect, is_running
-from .serial import Serial
 from .error import *
-from . import sensortag  # to register devices
+from .sensortag import SensorTagButtonState  # also to register devices
+from .serial import Serial
 
 __version__ = pkg_resources.get_distribution('btzen').version
 
 __all__ = [
-    'Device', 'DeviceRegistration', 'Make', 'register_device',
-    'is_running', 'read', 'pressure', 'temperature', 'humidity', 'light',
-    'accelerometer',
+    # bluetooth device descriptors
+    'Device',
+
+    'Make', 'is_running', 'read',
+
+    # bluetooth device registration classes and functions
+    'DeviceRegistration', 'register_device', 'pressure', 'temperature',
+    'humidity', 'light', 'accelerometer', 'button',
+
+    # make specific objects
+    'SensorTagButtonState',
 ]
 
 # vim: sw=4:et:ai

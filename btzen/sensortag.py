@@ -41,8 +41,8 @@ import typing as tp
 from functools import partial
 
 from .device import to_uuid as to_bt_uuid
-from .ndevice import DeviceEnvSensing, DeviceNotifying, register, \
-    Make, DeviceType
+from .ndevice import DeviceCharacteristic, DeviceEnvSensing, \
+    DeviceNotifying, register, Make, DeviceType
 from .util import to_int
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,15 @@ ACCEL_WAKE_ON_MOTION = 0x80
 MPU9250_GYRO = 65536 / 500
 MPU9250_ACCEL_2G = 32768 / 2
 MPU9250_ACCEL_UNPACK = struct.Struct('<3h').unpack
+
+class SensorTagButtonState(enum.IntFlag):
+    """
+    Sensor Tag Bluetooth device button state.
+    """
+    OFF = 0x00
+    USER = 0x01
+    POWER = 0x02
+    REED_RELAY = 0x04
 
 # function to convert 16-bit UUID to full 128-bit Sensor Tag UUID
 to_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
@@ -79,6 +88,13 @@ def convert_accel(data: bytes) -> tuple[float, float, float]:
     # magnet: data[12:]
     x, y, z = tp.cast(tuple[float, float, float], MPU9250_ACCEL_UNPACK(data[6:12]))
     return (x / MPU9250_ACCEL_2G, y / MPU9250_ACCEL_2G, z / MPU9250_ACCEL_2G)
+
+def convert_button(data: bytes) -> SensorTagButtonState:
+    """
+    Convert Sensor Tag Bluetooth device button data into button state
+    object.
+    """
+    return SensorTagButtonState(data[0])
 
 register_st(DeviceType.PRESSURE, DeviceEnvSensing(
     to_uuid(0xaa40),
@@ -135,6 +151,13 @@ register_st(DeviceType.ACCELEROMETER, DeviceNotifying(DeviceEnvSensing(
     b'\x00\x00',
 )))
 
+register_st(DeviceType.BUTTON, DeviceNotifying(DeviceCharacteristic(
+    to_bt_uuid(0xffe0),
+    convert_button,
+    to_bt_uuid(0xffe1),
+    1,
+)))
+
 #   class DeviceEnvSensing(DeviceEnvSensing):
 #       """
 #       Sensor Tag Bluetooth device sensor.
@@ -156,22 +179,5 @@ register_st(DeviceType.ACCELEROMETER, DeviceNotifying(DeviceEnvSensing(
 #           assert value < 256
 #           return bytes([value])
 #
-#   class ButtonState(enum.IntFlag):
-#       """
-#       Sensor Tag Bluetooth device button state.
-#       """
-#       OFF = 0x00
-#       USER = 0x01
-#       POWER = 0x02
-#       REED_RELAY = 0x04
-#
-#   class Button(DeviceCharacteristic):
-#       """
-#       Sensor Tag Bluetooth device button.
-#       """
-#       info = InfoCharacteristic(to_bt_uuid(0xffe0), to_bt_uuid(0xffe1), 1)
-#
-#       def get_value(self, data: bytes) -> ButtonState:
-#           return ButtonState(data[0])
 
 # vim: sw=4:et:ai

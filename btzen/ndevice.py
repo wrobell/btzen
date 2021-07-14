@@ -169,6 +169,9 @@ def light(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
 def accelerometer(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
     return register_device(from_registry(make, DeviceType.ACCELEROMETER), mac)
 
+def button(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
+    return register_device(from_registry(make, DeviceType.BUTTON), mac)
+
 async def read(device: DeviceRegistration) -> tp.Any:
     from .cm import CM_STOP, connected
     mac = device.mac
@@ -232,19 +235,20 @@ async def _disable_env_sensing(device: DeviceEnvSensing, mac: str):
         await write_config(mac, device.uuid_conf, device.config_off)
     except Exception as ex:
         logger.warning('cannot disable device: {}'.format(ex))
+    logger.info('device disabled: {}'.format(device))
 
 @disable.register
 async def _disable_dev_notifying(device: DeviceNotifying, mac: str):
     bus = Bus.get_bus('hci0')
     dev = device.device
     try:
+        # TODO: path might be not known anymore
         path = bus.characteristic_path(mac, dev.uuid_data)
         bus._gatt_stop(path)
     except Exception as ex:
         logger.warning('cannot stop notifications: {}'.format(ex))
 
     await disable(dev, mac)
-    logger.info('notifications disabled: {}'.format(path))
 
 async def write_config(mac: str, uuid_conf: str, data: bytes):
     bus = Bus.get_bus('hci0')
