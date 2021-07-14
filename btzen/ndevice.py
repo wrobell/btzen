@@ -17,9 +17,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import annotations
+
 import enum
 import typing as tp
 import dataclasses as dtc
+from collections import defaultdict
 from functools import singledispatch
 
 from . import _btzen  # type: ignore
@@ -28,6 +31,9 @@ from .config import DEFAULT_DBUS_TIMEOUT
 from .error import CallError
 from .util import to_int
 
+# registry of known devices
+REGISTRY: dict[Make, dict[DeviceType, Device]] = defaultdict(dict)
+
 class Make(enum.Enum):
     """
     Bluetooth device make.
@@ -35,6 +41,18 @@ class Make(enum.Enum):
     STANDARD = enum.auto()
     SENSOR_TAG = enum.auto()
     THINGY52 = enum.auto()
+
+class DeviceType(enum.Enum):
+    """
+    Bluetooth device type.
+    """
+    PRESSURE = enum.auto()
+    TEMPERATURE = enum.auto()
+    HUMIDITY = enum.auto()
+    LIGHT = enum.auto()
+    ACCELEROMETER = enum.auto()
+    BUTTON = enum.auto()
+    WEIGHT_MEASUREMENT = enum.auto()
 
 class AddressType(enum.Enum):
     """
@@ -106,30 +124,32 @@ class DeviceRegistration:
     mac: str
     address_type: AddressType = AddressType.PUBLIC
 
-def register_device(device: Device, mac: str) -> DeviceRegistration:
-    return DeviceRegistration(device, mac)
+
+def from_registry(make: Make, dev_type: DeviceType):
+    return REGISTRY[make][dev_type]
+
+def register(make: Make, dev_type: DeviceType, dev):
+    REGISTRY[make][dev_type] = dev
+
+def register_device(device: Device, mac: str, address_type: AddressType=AddressType.PUBLIC) -> DeviceRegistration:
+    return DeviceRegistration(device, mac, address_type=address_type)
 
 def pressure(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
-    # function to convert 16-bit UUID to full 128-bit Sensor Tag UUID
-    to_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
-    return DeviceRegistration(
-        DeviceEnvSensing(
-            to_uuid(0xaa40),
-            to_uuid(0xaa41),
-            6,
-            to_uuid(0xaa42),
-            to_uuid(0xaa44),
-            b'\x01',
-            b'\x00',
-        ),
-        mac,
-        address_type=AddressType.PUBLIC,
-    )
+    return register_device(from_registry(make, DeviceType.PRESSURE), mac)
+
+def temperature(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
+    return register_device(from_registry(make, DeviceType.TEMPERATURE), mac)
+
+def humidity(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
+    return register_device(from_registry(make, DeviceType.HUMIDITY), mac)
+
+def light(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
+    return register_device(from_registry(make, DeviceType.LIGHT), mac)
 
 @singledispatch
 async def read(device: DeviceRegistration) -> tp.Any:
     from .cm import CM_STOP, connected
-    bus = Bus.get_bus('hci0')
+    bus = Bus.get_bus('hci0')  # FIXME: no hci0
     mac = device.mac
 
     if CM_STOP.get():
@@ -144,10 +164,20 @@ async def read(device: DeviceRegistration) -> tp.Any:
     return to_int(data[3:])
     #await asyncio.ensure_future(self._read_data())
 
-async def enable(mac: str, device: DeviceEnvSensing):
+@singledispatch
+async def enable(device: Device, mac: str):
+    pass
+
+@singledispatch
+async def disable(device: Device, mac: str):
+    pass
+
+@enable.register
+async def _enable_env_sensing(device: DeviceEnvSensing, mac: str):
     await write_config(mac, device.uuid_conf, device.config_on)
 
-async def disable(mac: str, device: DeviceEnvSensing):
+@disable.register
+async def _disable_env_sensing(device: DeviceEnvSensing, mac: str):
     await write_config(mac, device.uuid_conf, device.config_off)
 
 async def write_config(mac: str, uuid_conf: str, data: bytes):

@@ -20,16 +20,18 @@
 import pkg_resources
 
 from .btweight import WeightFlags, WeightData, WeightMeasurement
-from .ndevice import Make, Device, DeviceRegistration, read, pressure, register_device
+from .ndevice import Make, Device, DeviceRegistration, read, pressure, temperature, \
+    humidity, light, register_device
 from .cm import connect, is_running
 from .serial import Serial
 from .error import *
+from . import sensortag  # to register devices
 
 __version__ = pkg_resources.get_distribution('btzen').version
 
 __all__ = [
     'Device', 'DeviceRegistration', 'Make', 'register_device',
-    'is_running', 'read', 'pressure',
+    'is_running', 'read', 'pressure', 'temperature', 'humidity', 'light',
 ]
 
 # vim: sw=4:et:ai

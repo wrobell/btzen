@@ -502,14 +502,14 @@ from .ndevice import enable, disable
 
 async def enable_devices(mac: str, devices: RDevices):
     for dev in devices:
-        await enable(mac, dev.device)
+        await enable(dev.device, mac)
     CM_CONNECTION.get()[mac].set()
 
 async def disable_devices(mac: str, devices: RDevices):
     for dev in devices:
         # no exception checks as the disable functions should not raise
         # exceptions on failure
-        await disable(mac, dev.device)
+        await disable(dev.device, mac)
     CM_CONNECTION.get()[mac].clear()
 
 async def restart_devices(bus: Bus, mac: str, devices: RDevices) -> None:
