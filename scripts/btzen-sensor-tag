@@ -62,7 +62,7 @@ async def read_sensor(name: str, sensor) -> None:
         await asyncio.sleep(-loop.time() % 1)
 
 async def read_accelerometer(name: str, sensor) -> None:
-    sensor.set_interval(0.1)
+    #sensor.set_interval(0.1)
     async for values in read_data(sensor):
         values = ', '.join('{:.4f}'.format(v) for v in values)
         print_data(name, values)
@@ -82,13 +82,13 @@ def print_data(name: str, value: tp.Union[str, int, float]) -> None:
 # sensor definitions
 #
 SENSORS = [
-    ('pressure', btzen.pressure, read_sensor),
-    ('temperature', btzen.temperature, read_sensor),
-    ('humidity', btzen.humidity, read_sensor),
-    ('light', btzen.light, read_sensor),
+#    ('pressure', btzen.pressure, read_sensor),
+#    ('temperature', btzen.temperature, read_sensor),
+#    ('humidity', btzen.humidity, read_sensor),
+#    ('light', btzen.light, read_sensor),
 #    # notifying readers
 #    ('button', btzen.button, read_button),
-#    ('accelerometer', btzen.accelerometer, read_accelerometer),
+    ('accelerometer', btzen.accelerometer, read_accelerometer),
 ]
 
 parser = argparse.ArgumentParser()

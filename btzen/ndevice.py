@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import enum
+import logging
 import typing as tp
 import dataclasses as dtc
 from collections import defaultdict
@@ -31,9 +32,13 @@ from .config import DEFAULT_DBUS_TIMEOUT
 from .error import CallError
 from .util import to_int
 
+logger = logging.getLogger(__name__)
+
 # registry of known devices
 REGISTRY: dict[Make, dict[DeviceType, Device]] = defaultdict(dict)
+
 T = tp.TypeVar('T')
+DeviceAny = tp.Union['Device[T]', 'DeviceNotifying[T]']
 
 class Make(enum.Enum):
     """
@@ -78,6 +83,20 @@ class Device(tp.Generic[T]):
     """
     service: str
     convert: tp.Callable[[bytes], T]
+
+@dtc.dataclass(frozen=True)
+class DeviceNotifying(tp.Generic[T]):
+    """
+    Bluetooth device descriptor for a device reading data via
+    notifications.
+
+    :var device: Bluetooth device descriptor.
+    """
+    device: T  # TODO: T == Device[T]
+
+    @property
+    def service(self):
+        return self.device.service
 
 @dtc.dataclass(frozen=True)
 class DeviceCharacteristic(Device[T]):
@@ -147,6 +166,9 @@ def humidity(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
 def light(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
     return register_device(from_registry(make, DeviceType.LIGHT), mac)
 
+def accelerometer(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
+    return register_device(from_registry(make, DeviceType.ACCELEROMETER), mac)
+
 async def read(device: DeviceRegistration) -> tp.Any:
     from .cm import CM_STOP, connected
     mac = device.mac
@@ -162,7 +184,7 @@ async def read(device: DeviceRegistration) -> tp.Any:
 
 
 @singledispatch
-async def read_data(device: Device[T], mac: str) -> T:
+async def read_data(device: DeviceAny, mac: str) -> T:
     pass
 
 @read_data.register
@@ -175,21 +197,54 @@ async def _read_env_sensing(device: DeviceCharacteristic, mac: str) -> T:
     return device.convert(data)
     # TODO: await asyncio.ensure_future(self._read_data())
 
+@read_data.register
+async def _read_dev_notifying(device: DeviceNotifying, mac: str) -> T:
+    bus = Bus.get_bus('hci0')
+    dev = device.device
+    path = bus.characteristic_path(mac, dev.uuid_data)
+    data = await bus._gatt_get(path)
+    return dev.convert(data)
+
 @singledispatch
-async def enable(device: Device, mac: str):
+async def enable(device: DeviceAny, mac: str):
     pass
 
 @singledispatch
-async def disable(device: Device, mac: str):
+async def disable(device: DeviceAny, mac: str):
     pass
 
 @enable.register
 async def _enable_env_sensing(device: DeviceEnvSensing, mac: str):
     await write_config(mac, device.uuid_conf, device.config_on)
 
+@enable.register
+async def _enable_dev_notifying(device: DeviceNotifying, mac: str):
+    bus = Bus.get_bus('hci0')
+    dev = device.device
+    await enable(dev, mac)
+    path = bus.characteristic_path(mac, dev.uuid_data)
+    bus._gatt_start(path)
+    logger.info('notifications enabled for {}'.format(path))
+
 @disable.register
 async def _disable_env_sensing(device: DeviceEnvSensing, mac: str):
-    await write_config(mac, device.uuid_conf, device.config_off)
+    try:
+        await write_config(mac, device.uuid_conf, device.config_off)
+    except Exception as ex:
+        logger.warning('cannot disable device: {}'.format(ex))
+
+@disable.register
+async def _disable_dev_notifying(device: DeviceNotifying, mac: str):
+    bus = Bus.get_bus('hci0')
+    dev = device.device
+    try:
+        path = bus.characteristic_path(mac, dev.uuid_data)
+        bus._gatt_stop(path)
+    except Exception as ex:
+        logger.warning('cannot stop notifications: {}'.format(ex))
+
+    await disable(dev, mac)
+    logger.info('notifications disabled: {}'.format(path))
 
 async def write_config(mac: str, uuid_conf: str, data: bytes):
     bus = Bus.get_bus('hci0')

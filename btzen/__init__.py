@@ -21,7 +21,7 @@ import pkg_resources
 
 from .btweight import WeightFlags, WeightData, WeightMeasurement
 from .ndevice import Make, Device, DeviceRegistration, read, pressure, temperature, \
-    humidity, light, register_device
+    humidity, light, register_device, accelerometer
 from .cm import connect, is_running
 from .serial import Serial
 from .error import *
@@ -32,6 +32,7 @@ __version__ = pkg_resources.get_distribution('btzen').version
 __all__ = [
     'Device', 'DeviceRegistration', 'Make', 'register_device',
     'is_running', 'read', 'pressure', 'temperature', 'humidity', 'light',
+    'accelerometer',
 ]
 
 # vim: sw=4:et:ai

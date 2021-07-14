@@ -34,7 +34,6 @@ CC2650STK
 """
 
 import asyncio
-import dataclasses as dtc
 import enum
 import logging
 import struct
@@ -42,7 +41,8 @@ import typing as tp
 from functools import partial
 
 from .device import to_uuid as to_bt_uuid
-from .ndevice import DeviceEnvSensing, register, Make, DeviceType
+from .ndevice import DeviceEnvSensing, DeviceNotifying, register, \
+    Make, DeviceType
 from .util import to_int
 
 logger = logging.getLogger(__name__)
@@ -50,10 +50,11 @@ logger = logging.getLogger(__name__)
 T = tp.TypeVar('T')
 
 HDC1000_HUMIDITY = 65536 / 100
-
-@dtc.dataclass(frozen=True)
-class DeviceSensorTag(DeviceEnvSensing[T]):
-    pass
+ACCEL = 0x08 | 0x10 | 0x20
+ACCEL_WAKE_ON_MOTION = 0x80
+MPU9250_GYRO = 65536 / 500
+MPU9250_ACCEL_2G = 32768 / 2
+MPU9250_ACCEL_UNPACK = struct.Struct('<3h').unpack
 
 # function to convert 16-bit UUID to full 128-bit Sensor Tag UUID
 to_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
@@ -68,6 +69,16 @@ def convert_light(data: bytes) -> float:
     m = (v & 0x0FFF) / 100
     e = (v & 0xF000) >> 12
     return m * (2 << e)
+
+def convert_accel(data: bytes) -> tuple[float, float, float]:
+    """
+    Convert Sensor Tag Bluetooth device accelerometer data into (x, y, z)
+    values.
+    """
+    # gyro: data[:6]
+    # magnet: data[12:]
+    x, y, z = tp.cast(tuple[float, float, float], MPU9250_ACCEL_UNPACK(data[6:12]))
+    return (x / MPU9250_ACCEL_2G, y / MPU9250_ACCEL_2G, z / MPU9250_ACCEL_2G)
 
 register_st(DeviceType.PRESSURE, DeviceEnvSensing(
     to_uuid(0xaa40),
@@ -91,7 +102,7 @@ register_st(DeviceType.TEMPERATURE, DeviceEnvSensing(
     b'\x00',
 ))
 
-register_st(DeviceType.HUMIDITY, DeviceSensorTag(
+register_st(DeviceType.HUMIDITY, DeviceEnvSensing(
     to_uuid(0xaa20),
     lambda v: to_int(v[2:]) / HDC1000_HUMIDITY,
     to_uuid(0xaa21),
@@ -102,7 +113,7 @@ register_st(DeviceType.HUMIDITY, DeviceSensorTag(
     b'\x00',
 ))
 
-register_st(DeviceType.LIGHT, DeviceSensorTag(
+register_st(DeviceType.LIGHT, DeviceEnvSensing(
     to_uuid(0xaa70),
     convert_light,
     to_uuid(0xaa71),
@@ -113,7 +124,18 @@ register_st(DeviceType.LIGHT, DeviceSensorTag(
     b'\x00',
 ))
 
-#   class DeviceSensorTag(DeviceEnvSensing):
+register_st(DeviceType.ACCELEROMETER, DeviceNotifying(DeviceEnvSensing(
+    to_uuid(0xaa80),
+    convert_accel,
+    to_uuid(0xaa81),
+    18,
+    to_uuid(0xaa82),
+    to_uuid(0xaa83),
+    struct.pack('<H', ACCEL | ACCEL_WAKE_ON_MOTION),
+    b'\x00\x00',
+)))
+
+#   class DeviceEnvSensing(DeviceEnvSensing):
 #       """
 #       Sensor Tag Bluetooth device sensor.
 #       """
@@ -133,37 +155,6 @@ register_st(DeviceType.LIGHT, DeviceSensorTag(
 #           value = int(trigger.operand * 100)
 #           assert value < 256
 #           return bytes([value])
-#
-#
-#   class Accelerometer(DeviceSensorTag):
-#       """
-#       Sensor Tag Bluetooth device accelerometer sensor.
-#       """
-#       ACCEL = 0x08 | 0x10 | 0x20
-#       WAKE_ON_MOTION = 0x80
-#
-#       MPU9250_GYRO = 65536 / 500
-#       MPU9250_ACCEL_2G = 32768 / 2
-#       MPU9250_ACCEL_UNPACK = struct.Struct('<3h').unpack
-#
-#       info = InfoEnvSensing(
-#           to_uuid(0xaa80),
-#           to_uuid(0xaa81),
-#           18,
-#           to_uuid(0xaa82),
-#           to_uuid(0xaa83),
-#           struct.pack('<H', ACCEL),
-#           struct.pack('<H', ACCEL | WAKE_ON_MOTION),
-#           b'\x00\x00',
-#       )
-#
-#       def get_value(self, data):
-#           # gyro: data[:6]
-#           # magnet: data[12:]
-#           return tuple(
-#               v / self.MPU9250_ACCEL_2G
-#               for v in self.MPU9250_ACCEL_UNPACK(data[6:12])
-#           )
 #
 #   class ButtonState(enum.IntFlag):
 #       """
