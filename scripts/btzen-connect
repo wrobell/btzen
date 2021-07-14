@@ -64,7 +64,7 @@ level = logging.DEBUG if args.verbose else logging.INFO
 logging.basicConfig(level=level)
 
 async def connect_devices(service: str, mac: list[str]) -> None:
-    dev = btzen.Device(service)
+    dev = btzen.Device(service, lambda v: v)
     devices = [btzen.register_device(dev, m) for m in mac]
     async with btzen.connect(devices):
         while True:

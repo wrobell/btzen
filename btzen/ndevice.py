@@ -33,6 +33,7 @@ from .util import to_int
 
 # registry of known devices
 REGISTRY: dict[Make, dict[DeviceType, Device]] = defaultdict(dict)
+T = tp.TypeVar('T')
 
 class Make(enum.Enum):
     """
@@ -68,16 +69,18 @@ class AddressType(enum.Enum):
     RANDOM = 'random'
 
 @dtc.dataclass(frozen=True)
-class Device:
+class Device(tp.Generic[T]):
     """
     Bluetooth device descriptor.
 
     :var service: UUID of Bluetooth service.
+    :var convert: Function to convert binary device data to value.
     """
     service: str
+    convert: tp.Callable[[bytes], T]
 
 @dtc.dataclass(frozen=True)
-class DeviceCharacteristic(Device):
+class DeviceCharacteristic(Device[T]):
     """
     Bluetooth device information for device providing data via Bluetooth
     characteristic.
@@ -90,7 +93,7 @@ class DeviceCharacteristic(Device):
     size: int
 
 @dtc.dataclass(frozen=True)
-class DeviceEnvSensing(DeviceCharacteristic):
+class DeviceEnvSensing(DeviceCharacteristic[T]):
     """
     Bluetooth device information for device providing data via Bluetooth
     Environmental Sensing characteristic.
@@ -100,14 +103,12 @@ class DeviceEnvSensing(DeviceCharacteristic):
     :var uuid_trigger: UUID of characteristic to write and read device
         trigger data.
     :var config_on: Default configuration of device to switch device on.
-    :var config_notify_on: Default configuration of device to switch device
-        on in notifying mode. If none, then `config_on` is used.
     :var config_off: Default configuration of device to switch device off.
     """
-    uuid_conf: tp.Optional[str] = None
-    uuid_trigger: tp.Optional[str] = None
-    config_on: tp.Optional[bytes] = None
-    config_off: tp.Optional[bytes] = None
+    uuid_conf: str
+    uuid_trigger: str
+    config_on: bytes
+    config_off: bytes
 
 @dtc.dataclass(frozen=True)
 class DeviceRegistration:
@@ -146,10 +147,8 @@ def humidity(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
 def light(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
     return register_device(from_registry(make, DeviceType.LIGHT), mac)
 
-@singledispatch
 async def read(device: DeviceRegistration) -> tp.Any:
     from .cm import CM_STOP, connected
-    bus = Bus.get_bus('hci0')  # FIXME: no hci0
     mac = device.mac
 
     if CM_STOP.get():
@@ -159,10 +158,22 @@ async def read(device: DeviceRegistration) -> tp.Any:
     if CM_STOP.get():
         return
 
-    path = bus.characteristic_path(mac, device.device.uuid_data)
+    return (await read_data(device.device, mac))
+
+
+@singledispatch
+async def read_data(device: Device[T], mac: str) -> T:
+    pass
+
+@read_data.register
+async def _read_env_sensing(device: DeviceCharacteristic, mac: str) -> T:
+    bus = Bus.get_bus('hci0')  # FIXME: no hci0
+    path = bus.characteristic_path(mac, device.uuid_data)
+    assert path is not None
+
     data = await _btzen.bt_read(bus.system_bus, path, DEFAULT_DBUS_TIMEOUT)
-    return to_int(data[3:])
-    #await asyncio.ensure_future(self._read_data())
+    return device.convert(data)
+    # TODO: await asyncio.ensure_future(self._read_data())
 
 @singledispatch
 async def enable(device: Device, mac: str):

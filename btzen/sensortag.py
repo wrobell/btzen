@@ -38,6 +38,7 @@ import dataclasses as dtc
 import enum
 import logging
 import struct
+import typing as tp
 from functools import partial
 
 from .device import to_uuid as to_bt_uuid
@@ -46,17 +47,31 @@ from .util import to_int
 
 logger = logging.getLogger(__name__)
 
+T = tp.TypeVar('T')
+
+HDC1000_HUMIDITY = 65536 / 100
+
+@dtc.dataclass(frozen=True)
+class DeviceSensorTag(DeviceEnvSensing[T]):
+    pass
+
 # function to convert 16-bit UUID to full 128-bit Sensor Tag UUID
 to_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
 
-@dtc.dataclass(frozen=True)
-class DeviceSensorTag(DeviceEnvSensing):
-    pass
-
 register_st = partial(register, Make.SENSOR_TAG)
+
+def convert_light(data: bytes) -> float:
+    """
+    Convert Sensor Tag light sensor data to a lux value.
+    """
+    v = to_int(data)
+    m = (v & 0x0FFF) / 100
+    e = (v & 0xF000) >> 12
+    return m * (2 << e)
 
 register_st(DeviceType.PRESSURE, DeviceEnvSensing(
     to_uuid(0xaa40),
+    lambda v: to_int(v[3:]),
     to_uuid(0xaa41),
     6,
     to_uuid(0xaa42),
@@ -66,17 +81,19 @@ register_st(DeviceType.PRESSURE, DeviceEnvSensing(
 ))
 
 register_st(DeviceType.TEMPERATURE, DeviceEnvSensing(
-        to_uuid(0xaa00),
-        to_uuid(0xaa01),
-        4,
-        to_uuid(0xaa02),
-        to_uuid(0xaa03),
-        b'\x01',
-        b'\x00',
+    to_uuid(0xaa00),
+    lambda v: to_int(v[2:]) / 128,
+    to_uuid(0xaa01),
+    4,
+    to_uuid(0xaa02),
+    to_uuid(0xaa03),
+    b'\x01',
+    b'\x00',
 ))
 
 register_st(DeviceType.HUMIDITY, DeviceSensorTag(
     to_uuid(0xaa20),
+    lambda v: to_int(v[2:]) / HDC1000_HUMIDITY,
     to_uuid(0xaa21),
     4,
     to_uuid(0xaa22),
@@ -87,6 +104,7 @@ register_st(DeviceType.HUMIDITY, DeviceSensorTag(
 
 register_st(DeviceType.LIGHT, DeviceSensorTag(
     to_uuid(0xaa70),
+    convert_light,
     to_uuid(0xaa71),
     2,
     to_uuid(0xaa72),
@@ -116,82 +134,6 @@ register_st(DeviceType.LIGHT, DeviceSensorTag(
 #           assert value < 256
 #           return bytes([value])
 #
-#   class Temperature(DeviceSensorTag):
-#       """
-#       Sensor Tag Bluetooth device temperature sensor.
-#       """
-#       info = InfoEnvSensing(
-#           to_uuid(0xaa00),
-#           to_uuid(0xaa01),
-#           4,
-#           to_uuid(0xaa02),
-#           to_uuid(0xaa03),
-#           b'\x01',
-#           b'\x01',
-#           b'\x00',
-#       )
-#
-#       def get_value(self, data):
-#           return to_int(data[2:]) / 128.0
-#
-#   class Pressure(DeviceSensorTag):
-#       """
-#       Sensor Tag Bluetooth device pressure sensor.
-#       """
-#       info = InfoEnvSensing(
-#           to_uuid(0xaa40),
-#           to_uuid(0xaa41),
-#           6,
-#           to_uuid(0xaa42),
-#           to_uuid(0xaa44),
-#           b'\x01',
-#           b'\x01',
-#           b'\x00',
-#       )
-#
-#       def get_value(self, data):
-#           return to_int(data[3:])
-#
-#   class Humidity(DeviceSensorTag):
-#       """
-#       Sensor Tag Bluetooth device humidity sensor.
-#       """
-#       HDC1000_HUMIDITY = 65536 / 100
-#
-#       info = InfoEnvSensing(
-#           to_uuid(0xaa20),
-#           to_uuid(0xaa21),
-#           4,
-#           to_uuid(0xaa22),
-#           to_uuid(0xaa23),
-#           b'\x01',
-#           b'\x01',
-#           b'\x00',
-#       )
-#
-#       def get_value(self, data):
-#           return to_int(data[2:]) / self.HDC1000_HUMIDITY
-#
-#   class Light(DeviceSensorTag):
-#       """
-#       Sensor Tag Bluetooth device light sensor.
-#       """
-#       info = InfoEnvSensing(
-#           to_uuid(0xaa70),
-#           to_uuid(0xaa71),
-#           2,
-#           to_uuid(0xaa72),
-#           to_uuid(0xaa73),
-#           b'\x01',
-#           b'\x01',
-#           b'\x00',
-#       )
-#
-#       def get_value(self, data):
-#           v = to_int(data)
-#           m = (v & 0x0FFF) / 100
-#           e = (v & 0xF000) >> 12
-#           return m * (2 << e)
 #
 #   class Accelerometer(DeviceSensorTag):
 #       """
