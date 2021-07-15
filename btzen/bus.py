@@ -17,6 +17,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import annotations
+
 import asyncio
 import contextvars
 import logging
@@ -36,9 +38,9 @@ def _mac_to_path(mac: str) -> str:
     return mac.replace(':', '_').upper()
 
 class Bus:
-    bus = contextvars.ContextVar[tp.Optional['Bus']]('bus', default=None)
+    BUS = contextvars.ContextVar[tp.Optional['Bus']]('BUS', default=None)
 
-    def __init__(self, system_bus, interface):
+    def __init__(self, system_bus, interface: str):
         self.system_bus = system_bus
         self.interface = interface
 
@@ -50,19 +52,32 @@ class Bus:
         self._characteristic_cache: dict[tuple[str, str], str] = {}
 
     @staticmethod
-    def get_bus(interface: str) -> 'Bus':
+    def create_bus(interface: str) -> Bus:
         """
-        Get system bus reference.
+        Create system bus reference.
 
         The reference is local to current context.
 
         :param interface: Bluetooth interface, i.e. `hci0`.
         """
-        bus = Bus.bus.get()
+        bus = Bus.BUS.get()
         if bus is None:
             system_bus = _sd_bus.default_bus()
             bus = Bus(system_bus, interface)
-            Bus.bus.set(bus)
+            Bus.BUS.set(bus)
+        else:
+            raise ValueError('Bus already exists')
+
+        return bus
+
+    @staticmethod
+    def get_bus() -> Bus:
+        """
+        Get system bus reference from current context.
+        """
+        bus = Bus.BUS.get()
+        if bus is None:
+            raise ValueError('Bus does not exist')
         return bus
 
     def characteristic_path(self, mac: str, uuid: str) -> str:

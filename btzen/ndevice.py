@@ -193,7 +193,7 @@ async def read_data(device: DeviceAny, mac: str) -> T:
 
 @read_data.register
 async def _read_env_sensing(device: DeviceCharacteristic, mac: str) -> T:
-    bus = Bus.get_bus('hci0')  # FIXME: no hci0
+    bus = Bus.get_bus()
     path = bus.characteristic_path(mac, device.uuid_data)
     assert path is not None
 
@@ -203,7 +203,7 @@ async def _read_env_sensing(device: DeviceCharacteristic, mac: str) -> T:
 
 @read_data.register
 async def _read_dev_notifying(device: DeviceNotifying, mac: str) -> T:
-    bus = Bus.get_bus('hci0')
+    bus = Bus.get_bus()
     dev = device.device
     path = bus.characteristic_path(mac, dev.uuid_data)
     data = await bus._gatt_get(path)
@@ -223,7 +223,7 @@ async def _enable_env_sensing(device: DeviceEnvSensing, mac: str):
 
 @enable.register
 async def _enable_dev_notifying(device: DeviceNotifying, mac: str):
-    bus = Bus.get_bus('hci0')
+    bus = Bus.get_bus()
     dev = device.device
     await enable(dev, mac)
     path = bus.characteristic_path(mac, dev.uuid_data)
@@ -240,7 +240,7 @@ async def _disable_env_sensing(device: DeviceEnvSensing, mac: str):
 
 @disable.register
 async def _disable_dev_notifying(device: DeviceNotifying, mac: str):
-    bus = Bus.get_bus('hci0')
+    bus = Bus.get_bus()
     dev = device.device
     path = bus.characteristic_path(mac, dev.uuid_data)
     assert path is not None
@@ -252,12 +252,13 @@ async def _disable_dev_notifying(device: DeviceNotifying, mac: str):
     await disable(dev, mac)
 
 async def write_config(mac: str, uuid_conf: str, data: bytes):
-    bus = Bus.get_bus('hci0')
+    bus = Bus.get_bus()
     path = bus.characteristic_path(mac, uuid_conf)
     await _btzen.bt_write(
         bus.system_bus, path, data, DEFAULT_DBUS_TIMEOUT
     )
 
+# TODO: there is disarm in btzen.cm, non async version
 async def disarm(msg: str, warn: str, f, *args):
     try:
         await f(*args)

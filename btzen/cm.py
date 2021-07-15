@@ -356,15 +356,16 @@ class ConnectionManager:
             logger.warning('error when disconnecting {}: {}'.format(mac, ex))
 
     def _get_bus(self) -> Bus:
-        return Bus.get_bus(self._interface)
+        return Bus.get_bus()
 
 @asynccontextmanager
 async def connect(devices: RDevices, *, interface: str='hci0'):
-    bus = Bus.get_bus(interface)
+    bus = Bus.create_bus(interface)
     adapter_path = bus.adapter_path()
 
     CM_STOP.set(False)
 
+    # TODO: use context variable
     _dbus_timeout = DEFAULT_DBUS_TIMEOUT
     await _cm.bt_register_agent(bus.system_bus, _dbus_timeout)
 
