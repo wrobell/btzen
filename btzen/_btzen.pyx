@@ -420,6 +420,7 @@ def bt_process(Bus bus):
     while r > 0:
         r = sd_bus_process(bus.bus, NULL)
 
+# TODO: make async
 def bt_characteristic(Bus bus, str prefix, str uuid):
     """
     Fetch Gatt Characteristic path relative to `prefix` and for specified

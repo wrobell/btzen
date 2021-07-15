@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import enum
 import logging
 import typing as tp
@@ -231,23 +232,23 @@ async def _enable_dev_notifying(device: DeviceNotifying, mac: str):
 
 @disable.register
 async def _disable_env_sensing(device: DeviceEnvSensing, mac: str):
-    try:
-        await write_config(mac, device.uuid_conf, device.config_off)
-    except Exception as ex:
-        logger.warning('cannot disable device: {}'.format(ex))
-    logger.info('device disabled: {}'.format(device))
+    await disarm(
+        'device {}/{} disabled'.format(mac, device),
+        'cannot disable device {}/{}'.format(mac, device),
+        write_config, mac, device.uuid_conf, device.config_off
+    )
 
 @disable.register
 async def _disable_dev_notifying(device: DeviceNotifying, mac: str):
     bus = Bus.get_bus('hci0')
     dev = device.device
-    try:
-        # TODO: path might be not known anymore
-        path = bus.characteristic_path(mac, dev.uuid_data)
-        bus._gatt_stop(path)
-    except Exception as ex:
-        logger.warning('cannot stop notifications: {}'.format(ex))
-
+    path = bus.characteristic_path(mac, dev.uuid_data)
+    assert path is not None
+    await disarm(
+        'notifications for {}/{} are disabled'.format(mac, device),
+        'cannot disable notifications for {}/{}'.format(mac, device),
+        bus._gatt_stop, path
+    )
     await disable(dev, mac)
 
 async def write_config(mac: str, uuid_conf: str, data: bytes):
@@ -256,5 +257,12 @@ async def write_config(mac: str, uuid_conf: str, data: bytes):
     await _btzen.bt_write(
         bus.system_bus, path, data, DEFAULT_DBUS_TIMEOUT
     )
+
+async def disarm(msg: str, warn: str, f, *args):
+    try:
+        await f(*args)
+        logger.info(msg)
+    except (Exception, asyncio.CancelledError) as ex:
+        logger.warning(warn + ': ' + str(ex))
 
 # vim: sw=4:et:ai

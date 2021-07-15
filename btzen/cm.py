@@ -64,7 +64,7 @@ from .bus import Bus
 from .error import BTZenError
 from .config import DEFAULT_DBUS_TIMEOUT
 from .device import Device
-from .ndevice import DeviceRegistration, AddressType
+from .ndevice import DeviceRegistration, AddressType, enable, disable
 from . import _cm  # type: ignore
 from .util import concat
 
@@ -498,19 +498,28 @@ async def create_connection(
         _cm.bt_device_set_trusted(bus.system_bus, dev_path)
     return created
 
-from .ndevice import enable, disable
-
 async def enable_devices(mac: str, devices: RDevices):
+    logger.info('enabling devices: {}'.format(mac))
+
     for dev in devices:
         await enable(dev.device, mac)
+
     CM_CONNECTION.get()[mac].set()
+    logger.info('enabled devices: {}'.format(mac))
 
 async def disable_devices(mac: str, devices: RDevices):
+    logger.info('disabling devices: {}'.format(mac))
+
+    # clear connection flag as soon as possible, to prevent reading from
+    # disabled device
+    CM_CONNECTION.get()[mac].clear()
+
     for dev in devices:
         # no exception checks as the disable functions should not raise
         # exceptions on failure
         await disable(dev.device, mac)
-    CM_CONNECTION.get()[mac].clear()
+
+    logger.info('disabled devices: {}'.format(mac))
 
 async def restart_devices(bus: Bus, mac: str, devices: RDevices) -> None:
     """
@@ -520,9 +529,8 @@ async def restart_devices(bus: Bus, mac: str, devices: RDevices) -> None:
 
     # the `ServicesResolved` property monitoring is started by a
     # caller, so just wait for the service to be resolved
-    async for _ in resolve_services(bus, mac):
+    async for _ in resolve_services(bus, mac, devices):
         try:
-            logger.info('enabling device {}'.format(mac))
             await enable_devices(mac, devices)
         except asyncio.CancelledError as ex:
             logger.info(
@@ -534,7 +542,7 @@ async def restart_devices(bus: Bus, mac: str, devices: RDevices) -> None:
             if CM_STOP.get():
                 raise
 
-async def resolve_services(bus: Bus, mac: str) -> tp.AsyncGenerator[None, None]:
+async def resolve_services(bus: Bus, mac: str, devices: RDevices) -> tp.AsyncGenerator[None, None]:
     """
     Asynchronous generator waiting for a Bluetooth device to be
     resolved.
@@ -549,11 +557,11 @@ async def resolve_services(bus: Bus, mac: str) -> tp.AsyncGenerator[None, None]:
 
         if resolved:
             yield
-        #else:
-        #    # disable devices; while a device itself might be
-        #    # disconneted, we might need to release d-bus related
-        #    # resources
-        #    await disable_devices(mac, devices)
+        else:
+            # disable devices; while a device itself might be
+            # disconneted, we might need to release d-bus related
+            # resources
+            await disable_devices(mac, devices)
 
 def stop_tasks(task: asyncio.Task):
     """

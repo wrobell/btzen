@@ -47,13 +47,14 @@ class Bus:
         loop.add_reader(system_bus.fileno, process)
 
         self._notifications = Notifications(self)
+        self._characteristic_cache: dict[tuple[str, str], str] = {}
 
     @staticmethod
     def get_bus(interface: str) -> 'Bus':
         """
         Get system bus reference.
 
-        The reference is local to current thread.
+        The reference is local to current context.
 
         :param interface: Bluetooth interface, i.e. `hci0`.
         """
@@ -64,9 +65,22 @@ class Bus:
             Bus.bus.set(bus)
         return bus
 
-    def characteristic_path(self, mac, uuid):
+    def characteristic_path(self, mac: str, uuid: str) -> str:
+        """
+        Get Bluetooth GATT Characteristic path for Bluetooth device address
+        and GATT Characteristic UUID.
+
+        The paths are cached.
+
+        :param mac: Bluetooth device MAC address.
+        :param uuid: UUID of Bluetooth GATT Characteristic.
+        """
         prefix = self.dev_path(mac)
-        return _btzen.bt_characteristic(self.system_bus, prefix, uuid)
+        path = self._characteristic_cache.get((mac, uuid))
+        if path is None:
+            path = _btzen.bt_characteristic(self.system_bus, prefix, uuid)
+        self._characteristic_cache[mac, uuid] = path
+        return path
 
     def _gatt_start(self, path):
         # TODO: creates notification session; if another session started,
@@ -82,7 +96,7 @@ class Bus:
     def adapter_path(self):
         return '/org/bluez/{}'.format(self.interface)
 
-    def dev_path(self, mac):
+    def dev_path(self, mac: str) -> str:
         return '/org/bluez/{}/dev_{}'.format(self.interface, _mac_to_path(mac))
 
     async def _gatt_get(self, path):
