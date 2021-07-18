@@ -40,39 +40,39 @@ async def read_sensors(args) -> None:
     #tasks.append(battery_level(battery))
 
     devices = [ctor(args.mac, make=btzen.Make.SENSOR_TAG) for _, ctor, _ in SENSORS]
-    async with btzen.connect(devices, interface=args.interface):
+    async with btzen.connect(devices, interface=args.interface) as session:
         items = zip(SENSORS, devices)
         tasks = (reader(name, dev) for (name, _, reader), dev in items)
-        await asyncio.gather(*tasks)
+        await asyncio.gather(session, *tasks)
 
-async def read_data(sensor) -> tp.Any:
-    while btzen.is_running():
+async def read_data(name: str, sensor) -> tp.Any:
+    while btzen.is_active():
         try:
             value = await btzen.read(sensor)
         except asyncio.CancelledError as ex:
             # cancelled calls happen on device disconnection
-            logger.info('{}: {}'.format(sensor, ex))
+            logger.info('{}/{}: {}'.format(name, sensor, ex))
         else:
             yield value
 
 async def read_sensor(name: str, sensor) -> None:
     loop = asyncio.get_event_loop()
-    async for value in read_data(sensor):
+    async for value in read_data(name, sensor):
         print_data(name, '{:.1f}'.format(value))
         await asyncio.sleep(-loop.time() % 1)
 
 async def read_accelerometer(name: str, sensor) -> None:
     #sensor.set_interval(0.1)
-    async for values in read_data(sensor):
+    async for values in read_data(name, sensor):
         values = ', '.join('{:.4f}'.format(v) for v in values)
         print_data(name, values)
 
 async def read_button(name: str, button) -> None:
-    async for value in read_data(button):
+    async for value in read_data(name, button):
         print_data('button', value)
 
-async def battery_level(battery) -> None:
-    async for value in read_data(battery):
+async def battery_level(name: str, battery) -> None:
+    async for value in read_data(name, battery):
         print_data('battery level', value)
 
 def print_data(name: str, value: tp.Union[str, int, float]) -> None:
@@ -82,13 +82,13 @@ def print_data(name: str, value: tp.Union[str, int, float]) -> None:
 # sensor definitions
 #
 SENSORS = [
-#    ('pressure', btzen.pressure, read_sensor),
-#    ('temperature', btzen.temperature, read_sensor),
-#    ('humidity', btzen.humidity, read_sensor),
-#    ('light', btzen.light, read_sensor),
-#    # notifying readers
+    ('pressure', btzen.pressure, read_sensor),
+    ('temperature', btzen.temperature, read_sensor),
+    ('humidity', btzen.humidity, read_sensor),
+    ('light', btzen.light, read_sensor),
+    # notifying readers
     ('button', btzen.button, read_button),
-#    ('accelerometer', btzen.accelerometer, read_accelerometer),
+    ('accelerometer', btzen.accelerometer, read_accelerometer),
 ]
 
 parser = argparse.ArgumentParser()

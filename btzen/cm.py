@@ -55,29 +55,29 @@ import asyncio
 import logging
 import typing as tp
 from collections import defaultdict
+from collections.abc import Coroutine
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from functools import partial
 from operator import attrgetter
 
+from . import _cm  # type: ignore
 from .bus import Bus
 from .error import BTZenError
 from .config import DEFAULT_DBUS_TIMEOUT
 from .device import Device
-from .ndevice import DeviceRegistration, AddressType, enable, disable
-from . import _cm  # type: ignore
+from .ndevice import DeviceRegistration, AddressType
+from .fdevice import enable, disable
+from .session import BT_SESSION, Session, get_session
 from .util import concat
 
-DeviceDict = tp.DefaultDict[str, tp.Set[Device]]
+DeviceDict = defaultdict[str, tp.Set[Device]]
 Devices = tp.Iterable[Device]
 
-RDeviceDict = tp.DefaultDict[str, set[DeviceRegistration]]
+RDeviceDict = defaultdict[str, set[DeviceRegistration]]
 RDevices = tp.Iterable[DeviceRegistration]
 
 logger = logging.getLogger(__name__)
-
-CM_CONNECTION = ContextVar[dict[str, asyncio.Event]]('CM_CONNECTION')
-CM_STOP = ContextVar[bool]('CM_STOP')
 
 FMT_PATH_ADAPTER = '/org/bluez/{}'.format
 
@@ -358,12 +358,14 @@ class ConnectionManager:
     def _get_bus(self) -> Bus:
         return Bus.get_bus()
 
+
 @asynccontextmanager
 async def connect(devices: RDevices, *, interface: str='hci0'):
     bus = Bus.create_bus(interface)
     adapter_path = bus.adapter_path()
 
-    CM_STOP.set(False)
+    session = Session(bus)
+    BT_SESSION.set(session)
 
     # TODO: use context variable
     _dbus_timeout = DEFAULT_DBUS_TIMEOUT
@@ -373,25 +375,20 @@ async def connect(devices: RDevices, *, interface: str='hci0'):
     for dev in devices:
         by_mac[dev.mac].add(dev)
 
-    CM_CONNECTION.set({mac: asyncio.Event() for mac in by_mac})
-
     # TODO: if bluez daemon is restarted, the connection manager needs
     # to be reinitialized
     bt_services = set(dev.device.service for dev in concat(by_mac.values()))
     cm_handle = await _cm.cm_init(bus.system_bus, adapter_path, bt_services)
 
-    conn_tasks = [
-        asyncio.create_task(manage_connection(bus, m, devs))
-        for m, devs in by_mac.items()
-    ]
-    for t in conn_tasks:
-        t.add_done_callback(stop_tasks)
+    for mac, devs in by_mac.items():
+        task = manage_connection(bus, mac, devs)
+        session.add_connection_task(mac, task)
+
+    session.start()
     try:
-        yield
+        yield session
     finally:
-        CM_STOP.set(True)
-        for t in conn_tasks:
-            t.cancel()
+        session.stop()
 
         disarm(
             'agent unregistered',
@@ -482,10 +479,10 @@ async def create_connection(
             _dbus_timeout
         )
     except (BTZenError, asyncio.CancelledError) as ex:
-        stop = CM_STOP.get()
-        if not stop and str(ex) == 'Already Exists':
+        is_active = get_session().is_active()
+        if is_active and str(ex) == 'Already Exists':
             created = True
-        elif not stop:
+        elif is_active:
             sleep = int(_dbus_timeout / 1e6)
             logger.info(
                 'connection for {} failed: {}, sleep for {}s'
@@ -505,15 +502,18 @@ async def enable_devices(mac: str, devices: RDevices):
     for dev in devices:
         await enable(dev.device, mac)
 
-    CM_CONNECTION.get()[mac].set()
+    get_session().set_connected(mac)
     logger.info('enabled devices: {}'.format(mac))
 
 async def disable_devices(mac: str, devices: RDevices):
     logger.info('disabling devices: {}'.format(mac))
 
+    session = get_session()
+
     # clear connection flag as soon as possible, to prevent reading from
     # disabled device
-    CM_CONNECTION.get()[mac].clear()
+    session.set_disconnected(mac)
+    session.cancel_device_tasks(mac, 'Disable device')
 
     for dev in devices:
         # no exception checks as the disable functions should not raise
@@ -524,24 +524,31 @@ async def disable_devices(mac: str, devices: RDevices):
 
 async def restart_devices(bus: Bus, mac: str, devices: RDevices) -> None:
     """
-    Re-enable or hold Bluetooth device when property 'ServicesResolved`
+    Enable or disable Bluetooth device when property 'ServicesResolved`
     changes.
     """
-
-    # the `ServicesResolved` property monitoring is started by a
-    # caller, so just wait for the service to be resolved
-    async for _ in resolve_services(bus, mac, devices):
+    # the `ServicesResolved` property monitoring is started by a caller, so
+    # just wait for services to be resolved
+    async for resolved in resolve_services(bus, mac, devices):
         try:
-            await enable_devices(mac, devices)
+            enabled = False
+            if resolved:
+                await enable_devices(mac, devices)
+                enabled = True
         except asyncio.CancelledError as ex:
             logger.info(
-                'enabling device %s failed, seems to be not connected',
+                'enabling devices for %s failed, seems to be not connected',
                 mac
             )
-            # some devices might be enabled, so try to disable them
-            await disable_devices(mac, devices)
-            if CM_STOP.get():
+            if not is_active():
                 raise
+        finally:
+            # not resolved or not all devices enabled, then disable all;
+            # some devices might be partially disabled and they still need
+            # release other resources, i.e. d-bus related
+            if not enabled:
+                # some devices might be enabled, so try to disable them
+                await disable_devices(mac, devices)
 
 async def resolve_services(bus: Bus, mac: str, devices: RDevices) -> tp.AsyncGenerator[None, None]:
     """
@@ -555,31 +562,13 @@ async def resolve_services(bus: Bus, mac: str, devices: RDevices) -> tp.AsyncGen
         )
         resolved = await bus._dev_property_get(mac, 'ServicesResolved')
         logger.info('device {} services resolved: {}'.format(mac, resolved))
-
-        if resolved:
-            yield
-        else:
-            # disable devices; while a device itself might be
-            # disconneted, we might need to release d-bus related
-            # resources
-            await disable_devices(mac, devices)
-
-def stop_tasks(task: asyncio.Task):
-    """
-    Stop BTZen connection tasks if a task is in error.
-    """
-    if task.done() and not task.cancelled() and task.exception():
-        CM_STOP.set(True)
-        try:
-            task.result()
-        except:
-            logger.critical('Error in connection task', exc_info=True) 
+        yield resolved
 
 def disarm(msg: str, warn: str, f: tp.Callable, *args: tp.Any) -> None:
     try:
         f(*args)
     except asyncio.CancelledError as ex:
-        if CM_STOP.get():
+        if not is_active():
             raise
         else:
             logger.warning(warn + ': ' + str(ex))
@@ -588,16 +577,10 @@ def disarm(msg: str, warn: str, f: tp.Callable, *args: tp.Any) -> None:
     else:
         logger.info(msg)
 
-def is_running() -> bool:
-    return not CM_STOP.get()
+def is_active() -> bool:
+    return get_session().is_active()
 
-async def connected(mac: str) -> None:
-    cm = CM_CONNECTION.get()    
-    if not mac in cm:
-        raise ValueError(
-            'Device with address {} not managed by BTZen connection manager'
-            .format(mac)
-        )
-    await cm[mac].wait()
+async def wait_connected(mac: str) -> None:
+    await get_session().wait_connected(mac)
 
 # vim: sw=4:et:ai

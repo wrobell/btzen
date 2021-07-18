@@ -19,19 +19,11 @@
 
 from __future__ import annotations
 
-import asyncio
 import enum
 import logging
 import typing as tp
 import dataclasses as dtc
 from collections import defaultdict
-from functools import singledispatch
-
-from . import _btzen  # type: ignore
-from .bus import Bus
-from .config import DEFAULT_DBUS_TIMEOUT
-from .error import CallError
-from .util import to_int
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +77,9 @@ class Device(tp.Generic[T]):
     service: str
     convert: tp.Callable[[bytes], T]
 
+    def __str__(self):
+        return "{}('{}')".format(self.__class__.__name__, self.service)
+
 @dtc.dataclass(frozen=True)
 class DeviceNotifying(tp.Generic[T]):
     """
@@ -99,6 +94,9 @@ class DeviceNotifying(tp.Generic[T]):
     def service(self):
         return self.device.service
 
+    def __str__(self):
+        return "Device('{}')".format(self.service)
+
 @dtc.dataclass(frozen=True)
 class DeviceCharacteristic(Device[T]):
     """
@@ -111,6 +109,9 @@ class DeviceCharacteristic(Device[T]):
     """
     uuid_data: str
     size: int
+
+    def __str__(self):
+        return super().__str__()
 
 @dtc.dataclass(frozen=True)
 class DeviceEnvSensing(DeviceCharacteristic[T]):
@@ -130,6 +131,9 @@ class DeviceEnvSensing(DeviceCharacteristic[T]):
     config_on: bytes
     config_off: bytes
 
+    def __str__(self):
+        return super().__str__()
+
 @dtc.dataclass(frozen=True)
 class DeviceRegistration:
     """
@@ -144,6 +148,9 @@ class DeviceRegistration:
     device: Device
     mac: str
     address_type: AddressType = AddressType.PUBLIC
+
+    def __str__(self):
+        return "DeviceRegistration('{}', '{}')".format(self.mac, self.device)
 
 
 def from_registry(make: Make, dev_type: DeviceType):
@@ -172,98 +179,5 @@ def accelerometer(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
 
 def button(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
     return register_device(from_registry(make, DeviceType.BUTTON), mac)
-
-async def read(device: DeviceRegistration) -> tp.Any:
-    from .cm import CM_STOP, connected
-    mac = device.mac
-
-    if CM_STOP.get():
-        raise CallError('btzen is not running for device {}'.format(device))
-
-    await connected(mac)
-    if CM_STOP.get():
-        return
-
-    return (await read_data(device.device, mac))
-
-
-@singledispatch
-async def read_data(device: DeviceAny, mac: str) -> T:
-    pass
-
-@read_data.register
-async def _read_env_sensing(device: DeviceCharacteristic, mac: str) -> T:
-    bus = Bus.get_bus()
-    path = bus.characteristic_path(mac, device.uuid_data)
-    assert path is not None
-
-    data = await _btzen.bt_read(bus.system_bus, path, DEFAULT_DBUS_TIMEOUT)
-    return device.convert(data)
-    # TODO: await asyncio.ensure_future(self._read_data())
-
-@read_data.register
-async def _read_dev_notifying(device: DeviceNotifying, mac: str) -> T:
-    bus = Bus.get_bus()
-    dev = device.device
-    path = bus.characteristic_path(mac, dev.uuid_data)
-    data = await bus._gatt_get(path)
-    return dev.convert(data)
-
-@singledispatch
-async def enable(device: DeviceAny, mac: str):
-    pass
-
-@singledispatch
-async def disable(device: DeviceAny, mac: str):
-    pass
-
-@enable.register
-async def _enable_env_sensing(device: DeviceEnvSensing, mac: str):
-    await write_config(mac, device.uuid_conf, device.config_on)
-
-@enable.register
-async def _enable_dev_notifying(device: DeviceNotifying, mac: str):
-    bus = Bus.get_bus()
-    dev = device.device
-    await enable(dev, mac)
-    path = bus.characteristic_path(mac, dev.uuid_data)
-    bus._gatt_start(path)
-    logger.info('notifications enabled for {}'.format(path))
-
-@disable.register
-async def _disable_env_sensing(device: DeviceEnvSensing, mac: str):
-    await disarm(
-        'device {}/{} disabled'.format(mac, device),
-        'cannot disable device {}/{}'.format(mac, device),
-        write_config, mac, device.uuid_conf, device.config_off
-    )
-
-@disable.register
-async def _disable_dev_notifying(device: DeviceNotifying, mac: str):
-    bus = Bus.get_bus()
-    dev = device.device
-    path = bus.characteristic_path(mac, dev.uuid_data)
-    assert path is not None
-    await disarm(
-        'notifications for {}/{} are disabled'.format(mac, device),
-        'cannot disable notifications for {}/{}'.format(mac, device),
-        bus._gatt_stop, path
-    )
-    await disable(dev, mac)
-
-async def write_config(mac: str, uuid_conf: str, data: bytes):
-    bus = Bus.get_bus()
-    path = bus.characteristic_path(mac, uuid_conf)
-    await _btzen.bt_write(
-        bus.system_bus, path, data, DEFAULT_DBUS_TIMEOUT
-    )
-
-# TODO: there is disarm in btzen.cm, non async version
-async def disarm(msg: str, warn: str, f, *args):
-    try:
-        await f(*args)
-        logger.info(msg)
-    except (Exception, asyncio.CancelledError) as ex:
-        logger.warning(warn + ': ' + str(ex))
 
 # vim: sw=4:et:ai

@@ -20,9 +20,10 @@
 import pkg_resources
 
 from .btweight import WeightFlags, WeightData, WeightMeasurement
-from .ndevice import Make, Device, DeviceRegistration, read, pressure, temperature, \
+from .ndevice import Make, Device, DeviceRegistration, pressure, temperature, \
     humidity, light, register_device, accelerometer, button
-from .cm import connect, is_running
+from .fdevice import read, enable, disable, read_data
+from .cm import connect, is_active
 from .error import *
 from .sensortag import SensorTagButtonState  # also to register devices
 from .serial import Serial
@@ -33,7 +34,7 @@ __all__ = [
     # bluetooth device descriptors
     'Device',
 
-    'Make', 'is_running', 'read',
+    'Make', 'is_active', 'read',
 
     # bluetooth device registration classes and functions
     'DeviceRegistration', 'register_device', 'pressure', 'temperature',
