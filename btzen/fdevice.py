@@ -26,8 +26,8 @@ from functools import singledispatch
 
 from . import _btzen  # type: ignore
 from .config import DEFAULT_DBUS_TIMEOUT
-from .ndevice import DeviceAny, DeviceRegistration, DeviceCharacteristic, \
-    DeviceNotifying, DeviceEnvSensing
+from .ndevice import ServiceAny, Device, ServiceCharacteristic, \
+    ServiceNotifying, ServiceEnvSensing
 from .error import CallError
 from .session import get_session
 
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 T = tp.TypeVar('T')
 
-async def read(device: DeviceRegistration) -> tp.Any:
+async def read(device: Device) -> tp.Any:
     mac = device.mac
     session = get_session()
 
@@ -46,54 +46,54 @@ async def read(device: DeviceRegistration) -> tp.Any:
     if not session.is_active():
         return
 
-    task = session.create_future(device, read_data(device.device, mac))
+    task = session.create_future(device, read_data(device.service, mac))
     return (await task)
 
 
 @singledispatch
-async def read_data(device: DeviceAny, mac: str) -> T:
+async def read_data(device: ServiceAny, mac: str) -> T:
     pass
 
 @read_data.register
-async def _read_env_sensing(device: DeviceCharacteristic, mac: str) -> T:
+async def _read_env_sensing(service: ServiceCharacteristic, mac: str) -> T:
     bus = get_session().bus
-    path = bus.characteristic_path(mac, device.uuid_data)
+    path = bus.characteristic_path(mac, service.uuid_data)
     assert path is not None
 
     data = await _btzen.bt_read(bus.system_bus, path, DEFAULT_DBUS_TIMEOUT)
-    return device.convert(data)
+    return service.convert(data)
 
 @read_data.register
-async def _read_dev_notifying(device: DeviceNotifying, mac: str) -> T:
+async def _read_dev_notifying(service: ServiceNotifying, mac: str) -> T:
     bus = get_session().bus
-    dev = device.device
-    path = bus.characteristic_path(mac, dev.uuid_data)
+    srv = service.service
+    path = bus.characteristic_path(mac, srv.uuid_data)
     data = await bus._gatt_get(path)
-    return dev.convert(data)
+    return srv.convert(data)
 
 @singledispatch
-async def enable(device: DeviceAny, mac: str):
+async def enable(service: ServiceAny, mac: str):
     pass
 
 @singledispatch
-async def disable(device: DeviceAny, mac: str):
+async def disable(service: ServiceAny, mac: str):
     pass
 
 @enable.register
-async def _enable_env_sensing(device: DeviceEnvSensing, mac: str):
-    await write_config(mac, device.uuid_conf, device.config_on)
+async def _enable_env_sensing(service: ServiceEnvSensing, mac: str):
+    await write_config(mac, service.uuid_conf, service.config_on)
 
 @enable.register
-async def _enable_dev_notifying(device: DeviceNotifying, mac: str):
+async def _enable_dev_notifying(service: ServiceNotifying, mac: str):
     bus = get_session().bus
-    dev = device.device
-    await enable(dev, mac)
-    path = bus.characteristic_path(mac, dev.uuid_data)
+    srv = service.service
+    await enable(srv, mac)
+    path = bus.characteristic_path(mac, srv.uuid_data)
     bus._gatt_start(path)
     logger.info('notifications enabled for {}'.format(path))
 
 @disable.register
-async def _disable_env_sensing(device: DeviceEnvSensing, mac: str):
+async def _disable_env_sensing(device: ServiceEnvSensing, mac: str):
     await disarm_async(
         'device {}/{} disabled'.format(mac, device),
         'cannot disable device {}/{}'.format(mac, device),
@@ -101,17 +101,17 @@ async def _disable_env_sensing(device: DeviceEnvSensing, mac: str):
     )
 
 @disable.register
-async def _disable_dev_notifying(device: DeviceNotifying, mac: str):
+async def _disable_dev_notifying(service: ServiceNotifying, mac: str):
     bus = get_session().bus
-    dev = device.device
-    path = bus.characteristic_path(mac, dev.uuid_data)
+    srv = service.service
+    path = bus.characteristic_path(mac, srv.uuid_data)
     assert path is not None
     await disarm(
-        'notifications for {}/{} are disabled'.format(mac, device),
-        'cannot disable notifications for {}/{}'.format(mac, device),
+        'notifications for {}/{} are disabled'.format(mac, service),
+        'cannot disable notifications for {}/{}'.format(mac, service),
         bus._gatt_stop, path
     )
-    await disable(dev, mac)
+    await disable(srv, mac)
 
 async def write_config(mac: str, uuid_conf: str, data: bytes):
     bus = get_session().bus

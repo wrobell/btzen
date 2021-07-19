@@ -24,7 +24,7 @@ from contextvars import ContextVar
 
 from .bus import Bus
 from .error import BTZenError
-from .ndevice import DeviceRegistration
+from .ndevice import Device
 
 logger = logging.getLogger()
 
@@ -40,7 +40,7 @@ class Session:
         self.bus = bus
         self._is_active = False
 
-        self._device_task: dict[DeviceRegistration, asyncio.Future] = {}
+        self._device_task: dict[Device, asyncio.Future] = {}
         self._connection_task: dict[str, asyncio.Task] = {}
         self._connection_status: dict[str, asyncio.Event] = {}
 
@@ -49,7 +49,7 @@ class Session:
     def start(self):
         self._is_active = True
 
-    def create_future(self, device: DeviceRegistration, f: Coroutine) -> asyncio.Future:
+    def create_future(self, device: Device, f: Coroutine) -> asyncio.Future:
         assert self._is_active
 
         task = asyncio.ensure_future(f)

@@ -28,10 +28,10 @@ from collections import defaultdict
 logger = logging.getLogger(__name__)
 
 # registry of known devices
-REGISTRY: dict[Make, dict[DeviceType, Device]] = defaultdict(dict)
+REGISTRY: dict[Make, dict[ServiceType, Device]] = defaultdict(dict)
 
 T = tp.TypeVar('T')
-DeviceAny = tp.Union['Device[T]', 'DeviceNotifying[T]']
+ServiceAny = tp.Union['Service[T]', 'ServiceNotifying[T]']
 
 class Make(enum.Enum):
     """
@@ -41,7 +41,7 @@ class Make(enum.Enum):
     SENSOR_TAG = enum.auto()
     THINGY52 = enum.auto()
 
-class DeviceType(enum.Enum):
+class ServiceType(enum.Enum):
     """
     Bluetooth device type.
     """
@@ -67,41 +67,41 @@ class AddressType(enum.Enum):
     RANDOM = 'random'
 
 @dtc.dataclass(frozen=True)
-class Device(tp.Generic[T]):
+class Service(tp.Generic[T]):
     """
-    Bluetooth device descriptor.
+    Bluetooth service descriptor.
 
-    :var service: UUID of Bluetooth service.
-    :var convert: Function to convert binary device data to value.
+    :var uuid: UUID of Bluetooth service.
+    :var convert: Function to convert binary data provided by service
+        to a value.
     """
-    service: str
+    uuid: str
     convert: tp.Callable[[bytes], T]
 
     def __str__(self):
-        return "{}('{}')".format(self.__class__.__name__, self.service)
+        return "{}('{}')".format(self.__class__.__name__, self.uuid)
 
 @dtc.dataclass(frozen=True)
-class DeviceNotifying(tp.Generic[T]):
+class ServiceNotifying(tp.Generic[T]):
     """
-    Bluetooth device descriptor for a device reading data via
+    Bluetooth service descriptor for a service providing data via
     notifications.
 
-    :var device: Bluetooth device descriptor.
+    :var service: Bluetooth service descriptor.
     """
-    device: T  # TODO: T == Device[T]
+    service: ServiceCharacteristic[T]
 
     @property
-    def service(self):
-        return self.device.service
+    def uuid(self):
+        return self.service.uuid
 
     def __str__(self):
-        return "Device('{}')".format(self.service)
+        return "ServiceNotifying('{}')".format(self.service)
 
 @dtc.dataclass(frozen=True)
-class DeviceCharacteristic(Device[T]):
+class ServiceCharacteristic(Service[T]):
     """
-    Bluetooth device information for device providing data via Bluetooth
-    characteristic.
+    Bluetooth service descriptor for Bluetooth characteristic.
 
     :var uuid_data: UUID of characteristic to read data from.
     :var size: Length of data received from Bluetooth characteristic on
@@ -114,10 +114,10 @@ class DeviceCharacteristic(Device[T]):
         return super().__str__()
 
 @dtc.dataclass(frozen=True)
-class DeviceEnvSensing(DeviceCharacteristic[T]):
+class ServiceEnvSensing(ServiceCharacteristic[T]):
     """
-    Bluetooth device information for device providing data via Bluetooth
-    Environmental Sensing characteristic.
+    Bluetooth service descriptor for Bluetooth Environmental Sensing
+    characteristic.
 
     :var uuid_conf: UUID of characteristic to write and read device
         configuration.
@@ -135,49 +135,52 @@ class DeviceEnvSensing(DeviceCharacteristic[T]):
         return super().__str__()
 
 @dtc.dataclass(frozen=True)
-class DeviceRegistration:
+class Device(tp.Generic[T]):
     """
-    Bluetooth device connection information.
+    Bluetooth device descriptor.
 
-    Associates Bluetooth device MAC address and address type with a device.
-
-    :var device: Bluetooth device descriptor.
+    :var service: Bluetooth service descriptor.
     :var mac: MAC address of Bluetooth device.
     :var address_type: Bluetooth device address type.
     """
-    device: Device
+    service: Service[T]
     mac: str
     address_type: AddressType = AddressType.PUBLIC
 
-    def __str__(self):
-        return "DeviceRegistration('{}', '{}')".format(self.mac, self.device)
+    def __str__(self) -> str:
+        return "Device('{}', '{}')".format(self.mac, self.service)
 
 
-def from_registry(make: Make, dev_type: DeviceType):
-    return REGISTRY[make][dev_type]
+def from_registry(make: Make, service_type: ServiceType):
+    return REGISTRY[make][service_type]
 
-def register(make: Make, dev_type: DeviceType, dev):
-    REGISTRY[make][dev_type] = dev
+def register_service(make: Make, service_type: ServiceType, service):
+    REGISTRY[make][service_type] = service
 
-def register_device(device: Device, mac: str, address_type: AddressType=AddressType.PUBLIC) -> DeviceRegistration:
-    return DeviceRegistration(device, mac, address_type=address_type)
+def create_device(
+        service: Service, mac: str, address_type: AddressType=AddressType.PUBLIC
+    ) -> Device:
+    """
+    Create Bluetooth device for a Bluetooth service.
+    """
+    return Device(service, mac, address_type=address_type)
 
-def pressure(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
-    return register_device(from_registry(make, DeviceType.PRESSURE), mac)
+def pressure(mac: str, make: Make=Make.STANDARD) -> Device:
+    return create_device(from_registry(make, ServiceType.PRESSURE), mac)
 
-def temperature(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
-    return register_device(from_registry(make, DeviceType.TEMPERATURE), mac)
+def temperature(mac: str, make: Make=Make.STANDARD) -> Device:
+    return create_device(from_registry(make, ServiceType.TEMPERATURE), mac)
 
-def humidity(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
-    return register_device(from_registry(make, DeviceType.HUMIDITY), mac)
+def humidity(mac: str, make: Make=Make.STANDARD) -> Device:
+    return create_device(from_registry(make, ServiceType.HUMIDITY), mac)
 
-def light(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
-    return register_device(from_registry(make, DeviceType.LIGHT), mac)
+def light(mac: str, make: Make=Make.STANDARD) -> Device:
+    return create_device(from_registry(make, ServiceType.LIGHT), mac)
 
-def accelerometer(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
-    return register_device(from_registry(make, DeviceType.ACCELEROMETER), mac)
+def accelerometer(mac: str, make: Make=Make.STANDARD) -> Device:
+    return create_device(from_registry(make, ServiceType.ACCELEROMETER), mac)
 
-def button(mac: str, make: Make=Make.STANDARD) -> DeviceRegistration:
-    return register_device(from_registry(make, DeviceType.BUTTON), mac)
+def button(mac: str, make: Make=Make.STANDARD) -> Device:
+    return create_device(from_registry(make, ServiceType.BUTTON), mac)
 
 # vim: sw=4:et:ai

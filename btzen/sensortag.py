@@ -41,8 +41,8 @@ import typing as tp
 from functools import partial
 
 from .device import to_uuid as to_bt_uuid
-from .ndevice import DeviceCharacteristic, DeviceEnvSensing, \
-    DeviceNotifying, register, Make, DeviceType
+from .ndevice import ServiceCharacteristic, ServiceEnvSensing, \
+    ServiceNotifying, register_service, Make, ServiceType
 from .util import to_int
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ class SensorTagButtonState(enum.IntFlag):
 # function to convert 16-bit UUID to full 128-bit Sensor Tag UUID
 to_uuid = 'f000{:04x}-0451-4000-b000-000000000000'.format
 
-register_st = partial(register, Make.SENSOR_TAG)
+register_st = partial(register_service, Make.SENSOR_TAG)
 
 def convert_light(data: bytes) -> float:
     """
@@ -96,7 +96,7 @@ def convert_button(data: bytes) -> SensorTagButtonState:
     """
     return SensorTagButtonState(data[0])
 
-register_st(DeviceType.PRESSURE, DeviceEnvSensing(
+register_st(ServiceType.PRESSURE, ServiceEnvSensing(
     to_uuid(0xaa40),
     lambda v: to_int(v[3:]),
     to_uuid(0xaa41),
@@ -107,7 +107,7 @@ register_st(DeviceType.PRESSURE, DeviceEnvSensing(
     b'\x00',
 ))
 
-register_st(DeviceType.TEMPERATURE, DeviceEnvSensing(
+register_st(ServiceType.TEMPERATURE, ServiceEnvSensing(
     to_uuid(0xaa00),
     lambda v: to_int(v[2:]) / 128,
     to_uuid(0xaa01),
@@ -118,7 +118,7 @@ register_st(DeviceType.TEMPERATURE, DeviceEnvSensing(
     b'\x00',
 ))
 
-register_st(DeviceType.HUMIDITY, DeviceEnvSensing(
+register_st(ServiceType.HUMIDITY, ServiceEnvSensing(
     to_uuid(0xaa20),
     lambda v: to_int(v[2:]) / HDC1000_HUMIDITY,
     to_uuid(0xaa21),
@@ -129,7 +129,7 @@ register_st(DeviceType.HUMIDITY, DeviceEnvSensing(
     b'\x00',
 ))
 
-register_st(DeviceType.LIGHT, DeviceEnvSensing(
+register_st(ServiceType.LIGHT, ServiceEnvSensing(
     to_uuid(0xaa70),
     convert_light,
     to_uuid(0xaa71),
@@ -140,7 +140,7 @@ register_st(DeviceType.LIGHT, DeviceEnvSensing(
     b'\x00',
 ))
 
-register_st(DeviceType.ACCELEROMETER, DeviceNotifying(DeviceEnvSensing(
+register_st(ServiceType.ACCELEROMETER, ServiceNotifying(ServiceEnvSensing(
     to_uuid(0xaa80),
     convert_accel,
     to_uuid(0xaa81),
@@ -151,14 +151,14 @@ register_st(DeviceType.ACCELEROMETER, DeviceNotifying(DeviceEnvSensing(
     b'\x00\x00',
 )))
 
-register_st(DeviceType.BUTTON, DeviceNotifying(DeviceCharacteristic(
+register_st(ServiceType.BUTTON, ServiceNotifying(ServiceCharacteristic(
     to_bt_uuid(0xffe0),
     convert_button,
     to_bt_uuid(0xffe1),
     1,
 )))
 
-#   class DeviceEnvSensing(DeviceEnvSensing):
+#   class ServiceEnvSensing(ServiceEnvSensing):
 #       """
 #       Sensor Tag Bluetooth device sensor.
 #       """

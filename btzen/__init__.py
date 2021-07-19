@@ -20,8 +20,8 @@
 import pkg_resources
 
 from .btweight import WeightFlags, WeightData, WeightMeasurement
-from .ndevice import Make, Device, DeviceRegistration, pressure, temperature, \
-    humidity, light, register_device, accelerometer, button
+from .ndevice import Make, Service, Device, pressure, temperature, \
+    humidity, light, create_device, accelerometer, button
 from .fdevice import read, enable, disable, read_data
 from .cm import connect, is_active
 from .error import *
@@ -31,13 +31,13 @@ from .serial import Serial
 __version__ = pkg_resources.get_distribution('btzen').version
 
 __all__ = [
-    # bluetooth device descriptors
-    'Device',
+    # bluetooth service descriptors
+    'Service',
 
     'Make', 'is_active', 'read',
 
-    # bluetooth device registration classes and functions
-    'DeviceRegistration', 'register_device', 'pressure', 'temperature',
+    # bluetooth device classes and functions
+    'Device', 'create_device', 'pressure', 'temperature',
     'humidity', 'light', 'accelerometer', 'button',
 
     # make specific objects
