@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses as dtc
 import logging
 import typing as tp
 from functools import singledispatch
@@ -27,7 +28,7 @@ from functools import singledispatch
 from . import _btzen  # type: ignore
 from .config import DEFAULT_DBUS_TIMEOUT
 from .ndevice import ServiceAny, Device, ServiceCharacteristic, \
-    ServiceNotifying, ServiceEnvSensing
+    ServiceNotifying, ServiceEnvSensing, Trigger, TriggerCondition
 from .error import CallError
 from .session import get_session
 
@@ -49,9 +50,42 @@ async def read(device: Device) -> tp.Any:
     task = session.create_future(device, read_data(device.service, mac))
     return (await task)
 
+@singledispatch
+async def read_data(service: ServiceAny, mac: str) -> T:
+    pass
+
+def set_interval(
+        device: Device[ServiceEnvSensing[T]], interval: float
+    ) -> Device[ServiceNotifying[ServiceEnvSensing[T]]]:
+    """
+    Set fixed time interval for Bluetooth Environmental Sensing device.
+
+    This is equivalent to::
+
+        set_trigger(TriggerCondition.FIXED_TIME, interval)
+
+    :param device: Bluetooth device descriptor.
+    :param interval: Interval in seconds.
+    """
+    return set_trigger(device, TriggerCondition.FIXED_TIME, interval)
+
+def set_trigger(
+        device: Device[ServiceEnvSensing[T]],
+        condition: TriggerCondition,
+        operand: float
+    ) -> Device[ServiceNotifying[ServiceEnvSensing[T]]]:
+    """
+    Set trigger for Bluetooth Environmental Sensing device.
+    """
+    srv = dtc.replace(device.service, trigger=Trigger(condition, operand))
+    return dtc.replace(device, service=srv)
 
 @singledispatch
-async def read_data(device: ServiceAny, mac: str) -> T:
+async def enable(service: ServiceAny, mac: str):
+    pass
+
+@singledispatch
+async def disable(service: ServiceAny, mac: str):
     pass
 
 @read_data.register
@@ -71,20 +105,12 @@ async def _read_dev_notifying(service: ServiceNotifying, mac: str) -> T:
     data = await bus._gatt_get(path)
     return srv.convert(data)
 
-@singledispatch
-async def enable(service: ServiceAny, mac: str):
-    pass
-
-@singledispatch
-async def disable(service: ServiceAny, mac: str):
-    pass
-
 @enable.register
 async def _enable_env_sensing(service: ServiceEnvSensing, mac: str):
     await write_config(mac, service.uuid_conf, service.config_on)
 
 @enable.register
-async def _enable_dev_notifying(service: ServiceNotifying, mac: str):
+async def _enable_env_sensing_notifying(service: ServiceNotifying, mac: str):
     bus = get_session().bus
     srv = service.service
     await enable(srv, mac)
@@ -93,15 +119,15 @@ async def _enable_dev_notifying(service: ServiceNotifying, mac: str):
     logger.info('notifications enabled for {}'.format(path))
 
 @disable.register
-async def _disable_env_sensing(device: ServiceEnvSensing, mac: str):
+async def _disable_env_sensing(service: ServiceEnvSensing, mac: str):
     await disarm_async(
-        'device {}/{} disabled'.format(mac, device),
-        'cannot disable device {}/{}'.format(mac, device),
-        write_config, mac, device.uuid_conf, device.config_off
+        '{}/{} disabled'.format(mac, service),
+        'cannot disable {}/{}'.format(mac, service),
+        write_config, mac, service.uuid_conf, service.config_off
     )
 
 @disable.register
-async def _disable_dev_notifying(service: ServiceNotifying, mac: str):
+async def _disable_env_sensing_notifying(service: ServiceNotifying, mac: str):
     bus = get_session().bus
     srv = service.service
     path = bus.characteristic_path(mac, srv.uuid_data)
@@ -113,9 +139,9 @@ async def _disable_dev_notifying(service: ServiceNotifying, mac: str):
     )
     await disable(srv, mac)
 
-async def write_config(mac: str, uuid_conf: str, data: bytes):
+async def write_config(mac: str, uuid: str, data: bytes):
     bus = get_session().bus
-    path = bus.characteristic_path(mac, uuid_conf)
+    path = bus.characteristic_path(mac, uuid)
     await _btzen.bt_write(
         bus.system_bus, path, data, DEFAULT_DBUS_TIMEOUT
     )

@@ -383,7 +383,7 @@ class TriggerCondition(enum.IntEnum):
     information.
 
     NOTE: Incomplete, see Bluetooth Environmental Sensing Service
-        specification, page 18..
+        specification, page 18.
     """
     INACTIVE = 0x00
     FIXED_TIME = 0x01

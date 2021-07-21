@@ -21,9 +21,12 @@
 Texas Instrument Sensor Tag Bluetooth device sensors.
 
 The sensors do not implement the Bluetooth Environmental Sensing interfaces
-and require custom classes. To enable reading data from sensors, trigger is
-required, which we default to one second. Only one trigger can be
-configured.
+and require some custom implementation.
+
+The sensors on device read data at certain time interval (period), usually
+one second. Functions `set_interval` or `set_trigger` change this interval.
+To change the time interval for a device with inactive trigger, use
+`btzen.set` function.
 
 The identificators for specific sensors can be found at
 
@@ -42,7 +45,9 @@ from functools import partial
 
 from .device import to_uuid as to_bt_uuid
 from .ndevice import ServiceCharacteristic, ServiceEnvSensing, \
-    ServiceNotifying, register_service, Make, ServiceType
+    ServiceNotifying, register_service, Make, ServiceType, Trigger, \
+    TriggerCondition
+from .fdevice import enable, _enable_env_sensing_notifying, write_config
 from .util import to_int
 
 logger = logging.getLogger(__name__)
@@ -55,6 +60,13 @@ ACCEL_WAKE_ON_MOTION = 0x80
 MPU9250_GYRO = 65536 / 500
 MPU9250_ACCEL_2G = 32768 / 2
 MPU9250_ACCEL_UNPACK = struct.Struct('<3h').unpack
+
+class SensorTagService(ServiceEnvSensing[T]):
+    interval: float=1
+
+# TODO: verify trigger data
+class SensorTagNotifying(ServiceNotifying[T]):
+    pass
 
 class SensorTagButtonState(enum.IntFlag):
     """
@@ -96,7 +108,7 @@ def convert_button(data: bytes) -> SensorTagButtonState:
     """
     return SensorTagButtonState(data[0])
 
-register_st(ServiceType.PRESSURE, ServiceEnvSensing(
+register_st(ServiceType.PRESSURE, SensorTagService(
     to_uuid(0xaa40),
     lambda v: to_int(v[3:]),
     to_uuid(0xaa41),
@@ -107,7 +119,7 @@ register_st(ServiceType.PRESSURE, ServiceEnvSensing(
     b'\x00',
 ))
 
-register_st(ServiceType.TEMPERATURE, ServiceEnvSensing(
+register_st(ServiceType.TEMPERATURE, SensorTagService(
     to_uuid(0xaa00),
     lambda v: to_int(v[2:]) / 128,
     to_uuid(0xaa01),
@@ -118,7 +130,7 @@ register_st(ServiceType.TEMPERATURE, ServiceEnvSensing(
     b'\x00',
 ))
 
-register_st(ServiceType.HUMIDITY, ServiceEnvSensing(
+register_st(ServiceType.HUMIDITY, SensorTagService(
     to_uuid(0xaa20),
     lambda v: to_int(v[2:]) / HDC1000_HUMIDITY,
     to_uuid(0xaa21),
@@ -129,7 +141,7 @@ register_st(ServiceType.HUMIDITY, ServiceEnvSensing(
     b'\x00',
 ))
 
-register_st(ServiceType.LIGHT, ServiceEnvSensing(
+register_st(ServiceType.LIGHT, SensorTagService(
     to_uuid(0xaa70),
     convert_light,
     to_uuid(0xaa71),
@@ -140,44 +152,38 @@ register_st(ServiceType.LIGHT, ServiceEnvSensing(
     b'\x00',
 ))
 
-register_st(ServiceType.ACCELEROMETER, ServiceNotifying(ServiceEnvSensing(
-    to_uuid(0xaa80),
-    convert_accel,
-    to_uuid(0xaa81),
-    18,
-    to_uuid(0xaa82),
-    to_uuid(0xaa83),
-    struct.pack('<H', ACCEL | ACCEL_WAKE_ON_MOTION),
-    b'\x00\x00',
-)))
+register_st(ServiceType.ACCELEROMETER, SensorTagNotifying(
+    ServiceEnvSensing(
+        to_uuid(0xaa80),
+        convert_accel,
+        to_uuid(0xaa81),
+        18,
+        to_uuid(0xaa82),
+        to_uuid(0xaa83),
+        struct.pack('<H', ACCEL | ACCEL_WAKE_ON_MOTION),
+        b'\x00\x00',
+    ),
+    Trigger(TriggerCondition.FIXED_TIME, 0.1),
+))
 
-register_st(ServiceType.BUTTON, ServiceNotifying(ServiceCharacteristic(
-    to_bt_uuid(0xffe0),
-    convert_button,
-    to_bt_uuid(0xffe1),
-    1,
-)))
+register_st(ServiceType.BUTTON,
+    ServiceNotifying(ServiceCharacteristic(
+        to_bt_uuid(0xffe0),
+        convert_button,
+        to_bt_uuid(0xffe1),
+        1,
+    ),
+    Trigger(TriggerCondition.INACTIVE),
+))
 
-#   class ServiceEnvSensing(ServiceEnvSensing):
-#       """
-#       Sensor Tag Bluetooth device sensor.
-#       """
-#       def __init__(self, mac, notifying=False):
-#           super().__init__(mac, notifying=notifying)
-#
-#           self.set_trigger(Trigger(TriggerCondition.FIXED_TIME, 1))
-#
-#       async def _configure(self):
-#           await super()._configure()
-#           # allow to read first value from sensor
-#           await asyncio.sleep(self._trigger.operand)
-#
-#       def _trigger_data(self, trigger: Trigger) -> bytes:
-#           assert trigger.condition == TriggerCondition.FIXED_TIME
-#
-#           value = int(trigger.operand * 100)
-#           assert value < 256
-#           return bytes([value])
-#
+@enable.register
+async def _enable_notifying(service: SensorTagNotifying, mac: str):
+    await _enable_env_sensing_notifying(service, mac)
+
+    assert service.trigger.operand is not None
+    value = int(service.trigger.operand * 100)
+    assert value < 256  # TODO: raise value error
+    await write_config(mac, service.service.uuid_trigger, bytes([value]))
+    logger.info('trigger for {}/{} is set'.format(mac, service))
 
 # vim: sw=4:et:ai

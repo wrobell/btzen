@@ -62,7 +62,6 @@ async def read_sensor(name: str, sensor) -> None:
         await asyncio.sleep(-loop.time() % 1)
 
 async def read_accelerometer(name: str, sensor) -> None:
-    #sensor.set_interval(0.1)
     async for values in read_data(name, sensor):
         values = ', '.join('{:.4f}'.format(v) for v in values)
         print_data(name, values)

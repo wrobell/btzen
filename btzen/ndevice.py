@@ -28,7 +28,7 @@ from collections import defaultdict
 logger = logging.getLogger(__name__)
 
 # registry of known devices
-REGISTRY: dict[Make, dict[ServiceType, Device]] = defaultdict(dict)
+REGISTRY = defaultdict['Make', dict['ServiceType', 'Device']](dict)
 
 T = tp.TypeVar('T')
 ServiceAny = tp.Union['Service[T]', 'ServiceNotifying[T]']
@@ -67,6 +67,22 @@ class AddressType(enum.Enum):
     RANDOM = 'random'
 
 @dtc.dataclass(frozen=True)
+class Device(tp.Generic[T]):
+    """
+    Bluetooth device descriptor.
+
+    :var service: Bluetooth service descriptor.
+    :var mac: MAC address of Bluetooth device.
+    :var address_type: Bluetooth device address type.
+    """
+    service: Service[T]
+    mac: str
+    address_type: AddressType = AddressType.PUBLIC
+
+    def __str__(self) -> str:
+        return "Device('{}', '{}')".format(self.mac, self.service)
+
+@dtc.dataclass(frozen=True)
 class Service(tp.Generic[T]):
     """
     Bluetooth service descriptor.
@@ -88,8 +104,10 @@ class ServiceNotifying(tp.Generic[T]):
     notifications.
 
     :var service: Bluetooth service descriptor.
+    :var trigger: Trigger for the service.
     """
     service: ServiceCharacteristic[T]
+    trigger: Trigger
 
     @property
     def uuid(self):
@@ -134,22 +152,24 @@ class ServiceEnvSensing(ServiceCharacteristic[T]):
     def __str__(self):
         return super().__str__()
 
+class TriggerCondition(enum.IntEnum):
+    """
+    Condition value for Bluetooth Environmental Sensing device trigger
+    information.
+
+    NOTE: Incomplete, see Bluetooth Environmental Sensing Service
+        specification, page 18.
+    """
+    INACTIVE = 0x00
+    FIXED_TIME = 0x01
+
 @dtc.dataclass(frozen=True)
-class Device(tp.Generic[T]):
+class Trigger:
     """
-    Bluetooth device descriptor.
-
-    :var service: Bluetooth service descriptor.
-    :var mac: MAC address of Bluetooth device.
-    :var address_type: Bluetooth device address type.
+    Bluetooth Environmental Sensing device trigger information.
     """
-    service: Service[T]
-    mac: str
-    address_type: AddressType = AddressType.PUBLIC
-
-    def __str__(self) -> str:
-        return "Device('{}', '{}')".format(self.mac, self.service)
-
+    condition: TriggerCondition
+    operand: tp.Optional[float]=None
 
 def from_registry(make: Make, service_type: ServiceType):
     return REGISTRY[make][service_type]
