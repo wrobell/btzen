@@ -50,6 +50,9 @@ UUID_TX_CREDIT = '00000004-0000-1000-8000-008025000000'
 UUID_RX_CREDIT = '00000003-0000-1000-8000-008025000000'
 
 class State(tp.TypedDict):
+    """
+    Device state with buffer and number of RX credits.
+    """
     buffer: bytearray
     rx_credits: int
 
@@ -64,6 +67,9 @@ register_service(
 
 @cache
 def device_state(device: Device[SerialService, T]) -> State:
+    """
+    Create or get serial device state.
+    """
     return State(buffer=bytearray(), rx_credits=0)
 
 @read.register
