@@ -68,7 +68,7 @@ async def read_accelerometer(name: str, sensor) -> None:
 
 async def read_button(name: str, button) -> None:
     async for value in read_data(name, button):
-        print_data('button', value)
+        print_data('button', str(value))
 
 async def battery_level(name: str, battery) -> None:
     async for value in read_data(name, battery):

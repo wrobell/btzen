@@ -44,15 +44,15 @@ import typing as tp
 from functools import partial
 
 from .device import to_uuid as to_bt_uuid
-from .ndevice import ServiceCharacteristic, ServiceEnvSensing, \
-    ServiceNotifying, register_service, Make, ServiceType, Trigger, \
-    TriggerCondition
-from .fdevice import enable, _enable_env_sensing_notifying, write_config
+from .service import ServiceCharacteristic, ServiceEnvSensing
+from .ndevice import Device, DeviceTrigger, \
+    register_service, Make, ServiceType, Trigger, \
+    TriggerCondition, T
+from .fdevice import enable, write_config, unset_trigger, \
+    _enable_env_sensing, _enable_tr
 from .util import to_int
 
 logger = logging.getLogger(__name__)
-
-T = tp.TypeVar('T')
 
 HDC1000_HUMIDITY = 65536 / 100
 ACCEL = 0x08 | 0x10 | 0x20
@@ -61,12 +61,8 @@ MPU9250_GYRO = 65536 / 500
 MPU9250_ACCEL_2G = 32768 / 2
 MPU9250_ACCEL_UNPACK = struct.Struct('<3h').unpack
 
-class SensorTagService(ServiceEnvSensing[T]):
+class SensorTagService(ServiceEnvSensing):
     interval: float=1
-
-# TODO: verify trigger data
-class SensorTagNotifying(ServiceNotifying[T]):
-    pass
 
 class SensorTagButtonState(enum.IntFlag):
     """
@@ -108,54 +104,66 @@ def convert_button(data: bytes) -> SensorTagButtonState:
     """
     return SensorTagButtonState(data[0])
 
-register_st(ServiceType.PRESSURE, SensorTagService(
-    to_uuid(0xaa40),
+register_st(
+    ServiceType.PRESSURE,
+    SensorTagService(
+        to_uuid(0xaa40),
+        to_uuid(0xaa41),
+        6,
+        to_uuid(0xaa42),
+        to_uuid(0xaa44),
+        b'\x01',
+        b'\x00',
+    ),
     lambda v: to_int(v[3:]),
-    to_uuid(0xaa41),
-    6,
-    to_uuid(0xaa42),
-    to_uuid(0xaa44),
-    b'\x01',
-    b'\x00',
-))
+)
 
-register_st(ServiceType.TEMPERATURE, SensorTagService(
-    to_uuid(0xaa00),
+register_st(
+    ServiceType.TEMPERATURE,
+    SensorTagService(
+        to_uuid(0xaa00),
+        to_uuid(0xaa01),
+        4,
+        to_uuid(0xaa02),
+        to_uuid(0xaa03),
+        b'\x01',
+        b'\x00',
+    ),
     lambda v: to_int(v[2:]) / 128,
-    to_uuid(0xaa01),
-    4,
-    to_uuid(0xaa02),
-    to_uuid(0xaa03),
-    b'\x01',
-    b'\x00',
-))
+)
 
-register_st(ServiceType.HUMIDITY, SensorTagService(
-    to_uuid(0xaa20),
+register_st(
+    ServiceType.HUMIDITY,
+    SensorTagService(
+        to_uuid(0xaa20),
+        to_uuid(0xaa21),
+        4,
+        to_uuid(0xaa22),
+        to_uuid(0xaa23),
+        b'\x01',
+        b'\x00',
+    ),
     lambda v: to_int(v[2:]) / HDC1000_HUMIDITY,
-    to_uuid(0xaa21),
-    4,
-    to_uuid(0xaa22),
-    to_uuid(0xaa23),
-    b'\x01',
-    b'\x00',
-))
+)
 
-register_st(ServiceType.LIGHT, SensorTagService(
-    to_uuid(0xaa70),
+register_st(
+    ServiceType.LIGHT,
+    SensorTagService(
+        to_uuid(0xaa70),
+        to_uuid(0xaa71),
+        2,
+        to_uuid(0xaa72),
+        to_uuid(0xaa73),
+        b'\x01',
+        b'\x00',
+    ),
     convert_light,
-    to_uuid(0xaa71),
-    2,
-    to_uuid(0xaa72),
-    to_uuid(0xaa73),
-    b'\x01',
-    b'\x00',
-))
+)
 
-register_st(ServiceType.ACCELEROMETER, SensorTagNotifying(
-    ServiceEnvSensing(
+register_st(
+    ServiceType.ACCELEROMETER,
+    SensorTagService(
         to_uuid(0xaa80),
-        convert_accel,
         to_uuid(0xaa81),
         18,
         to_uuid(0xaa82),
@@ -163,27 +171,40 @@ register_st(ServiceType.ACCELEROMETER, SensorTagNotifying(
         struct.pack('<H', ACCEL | ACCEL_WAKE_ON_MOTION),
         b'\x00\x00',
     ),
+    convert_accel,
     Trigger(TriggerCondition.FIXED_TIME, 0.1),
-))
+)
 
-register_st(ServiceType.BUTTON,
-    ServiceNotifying(ServiceCharacteristic(
+register_st(
+    ServiceType.BUTTON,
+    ServiceCharacteristic(
         to_bt_uuid(0xffe0),
-        convert_button,
         to_bt_uuid(0xffe1),
         1,
     ),
-    Trigger(TriggerCondition.INACTIVE),
-))
+    convert_button,
+    Trigger(TriggerCondition.ON_CHANGE),
+)
 
-@enable.register
-async def _enable_notifying(service: SensorTagNotifying, mac: str):
-    await _enable_env_sensing_notifying(service, mac)
+@enable.register  # type: ignore
+async def _enable_sensor_tag(device: Device[SensorTagService, T]):
+    await _enable_env_sensing(device)
 
-    assert service.trigger.operand is not None
-    value = int(service.trigger.operand * 100)
+    value = int(device.service.interval * 100)
     assert value < 256  # TODO: raise value error
-    await write_config(mac, service.service.uuid_trigger, bytes([value]))
-    logger.info('trigger for {}/{} is set'.format(mac, service))
+
+    await write_config(device.mac, device.service.uuid_trigger, bytes([value]))
+    logger.info('interval for {} is set'.format(device))
+
+@enable.register  # type: ignore
+async def _enable_sensor_tag_tr(device: DeviceTrigger[SensorTagService, T]):
+    await _enable_tr(device)
+
+    assert device.trigger.operand is not None
+    value = int(device.trigger.operand * 100)
+    assert value < 256  # TODO: raise value error
+
+    await write_config(device.mac, device.service.uuid_trigger, bytes([value]))
+    logger.info('trigger for {} is set'.format(device))
 
 # vim: sw=4:et:ai

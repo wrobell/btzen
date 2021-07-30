@@ -217,7 +217,7 @@ async def enable_devices(mac: str, devices: Devices):
     logger.info('enabling devices: {}'.format(mac))
 
     for dev in devices:
-        await enable(dev.service, mac)
+        await enable(dev)
 
     get_session().set_connected(mac)
     logger.info('enabled devices: {}'.format(mac))
@@ -235,7 +235,7 @@ async def disable_devices(mac: str, devices: Devices):
     for dev in devices:
         # no exception checks as the disable functions should not raise
         # exceptions on failure
-        await disable(dev.service, mac)
+        await disable(dev)
 
     logger.info('disabled devices: {}'.format(mac))
 

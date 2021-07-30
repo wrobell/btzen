@@ -27,16 +27,16 @@ from functools import singledispatch
 
 from . import _btzen  # type: ignore
 from .config import DEFAULT_DBUS_TIMEOUT
-from .ndevice import ServiceAny, Device, ServiceCharacteristic, \
-    ServiceNotifying, ServiceEnvSensing, Trigger, TriggerCondition
+from .ndevice import T, DeviceBase, Device, DeviceTrigger, NoTrigger, \
+    Trigger, TriggerCondition
+from .service import S, Service, ServiceCharacteristic, \
+    ServiceEnvSensing
 from .error import CallError
 from .session import get_session
 
 logger = logging.getLogger(__name__)
 
-T = tp.TypeVar('T')
-
-async def read(device: Device) -> tp.Any:
+async def read(device: Device[Service, T]) -> T:
     mac = device.mac
     session = get_session()
 
@@ -45,18 +45,19 @@ async def read(device: Device) -> tp.Any:
 
     await session.wait_connected(mac)
     if not session.is_active():
-        return
+        return  # type: ignore
 
-    task = session.create_future(device, read_data(device.service, mac))
+    task = session.create_future(device, read_data(device))
     return (await task)
 
 @singledispatch
-async def read_data(service: ServiceAny, mac: str) -> T:
+async def read_data(device: DeviceBase[Service, T]) -> T:
     pass
 
 def set_interval(
-        device: Device[ServiceEnvSensing[T]], interval: float
-    ) -> Device[ServiceNotifying[ServiceEnvSensing[T]]]:
+        device: Device[ServiceEnvSensing, T],
+        interval: float,
+    ) -> DeviceTrigger[ServiceEnvSensing, T]:
     """
     Set fixed time interval for Bluetooth Environmental Sensing device.
 
@@ -67,77 +68,95 @@ def set_interval(
     :param device: Bluetooth device descriptor.
     :param interval: Interval in seconds.
     """
-    return set_trigger(device, TriggerCondition.FIXED_TIME, interval)
+    return set_trigger(device, TriggerCondition.FIXED_TIME, operand=interval)
 
 def set_trigger(
-        device: Device[ServiceEnvSensing[T]],
+        device: Device[S, T],
         condition: TriggerCondition,
-        operand: float
-    ) -> Device[ServiceNotifying[ServiceEnvSensing[T]]]:
+        *,
+        operand: tp.Optional[float]=None,
+        ) -> DeviceTrigger[S, T]:
     """
     Set trigger for Bluetooth Environmental Sensing device.
     """
-    srv = dtc.replace(device.service, trigger=Trigger(condition, operand))
-    return dtc.replace(device, service=srv)
+    return DeviceTrigger(
+        device.service,
+        device.mac,
+        device.address_type,
+        device.convert,
+        Trigger(condition, operand),
+    )
+
+def unset_trigger(device: DeviceTrigger[S, T]) -> Device[S, T]:
+    """
+    Set trigger for Bluetooth Environmental Sensing device.
+    """
+    return Device(
+        device.service,
+        device.mac,
+        device.address_type,
+        device.convert,
+    )
 
 @singledispatch
-async def enable(service: ServiceAny, mac: str):
+async def enable(device: DeviceBase[Service, T]):
     pass
 
 @singledispatch
-async def disable(service: ServiceAny, mac: str):
+async def disable(device: DeviceBase[Service, T]):
     pass
 
 @read_data.register
-async def _read_env_sensing(service: ServiceCharacteristic, mac: str) -> T:
+async def _read_data(device: Device[ServiceCharacteristic, T]) -> T:
     bus = get_session().bus
-    path = bus.characteristic_path(mac, service.uuid_data)
+    path = bus.characteristic_path(device.mac, device.service.uuid_data)
     assert path is not None
 
     data = await _btzen.bt_read(bus.system_bus, path, DEFAULT_DBUS_TIMEOUT)
-    return service.convert(data)
+    return device.convert(data)
 
 @read_data.register
-async def _read_dev_notifying(service: ServiceNotifying, mac: str) -> T:
+async def _read_data_tr(device: DeviceTrigger[ServiceCharacteristic, T]) -> T:
     bus = get_session().bus
-    srv = service.service
-    path = bus.characteristic_path(mac, srv.uuid_data)
+    path = bus.characteristic_path(device.mac, device.service.uuid_data)
     data = await bus._gatt_get(path)
-    return srv.convert(data)
+    return device.convert(data)
 
 @enable.register
-async def _enable_env_sensing(service: ServiceEnvSensing, mac: str):
-    await write_config(mac, service.uuid_conf, service.config_on)
-
-@enable.register
-async def _enable_env_sensing_notifying(service: ServiceNotifying, mac: str):
+async def _enable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):
     bus = get_session().bus
-    srv = service.service
-    await enable(srv, mac)
-    path = bus.characteristic_path(mac, srv.uuid_data)
+    await enable(unset_trigger(device))
+    path = bus.characteristic_path(device.mac, device.service.uuid_data)
     bus._gatt_start(path)
     logger.info('notifications enabled for {}'.format(path))
 
-@disable.register
-async def _disable_env_sensing(service: ServiceEnvSensing, mac: str):
-    await disarm_async(
-        '{}/{} disabled'.format(mac, service),
-        'cannot disable {}/{}'.format(mac, service),
-        write_config, mac, service.uuid_conf, service.config_off
-    )
+@enable.register
+async def _enable_env_sensing(device: Device[ServiceEnvSensing, T]):
+    srv = device.service
+    await write_config(device.mac, srv.uuid_conf, srv.config_on)
 
 @disable.register
-async def _disable_env_sensing_notifying(service: ServiceNotifying, mac: str):
+async def _disable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):
     bus = get_session().bus
-    srv = service.service
-    path = bus.characteristic_path(mac, srv.uuid_data)
+    srv = device.service
+    path = bus.characteristic_path(device.mac, srv.uuid_data)
+
     assert path is not None
     await disarm(
-        'notifications for {}/{} are disabled'.format(mac, service),
-        'cannot disable notifications for {}/{}'.format(mac, service),
+        'notifications for {} are disabled'.format(device),
+        'cannot disable notifications for {}'.format(device),
         bus._gatt_stop, path
     )
-    await disable(srv, mac)
+    await disable(unset_trigger(device))
+
+@disable.register
+async def _disable_env_sensing(device: Device[ServiceEnvSensing, T]):
+    srv = device.service
+    await disarm_async(
+        '{} disabled'.format(device),
+        'cannot disable {}'.format(device),
+        write_config, device.mac, srv.uuid_conf, srv.config_off
+    )
 
 async def write_config(mac: str, uuid: str, data: bytes):
     bus = get_session().bus
