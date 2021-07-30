@@ -48,8 +48,7 @@ from .service import ServiceCharacteristic, ServiceEnvSensing
 from .ndevice import Device, DeviceTrigger, \
     register_service, Make, ServiceType, Trigger, \
     TriggerCondition, T
-from .fdevice import enable, write_config, unset_trigger, \
-    _enable_env_sensing, _enable_tr
+from .fdevice import enable, write_config, _enable_env_sensing, _enable_tr
 from .util import to_int
 
 logger = logging.getLogger(__name__)
@@ -115,7 +114,7 @@ register_st(
         b'\x01',
         b'\x00',
     ),
-    lambda v: to_int(v[3:]),
+    convert=lambda v: to_int(v[3:]),
 )
 
 register_st(
@@ -129,7 +128,7 @@ register_st(
         b'\x01',
         b'\x00',
     ),
-    lambda v: to_int(v[2:]) / 128,
+    convert=lambda v: to_int(v[2:]) / 128,
 )
 
 register_st(
@@ -143,7 +142,7 @@ register_st(
         b'\x01',
         b'\x00',
     ),
-    lambda v: to_int(v[2:]) / HDC1000_HUMIDITY,
+    convert=lambda v: to_int(v[2:]) / HDC1000_HUMIDITY,
 )
 
 register_st(
@@ -157,7 +156,7 @@ register_st(
         b'\x01',
         b'\x00',
     ),
-    convert_light,
+    convert=convert_light,
 )
 
 register_st(
@@ -171,8 +170,8 @@ register_st(
         struct.pack('<H', ACCEL | ACCEL_WAKE_ON_MOTION),
         b'\x00\x00',
     ),
-    convert_accel,
-    Trigger(TriggerCondition.FIXED_TIME, 0.1),
+    convert=convert_accel,
+    trigger=Trigger(TriggerCondition.FIXED_TIME, 0.1),
 )
 
 register_st(
@@ -182,8 +181,8 @@ register_st(
         to_bt_uuid(0xffe1),
         1,
     ),
-    convert_button,
-    Trigger(TriggerCondition.ON_CHANGE),
+    convert=convert_button,
+    trigger=Trigger(TriggerCondition.ON_CHANGE),
 )
 
 @enable.register  # type: ignore

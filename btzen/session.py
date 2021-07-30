@@ -19,12 +19,14 @@
 
 import asyncio
 import logging
+import typing as tp
 from collections.abc import Coroutine
+from contextlib import asynccontextmanager
 from contextvars import ContextVar
 
 from .bus import Bus
-from .error import BTZenError
-from .ndevice import Device
+from .error import BTZenError, CallError
+from .ndevice import DeviceBase
 
 logger = logging.getLogger()
 
@@ -40,7 +42,7 @@ class Session:
         self.bus = bus
         self._is_active = False
 
-        self._device_task: dict[Device, asyncio.Future] = {}
+        self._device_task: dict[DeviceBase, asyncio.Future] = {}
         self._connection_task: dict[str, asyncio.Task] = {}
         self._connection_status: dict[str, asyncio.Event] = {}
 
@@ -49,7 +51,7 @@ class Session:
     def start(self):
         self._is_active = True
 
-    def create_future(self, device: Device, f: Coroutine) -> asyncio.Future:
+    def create_future(self, device: DeviceBase, f: Coroutine) -> asyncio.Future:
         assert self._is_active
 
         task = asyncio.ensure_future(f)
@@ -122,6 +124,19 @@ class Session:
             yield from self._event.wait().__await__()
         finally:
             self.stop()
+
+@asynccontextmanager
+async def connected(mac: str) -> tp.AsyncIterator[Session]:
+    session = get_session()
+
+    if not session.is_active():
+        raise CallError(
+            'BTZen is not running for device with address {}'.format(mac)
+        )
+
+    await session.wait_connected(mac)
+    if session.is_active():
+        yield session
 
 def get_session() -> Session:
     return BT_SESSION.get()

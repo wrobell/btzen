@@ -29,138 +29,158 @@ Tested with HeinrichsWeikamp OSTC 2 dive computer.
 import asyncio
 import math
 import logging
+import typing as tp
 from binascii import hexlify
 from contextlib import asynccontextmanager
-from functools import partial
+from functools import partial, cache
 
 from . import _btzen  # type: ignore
 from .bus import Bus
-from .device import Device, Info, to_uuid
+from .config import DEFAULT_DBUS_TIMEOUT
+from .ndevice import T, Device, Make, ServiceType, register_service, to_uuid
+from .service import Service
+from .fdevice import enable, disable, read, write, disarm
+from .session import get_session, connected
 
 logger = logging.getLogger(__name__)
 
-def credits_for(n):
+UUID_RX_UART = '00000001-0000-1000-8000-008025000000'
+UUID_TX_UART = '00000002-0000-1000-8000-008025000000'
+UUID_TX_CREDIT = '00000004-0000-1000-8000-008025000000'
+UUID_RX_CREDIT = '00000003-0000-1000-8000-008025000000'
+
+class State(tp.TypedDict):
+    buffer: bytearray
+    rx_credits: int
+
+class SerialService(Service):
+    pass
+
+register_service(
+    Make.OSTC,
+    ServiceType.SERIAL,
+    SerialService(to_uuid(0xfefb)),
+)
+
+@cache
+def device_state(device: Device[SerialService, T]) -> State:
+    return State(buffer=bytearray(), rx_credits=0)
+
+@read.register
+async def _read_serial(device: Device[SerialService, T], n: int) -> T:
+    async with connected(device.mac) as session:
+        task = session.create_future(device, _read_data(session.bus, device, n))
+        return (await task)
+
+async def _read_data(bus: Bus, device: Device[SerialService, T], n: int) -> bytes:
+    state = device_state(device)
+    data = bytearray(state['buffer'])
+    path_uart = bus.characteristic_path(device.mac, UUID_TX_UART)
+    while len(data) < n:
+        async with _rx_credits_mgr(bus, device, n - len(data)):
+            item = await bus._gatt_get(path_uart)
+            data.extend(item)
+
+            if __debug__:
+                logger.debug(
+                    'bytes read {}, last {}, tx credits size {}'
+                    .format(len(data), hexlify(data[-5:]).decode(), _tx_credit_size(bus, device.mac))
+                )
+
+    assert len(data) >= n
+
+    # keep extra data in buffer, return only requested number of bytes
+    state['buffer'] = data[n:]
+    return data[:n]
+
+@write.register
+async def _write_serial(device: Device[SerialService, T], data: bytes):
+    assert len(data) <= 20
+    async with connected(device.mac) as session:
+        state = device_state(device)
+
+        if state['rx_credits'] < 1:
+            await _add_rx_credits(session.bus, device)
+
+        if _tx_credit_size(session.bus, device.mac) > 0:
+            logger.debug('requesting tx credits on write')
+            await _tx_credit(session.bus, device.mac)
+
+        await _write(session.bus, device.mac, UUID_RX_UART, data)
+
+@enable.register
+async def _enable_serial(device: Device[SerialService, T]):
+    bus = get_session().bus
+    get_path = partial(bus.characteristic_path, device.mac)
+
+    # reset cache for device
+    state = device_state(device)
+    state['buffer'] = bytearray()
+    state['rx_credits'] = 0
+
+    bus._gatt_start(get_path(UUID_TX_CREDIT))
+    bus._gatt_start(get_path(UUID_TX_UART))
+
+    logger.debug('requesting xx credits on enable')
+    await _add_rx_credits(bus, device)
+
+    logger.debug('requesting tx credits on enable')
+    await _tx_credit(bus, device.mac)
+
+@disable.register
+async def _disable_serial(device: Device[SerialService, T]):
+    bus = get_session().bus
+    await disarm(
+        'disabled tx credit for {}'.format(device.mac),
+        'cannot disabl tx credit for {}'.format(device.mac),
+        bus._gatt_stop,
+        bus.characteristic_path(device.mac, UUID_TX_CREDIT),
+    )
+    await disarm(
+        'disabled tx uart for {}'.format(device.mac),
+        'cannot disabl tx uart for {}'.format(device.mac),
+        bus._gatt_stop,
+        bus.characteristic_path(device.mac, UUID_TX_UART),
+    )
+
+async def _tx_credit(bus: Bus, mac: str):
+    path = bus.characteristic_path(mac, UUID_TX_CREDIT)
+    n = await bus._gatt_get(path)
+    logger.debug('got tx credits: {}'.format(n))
+
+def _tx_credit_size(bus: Bus, mac: str) -> int:
+    path = bus.characteristic_path(mac, UUID_TX_CREDIT)
+    return bus._gatt_size(path)
+
+async def _add_rx_credits(bus: Bus, device: Device[SerialService, T], n=0x20):
+    state = device_state(device)
+    await _write(bus, device.mac, UUID_RX_CREDIT, bytes([n]))
+    state['rx_credits'] += n
+    logger.debug('rx credits: {}'.format(state['rx_credits']))
+
+@asynccontextmanager
+async def _rx_credits_mgr(
+        bus: Bus, device: Device[SerialService, T], n: int
+    ) -> tp.AsyncIterator:
+
+    state = device_state(device)
+    if state['rx_credits'] < 1:
+        await _add_rx_credits(bus, device, credits_for(n))
+
+    try:
+        yield
+    finally:
+        state['rx_credits'] -= 1
+
+async def _write(bus: Bus, mac: str, uuid: str, data: bytes):
+    path = bus.characteristic_path(mac, uuid)
+    task = _btzen.bt_write(bus.system_bus, path, data, DEFAULT_DBUS_TIMEOUT)
+    await task
+
+def credits_for(n: int) -> int:
     """
     Calculate number of required credits to send `n` number of bytes.
     """
     return min(255, math.ceil(n / 20))
-
-class Serial(Device):
-    info = Info(to_uuid(0xfefb))
-
-    UUID_RX_UART = '00000001-0000-1000-8000-008025000000'
-    UUID_TX_UART = '00000002-0000-1000-8000-008025000000'
-    UUID_TX_CREDIT = '00000004-0000-1000-8000-008025000000'
-    UUID_RX_CREDIT = '00000003-0000-1000-8000-008025000000'
-
-    def __init__(self, mac):
-        super().__init__(mac)
-        self._buffer = bytearray()
-        self._init_paths()
-
-    async def enable(self):
-        get_path = partial(self._bus.characteristic_path, self.mac)
-
-        self._tx_credit_path = get_path(self.UUID_TX_CREDIT)
-        self._tx_uart_path = get_path(self.UUID_TX_UART)
-        self._rx_credit_path = get_path(self.UUID_RX_CREDIT)
-        self._rx_uart_path = get_path(self.UUID_RX_UART)
-
-        self._bus._gatt_start(self._tx_credit_path)
-        self._bus._gatt_start(self._tx_uart_path)
-
-        self._tx_credit = partial(self._bus._gatt_get, self._tx_credit_path)
-        self._tx_uart = partial(self._bus._gatt_get, self._tx_uart_path)
-        self._tx_credit_size = partial(self._bus._gatt_size, self._tx_credit_path)
-
-        self._rx_credits = 0
-        await self._add_rx_credits()
-        logger.debug('requesting tx credits on enable')
-        value = await self._tx_credit()
-        logger.debug('got tx credits on enable: {}'.format(value))
-
-    def disable(self):
-        self._disable_notification(self._tx_credit_path)
-        self._disable_notification(self._tx_uart_path)
-        super().disable()
-
-    async def read(self, n):
-        await self._cm.connected(self.mac)
-        data = bytearray(self._buffer)
-        while len(data) < n:
-            async with self._rx_credits_mgr(n - len(data)):
-                item = await self._tx_uart()
-                data.extend(item)
-
-                if __debug__:
-                    logger.debug(
-                        'bytes read {}, last {}, tx credits size {}'
-                        .format(len(data), hexlify(data[-5:]), self._tx_credit_size())
-                    )
-
-        assert len(data) >= n
-
-        # keep extra data in buffer, return only requested number of bytes
-        self._buffer = data[n:]
-        return data[:n]
-
-    async def write(self, data):
-        await self._cm.connected(self.mac)
-        assert len(data) <= 20
-
-        if self._rx_credits < 1:
-            await self._add_rx_credits()
-
-        if self._tx_credit_size() > 0:
-            logger.debug('requesting tx credits')
-            value = await self._tx_credit()
-            logger.debug('got tx credits: {}'.format(value))
-
-        await self._write(self._rx_uart_path, data)
-
-    def close(self):
-        """
-        Close serial device.
-        """
-        if self._tx_credit_path:
-            self._bus._gatt_stop(self._tx_credit_path)
-        if self._tx_uart_path:
-            self._bus._gatt_stop(self._tx_uart_path)
-        self._init_paths()
-
-    @asynccontextmanager
-    async def _rx_credits_mgr(self, n):
-        if self._rx_credits < 1:
-            await self._add_rx_credits(credits_for(n))
-        try:
-            yield
-        finally:
-            self._rx_credits -= 1
-
-    async def _add_rx_credits(self, n=0x20):
-        await self._write(self._rx_credit_path, bytes([n]))
-        self._rx_credits += n
-        logger.debug('rx credits: {}'.format(self._rx_credits))
-
-    async def _write(self, path, data):
-        task = _btzen.bt_write(self._bus.system_bus, path, data)
-        await task
-
-    def _init_paths(self):
-        self._tx_credit_path = None
-        self._tx_uart_path = None
-        self._rx_credit_path = None
-        self._rx_uart_path = None
-
-    def _disable_notification(self, path: str) -> None:
-        """
-        Disable notifications.
-        """
-        try:
-            self._bus._gatt_stop(path)
-        except Exception as ex:
-            logger.warning('cannot disable notification for {}: {}'.format(
-                path, ex
-            ))
 
 # vim: sw=4:et:ai

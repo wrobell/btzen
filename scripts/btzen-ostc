@@ -31,14 +31,14 @@ import asyncio
 import logging
 import struct
 from collections import namedtuple
-from cytoolz import itertoolz as itz
-from cytoolz.functoolz import identity
+from cytoolz import itertoolz as itz  # type: ignore
+from cytoolz.functoolz import identity  # type: ignore
 from datetime import datetime
 from functools import partial
 
-from btzen import Serial, ConnectionManager
+import btzen
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('btzen-ostc')
 
 DiveHeader = namedtuple('DiveHeader', ['size', 'datetime', 'depth', 'duration', 'dive_number', 'version'])
 to_int = partial(int.from_bytes, byteorder='little', signed=False)
@@ -53,34 +53,35 @@ def parse_header(item):
     values = (p(v) for p, v in values)
     return DiveHeader._make(values)
 
-async def start(dev):
-    await dev.write(b'\xbb')
-    value = await dev.read(2)
+async def start(dev: btzen.DeviceBase) -> None:
+    await btzen.write(dev, b'\xbb')
+    value = await btzen.read(dev, 2)
     assert value == b'\xbb\x4d', 'got: {}'.format(value)
+    logger.info('started')
 
-async def stop(dev):
-    await dev.write(b'\xff')
+async def stop(dev: btzen.DeviceBase) -> None:
+    await btzen.write(dev, b'\xff')
     # NOTE: do not wait for the response as device is disconnected now
-    # value = await dev.read(2)
+    # value = await btzen.read(dev, 2)
     # assert value == b'\xffM', 'got: {}'.format(value)
 
-async def display(dev, msg):
-    msg = '{:16.16}'.format(msg).encode()
+async def display(dev: btzen.DeviceBase, msg: str) -> None:
+    msg_data = '{:16.16}'.format(msg).encode()
 
-    await dev.write(b'\x6e')
-    value = await dev.read(1)
+    await btzen.write(dev, b'\x6e')
+    value = await btzen.read(dev, 1)
     assert value == b'\x6e'
-    await dev.write(msg)
-    value = await dev.read(1)
+    await btzen.write(dev, msg_data)
+    value = await btzen.read(dev, 1)
     assert value == b'\x4d'
 
-async def read_data(dev, count):
+async def read_data(dev: btzen.DeviceBase, count: int):
     await start(dev)
     await display(dev, 'BTZen Connected')
 
     try:
-        await dev.write(b'\x6d')
-        headers = await dev.read(4098)
+        await btzen.write(dev, b'\x6d')
+        headers = await btzen.read(dev, 4098)
         headers = headers[1:-1]
 
         # get 20 latests dives
@@ -95,37 +96,30 @@ async def read_data(dev, count):
         for k, header in enumerate(items, 1):
             fmt = '{:3d}: {:%Y-%m-%d %H:%M} {:5.1f}m {:5.1f}\''.format
             print(fmt(k, header.datetime, header.depth, header.duration))
+        logger.info('done')
     finally:
         await stop(dev)
 
-async def run_single(dev, count):
+async def run_single(mac: str, count: int):
     """
     Download dives from a dive computer and exit.
     """
-    manager = ConnectionManager()
-    manager.add(dev)
-    asyncio.create_task(manager.__await__())
-    try:
+    dev = btzen.serial(mac, make=btzen.Make.OSTC)
+    async with btzen.connect([dev]) as session:
         await read_data(dev, count)
-    finally:
-        manager.close()
 
-async def run_loop(dev, count):
+async def run_loop(mac: str, count: int):
     """
     Download dives from a dive computer in a loop.
     """
-    manager = ConnectionManager()
-    manager.add(dev)
-    asyncio.create_task(manager.__await__())
-    try:
+    dev = btzen.serial(mac, make=btzen.Make.OSTC)
+    async with btzen.connect([dev]) as session:
         while True:
             await read_data(dev, count)
 
             # TODO: we need to wait for dive computer disconnection; let's
             # figure out better mechanism in the future
             await asyncio.sleep(10)
-    finally:
-        manager.close()
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -143,12 +137,10 @@ parser.add_argument(
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
-if args.verbose:
-    logging.basicConfig(level=logging.DEBUG)
+level = logging.DEBUG if args.verbose else logging.INFO
+logging.basicConfig(level=level)
 
 runner = run_loop if args.loop else run_single
-
-dev = Serial(args.device)
-asyncio.run(runner(dev, args.count))
+asyncio.run(runner(args.device, args.count))
 
 # vim: sw=4:et:ai

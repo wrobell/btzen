@@ -43,6 +43,10 @@ _SERVICE_REGISTRY = defaultdict[
 # key is tuple (base class, parameter class)
 _PROXY_REGISTRY: dict[tuple[type, type], type] = {}
 
+# function to convert 16-bit UUID to full 128-bit Bluetooth normative UUID
+# string
+to_uuid: tp.Callable[[int], str] = '0000{:04x}-0000-1000-8000-00805f9b34fb'.format
+
 class Make(enum.Enum):
     """
     Bluetooth device make.
@@ -50,17 +54,19 @@ class Make(enum.Enum):
     STANDARD = enum.auto()
     SENSOR_TAG = enum.auto()
     THINGY52 = enum.auto()
+    OSTC = enum.auto()
 
 class ServiceType(enum.Enum):
     """
-    Bluetooth device type.
+    Bluetooth service type.
     """
-    PRESSURE = enum.auto()
-    TEMPERATURE = enum.auto()
-    HUMIDITY = enum.auto()
-    LIGHT = enum.auto()
     ACCELEROMETER = enum.auto()
     BUTTON = enum.auto()
+    HUMIDITY = enum.auto()
+    LIGHT = enum.auto()
+    PRESSURE = enum.auto()
+    SERIAL = enum.auto()
+    TEMPERATURE = enum.auto()
     WEIGHT_MEASUREMENT = enum.auto()
 
 class AddressType(enum.Enum):
@@ -212,7 +218,8 @@ def register_service(
         make: Make,
         service_type: ServiceType,
         service: Service,
-        convert: Converter,
+        *,
+        convert: Converter[T]=tp.cast(Converter, lambda v: v),
         trigger: AnyTrigger=NoTrigger(),
     ):
     """
@@ -255,5 +262,6 @@ humidity = partial(_create_device, ServiceType.HUMIDITY)
 light = partial(_create_device, ServiceType.LIGHT)
 accelerometer = partial(_create_device, ServiceType.ACCELEROMETER)
 button = partial(_create_device, ServiceType.BUTTON)
+serial = partial(_create_device, ServiceType.SERIAL)
 
 # vim: sw=4:et:ai

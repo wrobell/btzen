@@ -32,26 +32,16 @@ from .ndevice import T, DeviceBase, Device, DeviceTrigger, NoTrigger, \
 from .service import S, Service, ServiceCharacteristic, \
     ServiceEnvSensing
 from .error import CallError
-from .session import get_session
+from .session import get_session, connected
 
 logger = logging.getLogger(__name__)
 
-async def read(device: Device[Service, T]) -> T:
-    mac = device.mac
-    session = get_session()
-
-    if not session.is_active():
-        raise CallError('btzen is not running for device {}'.format(device))
-
-    await session.wait_connected(mac)
-    if not session.is_active():
-        return  # type: ignore
-
-    task = session.create_future(device, read_data(device))
-    return (await task)
+@singledispatch
+async def read(device: DeviceBase[Service, T], *args: tp.Any) -> T:
+    pass
 
 @singledispatch
-async def read_data(device: DeviceBase[Service, T]) -> T:
+async def write(device: DeviceBase[Service, T], data: bytes):
     pass
 
 def set_interval(
@@ -106,21 +96,28 @@ async def enable(device: DeviceBase[Service, T]):
 async def disable(device: DeviceBase[Service, T]):
     pass
 
-@read_data.register
-async def _read_data(device: Device[ServiceCharacteristic, T]) -> T:
-    bus = get_session().bus
-    path = bus.characteristic_path(device.mac, device.service.uuid_data)
-    assert path is not None
+@read.register
+async def _read_dev(device: Device[ServiceCharacteristic, T]) -> T:
+    async with connected(device.mac) as session:
+        bus = session.bus
+        path = bus.characteristic_path(device.mac, device.service.uuid_data)
+        assert path is not None
 
-    data = await _btzen.bt_read(bus.system_bus, path, DEFAULT_DBUS_TIMEOUT)
-    return device.convert(data)
+        task = session.create_future(
+            device,
+            _btzen.bt_read(bus.system_bus, path, DEFAULT_DBUS_TIMEOUT)
+        )
+        data = await task
+        return device.convert(data)
 
-@read_data.register
-async def _read_data_tr(device: DeviceTrigger[ServiceCharacteristic, T]) -> T:
-    bus = get_session().bus
-    path = bus.characteristic_path(device.mac, device.service.uuid_data)
-    data = await bus._gatt_get(path)
-    return device.convert(data)
+@read.register
+async def _read_dev_tr(device: DeviceTrigger[ServiceCharacteristic, T]) -> T:
+    async with connected(device.mac) as session:
+        bus = session.bus
+        path = bus.characteristic_path(device.mac, device.service.uuid_data)
+        task = session.create_future(device, bus._gatt_get(path))
+        data = await task
+        return device.convert(data)
 
 @enable.register
 async def _enable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):
