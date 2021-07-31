@@ -74,7 +74,7 @@ def device_state(device: Device[SerialService, T]) -> State:
 
 @read.register
 async def _read_serial(device: Device[SerialService, T], n: int) -> T:
-    async with connected(device.mac) as session:
+    async with connected(device) as session:
         task = session.create_future(device, _read_data(session.bus, device, n))
         return (await task)
 
@@ -102,7 +102,7 @@ async def _read_data(bus: Bus, device: Device[SerialService, T], n: int) -> byte
 @write.register
 async def _write_serial(device: Device[SerialService, T], data: bytes):
     assert len(data) <= 20
-    async with connected(device.mac) as session:
+    async with connected(device) as session:
         state = device_state(device)
 
         if state['rx_credits'] < 1:

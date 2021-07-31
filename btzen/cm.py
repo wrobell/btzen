@@ -299,7 +299,4 @@ def disarm(msg: str, warn: str, f: tp.Callable, *args: tp.Any) -> None:
 def is_active() -> bool:
     return get_session().is_active()
 
-async def wait_connected(mac: str) -> None:
-    await get_session().wait_connected(mac)
-
 # vim: sw=4:et:ai

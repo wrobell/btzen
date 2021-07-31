@@ -98,7 +98,7 @@ async def disable(device: DeviceBase[Service, T]):
 
 @read.register
 async def _read_dev(device: Device[ServiceCharacteristic, T]) -> T:
-    async with connected(device.mac) as session:
+    async with connected(device) as session:
         bus = session.bus
         path = bus.characteristic_path(device.mac, device.service.uuid_data)
         assert path is not None
@@ -112,7 +112,7 @@ async def _read_dev(device: Device[ServiceCharacteristic, T]) -> T:
 
 @read.register
 async def _read_dev_tr(device: DeviceTrigger[ServiceCharacteristic, T]) -> T:
-    async with connected(device.mac) as session:
+    async with connected(device) as session:
         bus = session.bus
         path = bus.characteristic_path(device.mac, device.service.uuid_data)
         task = session.create_future(device, bus._gatt_get(path))

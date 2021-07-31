@@ -35,17 +35,17 @@ import btzen
 
 logger = logging.getLogger()
 
-async def read_sensors(args) -> None:
-    #battery = btzen.BatteryLevel(args.mac, notifying=True)
+async def read_sensors(mac: str, interface: str) -> None:
+    #battery = btzen.BatteryLevel(mac, notifying=True)
     #tasks.append(battery_level(battery))
 
-    devices = [ctor(args.mac, make=btzen.Make.SENSOR_TAG) for _, ctor, _ in SENSORS]
-    async with btzen.connect(devices, interface=args.interface) as session:
+    devices = [ctor(mac, make=btzen.Make.SENSOR_TAG) for _, ctor, _ in SENSORS]
+    async with btzen.connect(devices, interface=interface) as session:
         items = zip(SENSORS, devices)
         tasks = (reader(name, dev) for (name, _, reader), dev in items)
         await asyncio.gather(session, *tasks)
 
-async def read_data(name: str, sensor) -> tp.Any:
+async def read_data(name: str, sensor: btzen.DeviceBase) -> tp.Any:
     while btzen.is_active():
         try:
             value = await btzen.read(sensor)
@@ -55,18 +55,18 @@ async def read_data(name: str, sensor) -> tp.Any:
         else:
             yield value
 
-async def read_sensor(name: str, sensor) -> None:
+async def read_sensor(name: str, sensor: btzen.DeviceBase) -> None:
     loop = asyncio.get_event_loop()
     async for value in read_data(name, sensor):
         print_data(name, '{:.1f}'.format(value))
         await asyncio.sleep(-loop.time() % 1)
 
-async def read_accelerometer(name: str, sensor) -> None:
+async def read_accelerometer(name: str, sensor: btzen.DeviceBase) -> None:
     async for values in read_data(name, sensor):
         values = ', '.join('{:.4f}'.format(v) for v in values)
         print_data(name, values)
 
-async def read_button(name: str, button) -> None:
+async def read_button(name: str, button: btzen.DeviceBase) -> None:
     async for value in read_data(name, button):
         print_data('button', str(value))
 
@@ -106,6 +106,6 @@ level = logging.DEBUG if args.verbose else logging.INFO
 logging.basicConfig(level=level)
 
 uvloop.install()
-asyncio.run(read_sensors(args))
+asyncio.run(read_sensors(args.mac, args.interface))
 
 # vim: sw=4:et:ai

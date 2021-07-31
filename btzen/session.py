@@ -28,7 +28,7 @@ from .bus import Bus
 from .error import BTZenError, CallError
 from .ndevice import DeviceBase
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 BT_SESSION = ContextVar['Session']('BT_SESSION')
 
@@ -52,6 +52,11 @@ class Session:
         self._is_active = True
 
     def create_future(self, device: DeviceBase, f: Coroutine) -> asyncio.Future:
+        """
+        Create future managed by BTZen connection session.
+
+        If session stops, then all pending tasks are cancelled.
+        """
         assert self._is_active
 
         task = asyncio.ensure_future(f)
@@ -76,16 +81,19 @@ class Session:
     def set_disconnected(self, mac: str):
         self._connection_status[mac].clear()
 
-    async def wait_connected(self, mac: str) -> None:
+    async def wait_connected(self, device: DeviceBase) -> None:
         assert self._is_active
 
-        event = self._connection_status.get(mac)
+        event = self._connection_status.get(device.mac)
         if event is None:
             raise BTZenError(
                 'Device with address {} not managed by BTZen connection manager'
-                .format(mac)
+                .format(device.mac)
             )
-        await event.wait()
+        # create future, so it can be cancelled when error happens in
+        # connection management tasks
+        task = self.create_future(device, event.wait())
+        await task
 
     def is_active(self) -> bool:
         return self._is_active
@@ -124,17 +132,19 @@ class Session:
             yield from self._event.wait().__await__()
         finally:
             self.stop()
+        logger.info('session await exit')
 
 @asynccontextmanager
-async def connected(mac: str) -> tp.AsyncIterator[Session]:
+async def connected(device: DeviceBase) -> tp.AsyncIterator[Session]:
     session = get_session()
 
     if not session.is_active():
         raise CallError(
-            'BTZen is not running for device with address {}'.format(mac)
+            'BTZen is not running for device with address {}'
+            .format(device.mac)
         )
 
-    await session.wait_connected(mac)
+    await session.wait_connected(device)
     if session.is_active():
         yield session
 
