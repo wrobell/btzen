@@ -100,35 +100,57 @@ non_subclass_data = [
 
 @pytest.mark.parametrize('obj, cls, func, func_result', instance_data)
 def test_instance(obj, cls, func, func_result):
+    """
+    Test instance of parametrised class.
+    """
     assert isinstance(obj, cls)
     assert type(obj) == cls
     assert dtc.is_dataclass(obj)
 
 @pytest.mark.parametrize('parent, cls', subclass_data)
 def test_subclass(parent, cls):
+    """
+    Test inheritance of parametrised subclasses.
+    """
     assert parent in cls.mro()
     assert issubclass(cls, parent)
 
 @pytest.mark.parametrize('parent, cls', non_subclass_data)
 def test_not_subclass(parent, cls):
+    """
+    Test lack of inheritance of parametrised subclasses.
+    """
     assert parent not in cls.mro()
     assert not issubclass(cls, parent)
 
 @pytest.mark.parametrize('obj, cls, func, func_result', instance_data)
 def test_dispatch(obj, cls, func, func_result):
+    """
+    Test generic functions dispatch against instances of parametrised
+    classes.
+    """
     assert read.dispatch(type(obj)) == func
     assert read(obj) == func_result
 
-def test_cls_param():
+def test_cls_create():
+    """
+    Test creating parametrised class.
+    """
     t = Device[Service, T]
     assert isinstance(t, type)
 
-def test_cls_param_self():
+def test_cls_create_self():
+    """
+    Test creating parametrised class when itself has to be returned.
+    """
     t = Device[S, T]
     assert t == Device
 
 @pytest.mark.parametrize('cls_param', [(Service,), (Service, int)])
 def test_cls_param_invalid(cls_param):
+    """
+    Test if error is raised on an invalid parameters passed to a class.
+    """
     with pytest.raises(TypeError) as ctx:
         Device[cls_param]
 
