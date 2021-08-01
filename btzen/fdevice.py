@@ -120,17 +120,27 @@ async def _read_dev_tr(device: DeviceTrigger[ServiceCharacteristic, T]) -> T:
         return device.convert(data)
 
 @enable.register
+async def _enable(device: Device[ServiceCharacteristic, T]):
+    bus = get_session().bus
+    await bus.ensure_characteristic_paths(device.mac, device.service.uuid_data)
+
+@enable.register
 async def _enable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):
     bus = get_session().bus
     await enable(unset_trigger(device))
     path = bus.characteristic_path(device.mac, device.service.uuid_data)
     assert path is not None
+
     bus._gatt_start(path)
     logger.info('notifications enabled for {}'.format(path))
 
 @enable.register
 async def _enable_env_sensing(device: Device[ServiceEnvSensing, T]):
+    bus = get_session().bus
     srv = device.service
+    await bus.ensure_characteristic_paths(
+        device.mac, srv.uuid_data, srv.uuid_conf, srv.uuid_trigger
+    )
     await write_config(device.mac, srv.uuid_conf, srv.config_on)
 
 @disable.register
@@ -138,8 +148,8 @@ async def _disable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):
     bus = get_session().bus
     srv = device.service
     path = bus.characteristic_path(device.mac, srv.uuid_data)
-
     assert path is not None
+
     await disarm(
         'notifications for {} are disabled'.format(device),
         'cannot disable notifications for {}'.format(device),
