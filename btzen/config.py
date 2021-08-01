@@ -19,7 +19,11 @@
 
 USEC = 10 ** 6
 DEFAULT_DBUS_TIMEOUT = 5 * USEC
+
+# NOTE: connection timeout needs to be longer than default dbus timeout
+# used by btzen to allow connection object creation
 DEFAULT_CONNECTION_TIMEOUT = 30 * USEC
+
 DEFAULT_CHARACTERISTIC_PATH_RETRY = 3
 
 # vim: sw=4:et:ai
