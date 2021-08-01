@@ -55,6 +55,7 @@ class Make(enum.Enum):
     SENSOR_TAG = enum.auto()
     THINGY52 = enum.auto()
     OSTC = enum.auto()
+    MI_SMART_SCALE = enum.auto()
 
 class ServiceType(enum.Enum):
     """
@@ -263,5 +264,6 @@ light = partial(_create_device, ServiceType.LIGHT)
 accelerometer = partial(_create_device, ServiceType.ACCELEROMETER)
 button = partial(_create_device, ServiceType.BUTTON)
 serial = partial(_create_device, ServiceType.SERIAL)
+weight = partial(_create_device, ServiceType.WEIGHT_MEASUREMENT)
 
 # vim: sw=4:et:ai

@@ -23,10 +23,10 @@ import pkg_resources
 from . import serial as mod_serial
 from . import sensortag
 
-from .btweight import WeightFlags, WeightData, WeightMeasurement
+from .btweight import WeightFlags, WeightData, MiScaleWeightData
 from .ndevice import Make, Service, DeviceBase, Device, DeviceTrigger, \
     pressure, temperature, humidity, light, create_device, accelerometer, \
-    button, serial
+    button, serial, weight
 from .fdevice import read, write, enable, disable, set_interval, set_trigger
 from .cm import connect, is_active
 from .error import *
@@ -43,6 +43,7 @@ __all__ = [
     # bluetooth device classes and functions
     'DeviceBase', 'Device', 'DeviceTrigger', 'create_device', 'pressure',
     'temperature', 'humidity', 'light', 'accelerometer', 'button', 'serial',
+    'weight',
 
     # make specific objects
     'SensorTagButtonState',

@@ -21,12 +21,14 @@
 Bluetooth Weight service implementation.
 """
 
+import dataclasses as dtc
 import enum
 import struct
 import typing as tp
-from dataclasses import dataclass
 
-from .device import InfoCharacteristic, DeviceCharacteristic, to_uuid
+from .ndevice import register_service, to_uuid, Make, ServiceType, Trigger, \
+    TriggerCondition, T
+from .service import ServiceCharacteristic
 
 class WeightFlags(enum.IntFlag):
     IMPERIAL = 0x01
@@ -38,44 +40,52 @@ class WeightFlags(enum.IntFlag):
     RESERVED_3 = 0x40
     RESERVED_4 = 0x80
 
-@dataclass(frozen=True)
+@dtc.dataclass(frozen=True)
 class WeightData:
     """
-    Weight measurement.
+    Weight measurement data.
 
     var flags: Weight scale flags value.
     var weight: Weight measurement value.
-
-    Mi Smart Scale extensions:
-
-    :var stabilized: Indicates if weight stabilized.
-    :var load_removed: Indicates if load is removed.
     """
     flags: WeightFlags
     weight: float
 
+@dtc.dataclass(frozen=True)
+class MiScaleWeightData(WeightData):
+    """
+    Weight measurement data for Mi Smart Scale.
+
+    :var stabilized: Indicates if weight stabilized.
+    :var load_removed: Indicates if load is removed.
+    """
     stabilized: tp.Optional[bool] = True
     load_removed: tp.Optional[bool] = False
 
-class WeightMeasurement(DeviceCharacteristic):
-    """
-    Weight measurement Bluetooth device.
-    """
-    info = InfoCharacteristic(to_uuid(0x181d), to_uuid(0x2a9d), 9)
+def convert_weight(data: bytes) -> MiScaleWeightData:
+    flags, weight = struct.unpack('<BH', data[0:3])
+    flags = WeightFlags(flags)
 
-    def get_value(self, data: bytes):
-        flags, weight = struct.unpack('<BH', data[0:3])
-        flags = WeightFlags(flags)
+    stabilized = bool(flags & WeightFlags.RESERVED_2)
+    load_removed = bool(flags & WeightFlags.RESERVED_4)
 
-        # TODO: set only when mi smart scale
-        stabilized = bool(flags & WeightFlags.RESERVED_2)
-        load_removed = bool(flags & WeightFlags.RESERVED_4)
+    return MiScaleWeightData(
+        flags,
+        weight * 0.005,
+        stabilized=stabilized,
+        load_removed=load_removed
+    )
 
-        return WeightData(
-            flags,
-            weight * 0.005,
-            stabilized=stabilized,
-            load_removed=load_removed
-        )
+register_service(
+    Make.MI_SMART_SCALE,
+    ServiceType.WEIGHT_MEASUREMENT,
+    ServiceCharacteristic(
+        to_uuid(0x181d),
+        to_uuid(0x2a9d),
+        9
+    ),
+    convert=convert_weight,
+    trigger=Trigger(TriggerCondition.ON_CHANGE),
+)
 
 # vim: sw=4:et:ai

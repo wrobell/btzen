@@ -124,6 +124,7 @@ async def _enable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):
     bus = get_session().bus
     await enable(unset_trigger(device))
     path = bus.characteristic_path(device.mac, device.service.uuid_data)
+    assert path is not None
     bus._gatt_start(path)
     logger.info('notifications enabled for {}'.format(path))
 

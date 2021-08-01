@@ -21,8 +21,6 @@
 """
 Display weight data from a scale supporting Bluetooth weight measurement
 characteristic.
-
-Connection manager is used for automatic connection to the scale.
 """
 
 import argparse
@@ -31,14 +29,16 @@ import logging
 
 import btzen
 
-async def read_weight(scale):
-    while True:
-        try:
-            value = await scale.read()
-        except asyncio.CancelledError:
-            print('{}: cancelled'.format(scale))
-        else:
-            print('weight: {}'.format(value))
+async def read_weight(mac: str) -> None:
+    scale = btzen.weight(mac, make=btzen.Make.MI_SMART_SCALE)
+    async with btzen.connect([scale]):
+        while btzen.is_active():
+            try:
+                value = await btzen.read(scale)
+            except asyncio.CancelledError as ex:
+                print('{}: {}'.format(scale, ex))
+            else:
+                print('weight: {}'.format(value))
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -46,19 +46,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
-scale = btzen.WeightMeasurement(args.device, notifying=True)
-
-# create connection manager
-manager = btzen.ConnectionManager()
-manager.add(scale)
-
-task = asyncio.gather(read_weight(scale), manager)
-loop = asyncio.get_event_loop()
-try:
-    loop.run_until_complete(task)
-finally:
-    # manager also closes all referenced devices, the weight scale in this
-    # case
-    manager.close()
+asyncio.run(read_weight(args.device))
 
 # vim: sw=4:et:ai

@@ -90,11 +90,12 @@ class Bus:
         :param mac: Bluetooth device MAC address.
         :param uuid: UUID of Bluetooth GATT Characteristic.
         """
+        key = mac, uuid
         prefix = self.dev_path(mac)
-        path = self._characteristic_cache.get((mac, uuid))
+        path = self._characteristic_cache.get(key)
         if path is None:
             path = _btzen.bt_characteristic(self.system_bus, prefix, uuid)
-        self._characteristic_cache[mac, uuid] = path
+        self._characteristic_cache[key] = path
         return path
 
     def _gatt_start(self, path):
