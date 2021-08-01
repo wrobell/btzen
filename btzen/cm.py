@@ -55,7 +55,7 @@ import asyncio
 import logging
 import typing as tp
 from collections import defaultdict
-from collections.abc import Coroutine
+from collections.abc import Coroutine, AsyncGenerator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from functools import partial
@@ -64,7 +64,7 @@ from operator import attrgetter
 from . import _cm  # type: ignore
 from .bus import Bus
 from .error import BTZenError
-from .config import DEFAULT_DBUS_TIMEOUT
+from .config import DEFAULT_DBUS_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT
 from .ndevice import Device, AddressType
 from .fdevice import enable, disable
 from .session import BT_SESSION, Session, get_session
@@ -141,7 +141,7 @@ async def manage_connection(bus: Bus, mac: str, devices: Devices) -> None:
     # first; if it exists in bluez daemon registry, then creating new
     # connection blocks
     created = False
-    while not created:
+    while not created and is_active():
         await remove_connection(bus, mac)
         created = await create_connection(bus, mac, address_type)
 
@@ -193,7 +193,7 @@ async def create_connection(
         )
         await _cm.bt_connect(
             bus.system_bus, bus.adapter_path(), mac, address_type.value,
-            _dbus_timeout
+            DEFAULT_CONNECTION_TIMEOUT
         )
     except (BTZenError, asyncio.CancelledError) as ex:
         is_active = get_session().is_active()
@@ -269,7 +269,7 @@ async def restart_devices(bus: Bus, mac: str, devices: Devices) -> None:
 
 async def resolve_services(
         bus: Bus, mac: str, devices: Devices
-    ) -> tp.AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[None, None]:
     """
     Asynchronous generator waiting for a Bluetooth device to be
     resolved.
@@ -295,6 +295,13 @@ def disarm(msg: str, warn: str, f: tp.Callable, *args: tp.Any) -> None:
         logger.warning(warn + ': ' + str(ex))
     else:
         logger.info(msg)
+
+async def disarm_async(msg: str, warn: str, coro, *args):
+    try:
+        await coro(*args)
+        logger.info(msg)
+    except (Exception, asyncio.CancelledError) as ex:
+        logger.warning(warn + ': ' + str(ex))
 
 def is_active() -> bool:
     return get_session().is_active()

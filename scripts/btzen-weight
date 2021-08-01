@@ -29,16 +29,19 @@ import logging
 
 import btzen
 
-async def read_weight(mac: str) -> None:
+async def read_weight(scale: btzen.DeviceBase):
+    while btzen.is_active():
+        try:
+            value = await btzen.read(scale)
+        except asyncio.CancelledError as ex:
+            print('{}: {}'.format(scale, ex))
+        else:
+            print('weight: {}'.format(value))
+
+async def read_data(mac: str):
     scale = btzen.weight(mac, make=btzen.Make.MI_SMART_SCALE)
-    async with btzen.connect([scale]):
-        while btzen.is_active():
-            try:
-                value = await btzen.read(scale)
-            except asyncio.CancelledError as ex:
-                print('{}: {}'.format(scale, ex))
-            else:
-                print('weight: {}'.format(value))
+    async with btzen.connect([scale]) as session:
+        await asyncio.gather(session, read_weight(scale))
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -46,6 +49,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
-asyncio.run(read_weight(args.device))
+asyncio.run(read_data(args.device))
 
 # vim: sw=4:et:ai

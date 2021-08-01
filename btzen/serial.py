@@ -81,7 +81,13 @@ async def _read_serial(device: Device[SerialService, T], n: int) -> T:
 async def _read_data(bus: Bus, device: Device[SerialService, T], n: int) -> bytes:
     state = device_state(device)
     data = bytearray(state['buffer'])
+
+    await bus.ensure_characteristic_paths(
+        device.mac, UUID_TX_UART, UUID_RX_UART, UUID_TX_CREDIT, UUID_RX_CREDIT
+    )
+
     path_uart = bus.characteristic_path(device.mac, UUID_TX_UART)
+
     while len(data) < n:
         async with _rx_credits_mgr(bus, device, n - len(data)):
             item = await bus._gatt_get(path_uart)

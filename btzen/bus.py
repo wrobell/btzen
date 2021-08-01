@@ -27,7 +27,8 @@ from functools import partial
 
 from . import _btzen  # type: ignore
 from . import _sd_bus  # type: ignore
-from .error import ConnectionError
+from .config import DEFAULT_CHARACTERISTIC_PATH_RETRY
+from .error import BTZenError, ConnectionError
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +96,39 @@ class Bus:
         path = self._characteristic_cache.get(key)
         if path is None:
             path = _btzen.bt_characteristic(self.system_bus, prefix, uuid)
-        self._characteristic_cache[key] = path
+
+        # store in cache only non-null values
+        if path is None:
+            raise BTZenError('Path for {}/{} not found'.format(mac, uuid))
+        else:
+            self._characteristic_cache[key] = path
         return path
+
+    async def ensure_characteristic_paths(self, mac: str, *uuid: str):
+        """
+        Ensure Bluetooth GATT characteristic path exists for each UUID.
+        """
+        # TODO: in the future we might want to use object manager
+        for u in uuid:
+            await self.ensure_characteristic_path(mac, u)
+
+    async def ensure_characteristic_path(self, mac: str, uuid: str):
+        key = mac, uuid
+        prefix = self.dev_path(mac)
+        for i in range(DEFAULT_CHARACTERISTIC_PATH_RETRY):
+            path = _btzen.bt_characteristic(self.system_bus, prefix, uuid)
+            if path is None:
+                logger.warning(
+                    'characteristic path not found for {}/{}'.format(mac, uuid)
+                )
+                await asyncio.sleep(1)
+            else:
+                self._characteristic_cache[key] = path
+                return
+
+        raise BTZenError(
+            'Cannot determine characteristic path for {}/{}'.format(mac, uuid)
+        )
 
     def _gatt_start(self, path):
         # TODO: creates notification session; if another session started,
