@@ -25,9 +25,10 @@ from . import sensortag
 from . import thingy52
 
 from .btweight import WeightFlags, WeightData, MiScaleWeightData
-from .ndevice import Make, Service, DeviceBase, Device, DeviceTrigger, \
+from .ndevice import Make, DeviceBase, Device, DeviceTrigger, \
     pressure, temperature, humidity, light, light_rgb, create_device, \
     accelerometer, button, serial, weight
+from .service import Service, ServiceCharacteristic, ServiceEnvSensing
 from .fdevice import read, write, enable, disable, set_interval, set_trigger
 from .cm import connect, is_active
 from .error import *
@@ -37,7 +38,7 @@ __version__ = pkg_resources.get_distribution('btzen').version
 
 __all__ = [
     # bluetooth service descriptors
-    'Service',
+    'Service', 'ServiceCharacteristic', 'ServiceEnvSensing',
 
     'Make', 'is_active', 'read', 'write', 'set_interval', 'set_trigger',
 

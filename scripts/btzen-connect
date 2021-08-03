@@ -63,15 +63,14 @@ args = parser.parse_args()
 level = logging.DEBUG if args.verbose else logging.INFO
 logging.basicConfig(level=level)
 
-async def connect_devices(service: str, mac: list[str]) -> None:
-    dev = btzen.Device(service, lambda v: v)
-    devices = [btzen.register_device(dev, m) for m in mac]
+async def connect_devices(service_uuid: str, mac: list[str]) -> None:
+    srv = btzen.Service(service_uuid)
+    devices = [btzen.create_device(srv, m) for m in mac]
     async with btzen.connect(devices):
         while True:
             await asyncio.sleep(5)
 
 uvloop.install()
-
 asyncio.run(connect_devices(args.service, args.mac))
 
 # vim: sw=4:et:ai
