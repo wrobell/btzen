@@ -25,11 +25,20 @@ import uvloop
 from datetime import datetime
 
 import btzen
-import btzen.thingy52
 
-async def read_sensor(name, sensor):
+async def read_data(mac: str, interface: str, interval: float):
+    # initialize all Thingy52 sensors
+    devices = [ctor(mac, make=btzen.Make.THINGY52) for _, ctor in SENSORS]
+    devices = [btzen.set_interval(d, interval) for d in devices]
+
+    async with btzen.connect(devices, interface=interface) as session:
+        items = zip(SENSORS, devices)
+        tasks = (read_sensor(name, dev) for (name, _), dev in items)
+        await asyncio.gather(session, *tasks)
+
+async def read_sensor(name: str, sensor: btzen.DeviceBase):
     while True:
-        value = await sensor.read()
+        value = await btzen.read(sensor)
         if isinstance(value, (float, int)):
             print_data(name, '{:.1f}'.format(value))
         else:
@@ -44,15 +53,14 @@ async def battery_level(battery):
 def print_data(name, value):
     print('{} {}: {}'.format(datetime.now(), name, value))
 
-
 #
 # sensor definitions
 #
 SENSORS = [
-    ('pressure', btzen.thingy52.Pressure),
-    ('temperature', btzen.thingy52.Temperature),
-    ('humidity', btzen.thingy52.Humidity),
-    ('light', btzen.thingy52.Light),
+    ('pressure', btzen.pressure),
+    ('temperature', btzen.temperature),
+    ('humidity', btzen.humidity),
+    ('light', btzen.light_rgba),
 ]
 
 parser = argparse.ArgumentParser()
@@ -74,30 +82,10 @@ args = parser.parse_args()
 level = logging.DEBUG if args.verbose else logging.INFO
 logging.basicConfig(level=level)
 
-# get the loop first
+# install uvloop for demonstration purposes
 uvloop.install()
-loop = asyncio.get_event_loop()
 
-# initialize all Thingy52 sensors
-items = [(name, cls(args.device, notifying=True)) for name, cls in SENSORS]
-sensors =  [sensor for _, sensor in items]
-for s in sensors:
-    s.set_interval(args.interval)
-
-# create tasks reading the sensor data
-tasks = [read_sensor(name, sensor) for name, sensor in items]
-
-battery = btzen.BatteryLevel(args.device, notifying=True)
-tasks.append(battery_level(battery))
-
-# create connection manager
-manager = btzen.ConnectionManager(interface=args.interface)
-manager.add(battery, *sensors)
-
-try:
-    loop.run_until_complete(asyncio.gather(manager, *tasks))
-finally:
-    # connection manager closes all sensors
-    manager.close()
+task = read_data(args.device, args.interface, args.interval)
+asyncio.run(task)
 
 # vim: sw=4:et:ai

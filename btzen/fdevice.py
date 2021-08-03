@@ -45,9 +45,9 @@ async def write(device: DeviceBase[Service, T], data: bytes):
     pass
 
 def set_interval(
-        device: Device[ServiceEnvSensing, T],
+        device: DeviceBase[S, T],
         interval: float,
-    ) -> DeviceTrigger[ServiceEnvSensing, T]:
+    ) -> DeviceTrigger[S, T]:
     """
     Set fixed time interval for Bluetooth Environmental Sensing device.
 
@@ -60,8 +60,9 @@ def set_interval(
     """
     return set_trigger(device, TriggerCondition.FIXED_TIME, operand=interval)
 
+@singledispatch
 def set_trigger(
-        device: Device[S, T],
+        device: DeviceBase[S, T],
         condition: TriggerCondition,
         *,
         operand: tp.Optional[float]=None,

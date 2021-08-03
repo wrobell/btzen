@@ -37,7 +37,7 @@ AnyTrigger = tp.Union['Trigger', 'NoTrigger']
 # registry of known services
 _SERVICE_REGISTRY = defaultdict[
     'Make',
-    dict['ServiceType', tuple['Service', Converter, AnyTrigger]]
+    dict['ServiceType', tuple['Service', Converter, AnyTrigger, 'AddressType']]
 ](dict)
 
 # key is tuple (base class, parameter class)
@@ -65,6 +65,7 @@ class ServiceType(enum.Enum):
     BUTTON = enum.auto()
     HUMIDITY = enum.auto()
     LIGHT = enum.auto()
+    LIGHT_RGBA = enum.auto()
     PRESSURE = enum.auto()
     SERIAL = enum.auto()
     TEMPERATURE = enum.auto()
@@ -222,11 +223,14 @@ def register_service(
         *,
         convert: Converter[T]=tp.cast(Converter, lambda v: v),
         trigger: AnyTrigger=NoTrigger(),
+        address_type=AddressType.PUBLIC,
     ):
     """
     Register service with data conversion function.
     """
-    _SERVICE_REGISTRY[make][service_type] = (service, convert, trigger)
+    _SERVICE_REGISTRY[make][service_type] = (
+        service, convert, trigger, address_type
+    )
 
 def create_device(
         service: Service,
@@ -245,11 +249,10 @@ def _create_device(
         mac: str,
         *,
         make: Make=Make.STANDARD,
-        address_type: AddressType=AddressType.PUBLIC,
     ) -> DeviceBase[Service, tp.Any]:
 
-    srv, conv, trigger = _SERVICE_REGISTRY[make][service_type]
-    dev = create_device(srv, mac, address_type=address_type, convert=conv)
+    srv, conv, trigger, addr_type = _SERVICE_REGISTRY[make][service_type]
+    dev = create_device(srv, mac, address_type=addr_type, convert=conv)
 
     if isinstance(trigger, NoTrigger):
         return dev
@@ -261,6 +264,7 @@ pressure = partial(_create_device, ServiceType.PRESSURE)
 temperature = partial(_create_device, ServiceType.TEMPERATURE)
 humidity = partial(_create_device, ServiceType.HUMIDITY)
 light = partial(_create_device, ServiceType.LIGHT)
+light_rgba = partial(_create_device, ServiceType.LIGHT_RGBA)
 accelerometer = partial(_create_device, ServiceType.ACCELEROMETER)
 button = partial(_create_device, ServiceType.BUTTON)
 serial = partial(_create_device, ServiceType.SERIAL)

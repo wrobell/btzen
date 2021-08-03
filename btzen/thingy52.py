@@ -27,15 +27,17 @@ and require custom classes. All Thingy:52 Bluetooth device sensors are
 notifying.
 """
 
-import asyncio
+import dataclasses as dtc
 import logging
 import struct
 import typing as tp
-from dataclasses import dataclass, replace
+from collections import defaultdict
+from functools import partial, cache
 
-from . import _btzen  # type: ignore
-from .device import InfoCharacteristic, InfoEnvSensing, DeviceEnvSensing, \
-    DeviceCharacteristic, Trigger, TriggerCondition
+from .ndevice import T, DeviceBase, DeviceTrigger, Make, ServiceType, \
+    AddressType, Trigger, TriggerCondition, register_service
+from .fdevice import enable, _enable_tr, write_config, set_trigger
+from .service import S, ServiceCharacteristic
 from .util import to_int
 
 logger = logging.getLogger(__name__)
@@ -46,8 +48,20 @@ SENSOR_COLOR_FMT = struct.Struct('<HHHH')
 # function to convert 16-bit UUID to full 128-bit Thingy:52 UUID
 to_uuid = 'ef68{:04x}-9b35-4933-9b10-52ffa9740042'.format
 
-@dataclass
-class Config:
+register_th = partial(
+    register_service,
+    Make.THINGY52,
+    address_type=AddressType.RANDOM,
+    trigger=Trigger(TriggerCondition.FIXED_TIME, 1),
+)
+
+@dtc.dataclass(frozen=True)
+class Thingy52Service(ServiceCharacteristic):
+    uuid_conf: str
+    config_entry: str
+
+@dtc.dataclass
+class Thingy52Config:
     """
     Thingy:52 Bluetooth device configuration for the weather service
     sensors.
@@ -63,146 +77,129 @@ class Config:
     # gas sensor data read interval (1 - 1s, 2 - 10s, 3 - 60s)
     gas: int = 1
     # color sensor LED calibration (RGB value)
-    rgb: tp.Tuple[int, int, int] = (0, 255, 0)
+    rgb: tuple[int, int, int] = (0, 255, 0)
 
-@dataclass(frozen=True)
+CONFIG_CACHE: defaultdict[str, Thingy52Config] = defaultdict(Thingy52Config)
+
+@dtc.dataclass(frozen=True)
 class LightColor:
     red: int
     blue: int
     green: int
     clear: int
 
-class DeviceThingy52EnvSensing(DeviceEnvSensing):
-    """
-    Thingy:52 Bluetooth device sensor.
-    """
-    ADDRESS_TYPE = 'random'
-
-    # NOTE: the configuration is shared by all sensors per given device
-    # (mac address)
-    CONFIG: tp.Dict[str, Config] = {}
-    config_attr: str
-
-    def __init__(self, mac, notifying=False):
-        if not notifying:
-            raise ValueError(
-                'Thingy:52 Bluetooth environmental sensors can be used in'
-                ' notification mode only'
-            )
-        super().__init__(mac, notifying=notifying)
-
-        DeviceThingy52EnvSensing.CONFIG[mac] = Config()
-        self.set_trigger(Trigger(TriggerCondition.FIXED_TIME, 1))
-
-    def _trigger_data(self, trigger: Trigger) -> bytes:
-        assert trigger.condition == TriggerCondition.FIXED_TIME
-
-        # replace configuration for given thingy52 device
-        mac = self.mac
-        params = {self.config_attr: trigger.operand}
-        config = replace(DeviceThingy52EnvSensing.CONFIG[self.mac], **params)
-        DeviceThingy52EnvSensing.CONFIG[mac] = config
-        logger.info('thingy52 configuration: {}'.format(config))
-
-        to_ms = lambda v: int(v * 1000)
-        data = CONFIG_DATA_FMT.pack(
-            to_ms(config.temperature),
-            to_ms(config.pressure),
-            to_ms(config.humidity),
-            to_ms(config.color),
-            config.gas,
-            *config.rgb,
-        )
-        return data
-
-class Temperature(DeviceThingy52EnvSensing):
-    """
-    Thingy:52 Bluetooth device temperature sensor.
-    """
-    info = InfoEnvSensing(
-        to_uuid(0x0200),
-        to_uuid(0x0201),
-        2,
-        uuid_trigger=to_uuid(0x0206),
-    )
-    config_attr = 'temperature'
-
-    def get_value(self, data):
-        return data[0] + data[1] / 100
-
-class Pressure(DeviceThingy52EnvSensing):
-    """
-    Thingy:52 Bluetooth device pressure sensor.
-    """
-    info = InfoEnvSensing(
+register_th(
+    ServiceType.PRESSURE,
+    Thingy52Service(
         to_uuid(0x0200),
         to_uuid(0x0202),
         5,
-        uuid_trigger=to_uuid(0x0206),
-    )
-    config_attr = 'pressure'
+        to_uuid(0x0206),
+        'pressure',
+    ),
+    convert=lambda data: to_int(data[:4]) * 100 + data[4],
+)
 
-    def get_value(self, data):
-        return to_int(data[:4]) * 100 + data[4]
+register_th(
+    ServiceType.TEMPERATURE,
+    Thingy52Service(
+        to_uuid(0x0200),
+        to_uuid(0x0201),
+        2,
+        to_uuid(0x0206),
+        'temperature',
+    ),
+    convert=lambda data: data[0] + data[1] / 100
+)
 
-class Humidity(DeviceThingy52EnvSensing):
-    """
-    Thingy:52 Bluetooth device humidity sensor.
-    """
-    info = InfoEnvSensing(
+register_th(
+    ServiceType.HUMIDITY,
+    Thingy52Service(
         to_uuid(0x0200),
         to_uuid(0x0203),
         1,
-        uuid_trigger=to_uuid(0x0206),
-    )
-    config_attr = 'humidity'
+        to_uuid(0x0206),
+        'humidity',
+    ),
+    convert=lambda data: data[0],
+)
 
-    def get_value(self, data):
-        return data[0]
-
-class Light(DeviceThingy52EnvSensing):
-    """
-    Thingy:52 Bluetooth device humidity sensor.
-    """
-    info = InfoEnvSensing(
+register_th(
+    ServiceType.LIGHT_RGBA,
+    Thingy52Service(
         to_uuid(0x0200),
         to_uuid(0x0205),
         8,
-        uuid_trigger=to_uuid(0x0206),
+        to_uuid(0x0206),
+        'color',
+    ),
+    convert=lambda data: LightColor(*SENSOR_COLOR_FMT.unpack(data)),
+)
+
+@enable.register
+async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]):
+    to_ms = lambda v: int(v * 1000)
+    mac = device.mac
+    srv = device.service
+
+    config = CONFIG_CACHE[mac]
+    data = CONFIG_DATA_FMT.pack(
+        to_ms(config.temperature),
+        to_ms(config.pressure),
+        to_ms(config.humidity),
+        to_ms(config.color),
+        config.gas,
+        *config.rgb,
     )
-    config_attr = 'color'
+    await write_config(mac, srv.uuid_conf, data)
+    await _enable_tr(device)
 
-    def get_value(self, data):
-        return LightColor(*SENSOR_COLOR_FMT.unpack(data))
+@set_trigger.register
+async def _set_trigger_thingy52(
+        device: DeviceBase[Thingy52Service, T],
+        condition: TriggerCondition,
+        *,
+        operand: tp.Optional[float]=None,
+    ) -> DeviceTrigger[S, T]:
 
-class DeviceThingy52Configuration(DeviceCharacteristic):
-    """
-    Thingy:52 Bluetooth device configuration.
-    """
-    ADDRESS_TYPE = 'random'
+    assert operand is not None
 
-class ConnectionParameters(DeviceThingy52Configuration):
-    info = InfoCharacteristic(
-        to_uuid(0x0100),
-        to_uuid(0x0104),
-        8,
-    )
-    async def set_params(
-        self,
-        min_conn_interval,
-        max_conn_interval,
-        slave_latency,
-        supervision_timeout,
-    ):
-        system_bus = self._bus.system_bus
-        data = struct.pack(
-            '<HHHH',
-            min_conn_interval,
-            max_conn_interval,
-            slave_latency,
-            supervision_timeout,
-        )
-        path = self._get_path(self.info.uuid_data)
-        await _btzen.bt_write(system_bus, path, data)
+    mac = device.mac
+    config_entry = device.service.config_entry
+    config = CONFIG_CACHE[device.mac]
+    config = dtc.replace(config, **{config_entry: operand})
+    CONFIG_CACHE[mac] = config
+
+    return device  # type: ignore
+
+# class DeviceThingy52Configuration(DeviceCharacteristic):
+#     """
+#     Thingy:52 Bluetooth device configuration.
+#     """
+#     ADDRESS_TYPE = 'random'
+# 
+# class ConnectionParameters(DeviceThingy52Configuration):
+#     info = InfoCharacteristic(
+#         to_uuid(0x0100),
+#         to_uuid(0x0104),
+#         8,
+#     )
+#     async def set_params(
+#         self,
+#         min_conn_interval,
+#         max_conn_interval,
+#         slave_latency,
+#         supervision_timeout,
+#     ):
+#         system_bus = self._bus.system_bus
+#         data = struct.pack(
+#             '<HHHH',
+#             min_conn_interval,
+#             max_conn_interval,
+#             slave_latency,
+#             supervision_timeout,
+#         )
+#         path = self._get_path(self.info.uuid_data)
+#         await _btzen.bt_write(system_bus, path, data)
 
 # vim: sw=4:et:ai
