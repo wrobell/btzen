@@ -26,7 +26,7 @@ from . import thingy52
 
 from .btweight import WeightFlags, WeightData, MiScaleWeightData
 from .ndevice import Make, Service, DeviceBase, Device, DeviceTrigger, \
-    pressure, temperature, humidity, light, light_rgba, create_device, \
+    pressure, temperature, humidity, light, light_rgb, create_device, \
     accelerometer, button, serial, weight
 from .fdevice import read, write, enable, disable, set_interval, set_trigger
 from .cm import connect, is_active
@@ -43,7 +43,7 @@ __all__ = [
 
     # bluetooth device classes and functions
     'DeviceBase', 'Device', 'DeviceTrigger', 'create_device', 'pressure',
-    'temperature', 'humidity', 'light', 'light_rgba', 'accelerometer',
+    'temperature', 'humidity', 'light', 'light_rgb', 'accelerometer',
     'button', 'serial', 'weight',
 
     # make specific objects

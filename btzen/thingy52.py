@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 CONFIG_DATA_FMT = struct.Struct('<HHHHBBBB')
 SENSOR_COLOR_FMT = struct.Struct('<HHHH')
+LIGHT_MAX = 0xffff
 
 # function to convert 16-bit UUID to full 128-bit Thingy:52 UUID
 to_uuid = 'ef68{:04x}-9b35-4933-9b10-52ffa9740042'.format
@@ -83,10 +84,17 @@ CONFIG_CACHE: defaultdict[str, Thingy52Config] = defaultdict(Thingy52Config)
 
 @dtc.dataclass(frozen=True)
 class LightColor:
-    red: int
-    blue: int
-    green: int
-    clear: int
+    red: float
+    blue: float
+    green: float
+    clear: float
+
+def convert_light(data: bytes) -> LightColor:
+    """
+    Convert data of BH1745 light sensor in Thingy:52 to light color object.
+    """
+    values = SENSOR_COLOR_FMT.unpack(data)
+    return LightColor(*(v / LIGHT_MAX for v in values))
 
 register_th(
     ServiceType.PRESSURE,
@@ -125,7 +133,7 @@ register_th(
 )
 
 register_th(
-    ServiceType.LIGHT_RGBA,
+    ServiceType.LIGHT_RGB,
     Thingy52Service(
         to_uuid(0x0200),
         to_uuid(0x0205),
@@ -133,7 +141,7 @@ register_th(
         to_uuid(0x0206),
         'color',
     ),
-    convert=lambda data: LightColor(*SENSOR_COLOR_FMT.unpack(data)),
+    convert=convert_light,
 )
 
 @enable.register
