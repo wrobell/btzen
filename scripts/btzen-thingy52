@@ -31,9 +31,14 @@ async def read_data(mac: str, interface: str, interval: float):
     devices = [ctor(mac, make=btzen.Make.THINGY52) for _, ctor in SENSORS]
     devices = [btzen.set_interval(d, interval) for d in devices]
 
+    battery = btzen.battery_level(mac)
+    devices.append(battery)
+
     async with btzen.connect(devices, interface=interface) as session:
         items = zip(SENSORS, devices)
-        tasks = (read_sensor(name, dev) for (name, _), dev in items)
+        tasks = [read_sensor(name, dev) for (name, _), dev in items]
+        tasks.append(read_sensor('battery', battery))
+
         await asyncio.gather(session, *tasks)
 
 async def read_sensor(name: str, sensor: btzen.DeviceBase):
@@ -43,12 +48,6 @@ async def read_sensor(name: str, sensor: btzen.DeviceBase):
             print_data(name, '{:.1f}'.format(value))
         else:
             print_data(name, '{}'.format(value))
-
-async def battery_level(battery):
-    while True:
-        value = await battery.read()
-        print_data('battery level', value)
-        await asyncio.sleep(1)
 
 def print_data(name, value):
     print('{} {}: {}'.format(datetime.now(), name, value))

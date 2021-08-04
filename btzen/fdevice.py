@@ -29,7 +29,7 @@ from . import _btzen  # type: ignore
 from .config import DEFAULT_DBUS_TIMEOUT
 from .ndevice import T, DeviceBase, Device, DeviceTrigger, NoTrigger, \
     Trigger, TriggerCondition
-from .service import S, Service, ServiceCharacteristic, \
+from .service import S, Service, ServiceInterface, ServiceCharacteristic, \
     ServiceEnvSensing
 from .error import CallError
 from .session import get_session, connected
@@ -112,6 +112,19 @@ async def _read_dev(device: Device[ServiceCharacteristic, T]) -> T:
         return device.convert(data)
 
 @read.register
+async def _read_dev_int(device: DeviceTrigger[ServiceInterface, T]) -> T:
+    async with connected(device) as session:
+        bus = session.bus
+        srv = device.service
+
+        task = session.create_future(
+            device,
+            bus._dev_property_get(device.mac, srv.property, srv.interface)
+        )
+        data = await task
+        return device.convert(data)
+
+@read.register
 async def _read_dev_tr(device: DeviceTrigger[ServiceCharacteristic, T]) -> T:
     async with connected(device) as session:
         bus = session.bus
@@ -124,6 +137,12 @@ async def _read_dev_tr(device: DeviceTrigger[ServiceCharacteristic, T]) -> T:
 async def _enable(device: Device[ServiceCharacteristic, T]):
     bus = get_session().bus
     await bus.ensure_characteristic_paths(device.mac, device.service.uuid_data)
+
+@enable.register
+async def _enable_int(device: DeviceTrigger[ServiceInterface, T]):
+    bus = get_session().bus
+    srv = device.service
+    bus._dev_property_start(device.mac, srv.property, iface=srv.interface)
 
 @enable.register
 async def _enable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):
@@ -143,6 +162,12 @@ async def _enable_env_sensing(device: Device[ServiceEnvSensing, T]):
         device.mac, srv.uuid_data, srv.uuid_conf, srv.uuid_trigger
     )
     await write_config(device.mac, srv.uuid_conf, srv.config_on)
+
+@disable.register
+async def _disable_int(device: DeviceTrigger[ServiceInterface, T]):
+    bus = get_session().bus
+    srv = device.service
+    bus._dev_property_stop(device.mac, srv.property, iface=srv.interface)
 
 @disable.register
 async def _disable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):

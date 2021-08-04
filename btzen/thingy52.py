@@ -163,12 +163,12 @@ async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]):
     await _enable_tr(device)
 
 @set_trigger.register
-async def _set_trigger_thingy52(
-        device: DeviceBase[Thingy52Service, T],
+def _set_trigger_thingy52(
+        device: DeviceTrigger[Thingy52Service, T],
         condition: TriggerCondition,
         *,
         operand: tp.Optional[float]=None,
-    ) -> DeviceTrigger[S, T]:
+    ) -> DeviceTrigger[Thingy52Service, T]:
 
     assert operand is not None
 

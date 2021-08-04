@@ -63,6 +63,7 @@ class ServiceType(enum.Enum):
     """
     ACCELEROMETER = enum.auto()
     BUTTON = enum.auto()
+    BATTERY_LEVEL = enum.auto()
     HUMIDITY = enum.auto()
     LIGHT = enum.auto()
     LIGHT_RGB = enum.auto()
@@ -260,14 +261,15 @@ def _create_device(
         from .fdevice import set_trigger
         return set_trigger(dev, trigger.condition, operand=trigger.operand)
 
-pressure = partial(_create_device, ServiceType.PRESSURE)
-temperature = partial(_create_device, ServiceType.TEMPERATURE)
+accelerometer = partial(_create_device, ServiceType.ACCELEROMETER)
+battery_level = partial(_create_device, ServiceType.BATTERY_LEVEL)
+button = partial(_create_device, ServiceType.BUTTON)
 humidity = partial(_create_device, ServiceType.HUMIDITY)
 light = partial(_create_device, ServiceType.LIGHT)
 light_rgb = partial(_create_device, ServiceType.LIGHT_RGB)
-accelerometer = partial(_create_device, ServiceType.ACCELEROMETER)
-button = partial(_create_device, ServiceType.BUTTON)
+pressure = partial(_create_device, ServiceType.PRESSURE)
 serial = partial(_create_device, ServiceType.SERIAL)
+temperature = partial(_create_device, ServiceType.TEMPERATURE)
 weight = partial(_create_device, ServiceType.WEIGHT_MEASUREMENT)
 
 # vim: sw=4:et:ai

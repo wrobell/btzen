@@ -32,6 +32,24 @@ class Service:
     uuid: str
 
 @dtc.dataclass(frozen=True)
+class ServiceInterface(Service):
+    """
+    Bluetooth device information for device providing data via Bluez
+    interface property.
+
+    Example of interface for Battery Level Bluetooth characteristic is
+    `org.bluez.Battery1` Bluez interface, which provides data via
+    `Percentage` property.
+
+    :var interface: Bluez interface name.
+    :var property: Property name of the interface.
+    :var type: Type of property value.
+    """
+    interface: str
+    property: str
+    type: str
+
+@dtc.dataclass(frozen=True)
 class ServiceCharacteristic(Service):
     """
     Bluetooth service descriptor for Bluetooth characteristic.
@@ -42,7 +60,6 @@ class ServiceCharacteristic(Service):
     """
     uuid_data: str
     size: int
-
 
 @dtc.dataclass(frozen=True)
 class ServiceEnvSensing(ServiceCharacteristic):

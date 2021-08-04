@@ -23,11 +23,12 @@ import pkg_resources
 from . import serial as mod_serial
 from . import sensortag
 from . import thingy52
+from . import bluez
 
 from .btweight import WeightFlags, WeightData, MiScaleWeightData
 from .ndevice import Make, DeviceBase, Device, DeviceTrigger, \
     pressure, temperature, humidity, light, light_rgb, create_device, \
-    accelerometer, button, serial, weight
+    accelerometer, button, serial, weight, battery_level
 from .service import Service, ServiceCharacteristic, ServiceEnvSensing
 from .fdevice import read, write, enable, disable, set_interval, set_trigger
 from .cm import connect, is_active
@@ -45,7 +46,7 @@ __all__ = [
     # bluetooth device classes and functions
     'DeviceBase', 'Device', 'DeviceTrigger', 'create_device', 'pressure',
     'temperature', 'humidity', 'light', 'light_rgb', 'accelerometer',
-    'button', 'serial', 'weight',
+    'button', 'serial', 'weight', 'battery_level',
 
     # make specific objects
     'SensorTagButtonState',
