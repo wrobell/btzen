@@ -1,10 +1,8 @@
 Using the Library
 =================
-The module provides classes for multiple sensors of a device.  It is
-required to connect to a device after creating an instance of a sensor,
-i.e. :py:meth:`Temperature.connect` method.  Each sensor object provides
-:py:meth:`btzen.Sensor.read` method and :py:func:`btzen.Sensor.read_async`
-coroutine to return data of a sensor.
+- create devices
+- create connection session using `btzen.connect`
+- read data
 
 Example usage for single read from a device::
 
