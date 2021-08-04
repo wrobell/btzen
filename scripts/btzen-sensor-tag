@@ -36,13 +36,14 @@ import btzen
 logger = logging.getLogger()
 
 async def read_sensors(mac: str, interface: str) -> None:
-    #battery = btzen.BatteryLevel(mac, notifying=True)
-    #tasks.append(battery_level(battery))
-
+    battery = btzen.battery_level(mac)
     devices = [ctor(mac, make=btzen.Make.SENSOR_TAG) for _, ctor, _ in SENSORS]
+    devices.append(battery)
+
     async with btzen.connect(devices, interface=interface) as session:
         items = zip(SENSORS, devices)
-        tasks = (reader(name, dev) for (name, _, reader), dev in items)
+        tasks = [reader(name, dev) for (name, _, reader), dev in items]
+        tasks.append(read_battery('battery', battery))
         await asyncio.gather(session, *tasks)
 
 async def read_data(name: str, sensor: btzen.DeviceBase) -> tp.Any:
@@ -70,7 +71,7 @@ async def read_button(name: str, button: btzen.DeviceBase) -> None:
     async for value in read_data(name, button):
         print_data('button', str(value))
 
-async def battery_level(name: str, battery) -> None:
+async def read_battery(name: str, battery: btzen.DeviceBase) -> None:
     async for value in read_data(name, battery):
         print_data('battery level', value)
 
@@ -85,7 +86,6 @@ SENSORS = [
     ('temperature', btzen.temperature, read_sensor),
     ('humidity', btzen.humidity, read_sensor),
     ('light', btzen.light, read_sensor),
-    # notifying readers
     ('button', btzen.button, read_button),
     ('accelerometer', btzen.accelerometer, read_accelerometer),
 ]
