@@ -43,7 +43,7 @@ import struct
 import typing as tp
 from functools import partial
 
-from .device import to_uuid as to_bt_uuid
+from .ndevice import to_uuid as to_bt_uuid
 from .service import ServiceCharacteristic, ServiceEnvSensing
 from .ndevice import Device, DeviceTrigger, \
     register_service, Make, ServiceType, Trigger, \

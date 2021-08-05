@@ -38,6 +38,14 @@ logger = logging.getLogger(__name__)
 
 @singledispatch
 async def read(device: DeviceBase[Service, T], *args: tp.Any) -> T:
+    """
+    Read data from Bluetooth device.
+
+    The coroutine can raise cancellation error (`asyncio.CancelledError`),
+    i.e. when the device is disconnected. The caller should handle the
+    error, if it wants to continue reading data when the device is
+    reconnected.
+    """
     pass
 
 @singledispatch
@@ -91,10 +99,25 @@ def unset_trigger(device: DeviceTrigger[S, T]) -> Device[S, T]:
 
 @singledispatch
 async def enable(device: DeviceBase[Service, T]):
-    pass
+    """
+    Enable and configure Bluetooth device.
+
+    The function is called when a Bluetooth device is connected or
+    reconnected.
+    """
 
 @singledispatch
 async def disable(device: DeviceBase[Service, T]):
+    """
+    Disable Bluetooth device.
+
+    The function is called when device is disconnected to release any
+    resources held by the device.
+
+    While the device might be gone and thus it is not possible to, for
+    example, switch off a sensor on a Bluetooth device, there might be
+    other resources to release like Bluez notification setup.
+    """
     pass
 
 @read.register

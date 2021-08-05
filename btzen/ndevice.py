@@ -262,7 +262,17 @@ def _create_device(
         return set_trigger(dev, trigger.condition, operand=trigger.operand)
 
 accelerometer = partial(_create_device, ServiceType.ACCELEROMETER)
+
 battery_level = partial(_create_device, ServiceType.BATTERY_LEVEL)
+battery_level.__doc__ = """
+The current charge level of a Bluetooth device battery.
+
+:param mac: MAC address of Bluetooth device.
+:param make: Bluetooth device make.
+
+.. seealso: `Make`
+"""
+
 button = partial(_create_device, ServiceType.BUTTON)
 humidity = partial(_create_device, ServiceType.HUMIDITY)
 light = partial(_create_device, ServiceType.LIGHT)
