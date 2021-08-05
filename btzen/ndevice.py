@@ -17,6 +17,42 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+Bluetooth device descriptors.
+
+Diagram::
+
+                                   +--------------+
+                                   | <<abstract>> |
+                         +-------|>|  DeviceBase  |<|-------+
+                         |         +--------------+         |
+                         |                                  |
+                         |                                  |
+                     +---+----+   set_trigger() >    +---------------+
+                     | Device |--------------------->| DeviceTrigger |
+                     +--------+                      +---------------+
+
+The following functions create Bluetooth devices descriptors
+
+- `accelerometer`
+- `battery_level`
+- `button`
+- `humidity`
+- `light`
+- `light_rgb`
+- `pressure`
+- `serial`
+- `temperature`
+- `weight`
+
+Depending on context a non-triggered or a triggered device is created. This
+depends on a device itself and its make. If possible, non-triggered device
+is created by default. Use `set_trigger` function to create tirggered
+device.
+
+It is not possible to create non-triggered device from a triggered one.
+"""
+
 from __future__ import annotations
 
 import enum
