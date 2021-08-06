@@ -36,7 +36,7 @@ from functools import partial, cache
 
 from .ndevice import T, DeviceBase, DeviceTrigger, Make, ServiceType, \
     AddressType, Trigger, TriggerCondition, register_service
-from .fdevice import enable, _enable_tr, write_config, set_trigger
+from .fdevice import enable, _enable_device_trigger, write_config, set_trigger
 from .service import S, ServiceCharacteristic
 from .util import to_int
 
@@ -160,7 +160,7 @@ async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]):
         *config.rgb,
     )
     await write_config(mac, srv.uuid_conf, data)
-    await _enable_tr(device)
+    await _enable_device_trigger(device)
 
 @set_trigger.register
 def _set_trigger_thingy52(

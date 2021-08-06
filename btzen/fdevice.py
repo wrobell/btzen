@@ -29,8 +29,7 @@ from . import _btzen  # type: ignore
 from .config import DEFAULT_DBUS_TIMEOUT
 from .ndevice import T, DeviceBase, Device, DeviceTrigger, NoTrigger, \
     Trigger, TriggerCondition
-from .service import S, Service, ServiceInterface, ServiceCharacteristic, \
-    ServiceEnvSensing
+from .service import S, Service, ServiceInterface, ServiceCharacteristic
 from .error import CallError
 from .session import get_session, connected
 
@@ -84,17 +83,6 @@ def set_trigger(
         device.address_type,
         device.convert,
         Trigger(condition, operand),
-    )
-
-def unset_trigger(device: DeviceTrigger[S, T]) -> Device[S, T]:
-    """
-    Set trigger for Bluetooth Environmental Sensing device.
-    """
-    return Device(
-        device.service,
-        device.mac,
-        device.address_type,
-        device.convert,
     )
 
 @singledispatch
@@ -168,23 +156,14 @@ async def _enable_int(device: DeviceTrigger[ServiceInterface, T]):
     bus._dev_property_start(device.mac, srv.property, iface=srv.interface)
 
 @enable.register
-async def _enable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):
+async def _enable_device_trigger(device: DeviceTrigger[ServiceCharacteristic, T]):
     bus = get_session().bus
-    await enable(unset_trigger(device))
+    await bus.ensure_characteristic_paths(device.mac, device.service.uuid_data)
+
     path = bus.characteristic_path(device.mac, device.service.uuid_data)
     assert path is not None
-
     bus._gatt_start(path)
     logger.info('notifications enabled for {}'.format(path))
-
-@enable.register
-async def _enable_env_sensing(device: Device[ServiceEnvSensing, T]):
-    bus = get_session().bus
-    srv = device.service
-    await bus.ensure_characteristic_paths(
-        device.mac, srv.uuid_data, srv.uuid_conf, srv.uuid_trigger
-    )
-    await write_config(device.mac, srv.uuid_conf, srv.config_on)
 
 @disable.register
 async def _disable_int(device: DeviceTrigger[ServiceInterface, T]):
@@ -193,7 +172,7 @@ async def _disable_int(device: DeviceTrigger[ServiceInterface, T]):
     bus._dev_property_stop(device.mac, srv.property, iface=srv.interface)
 
 @disable.register
-async def _disable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):
+async def _disable_device_trigger(device: DeviceTrigger[ServiceCharacteristic, T]):
     bus = get_session().bus
     srv = device.service
     path = bus.characteristic_path(device.mac, srv.uuid_data)
@@ -203,16 +182,6 @@ async def _disable_tr(device: DeviceTrigger[ServiceCharacteristic, T]):
         'notifications for {} are disabled'.format(device),
         'cannot disable notifications for {}'.format(device),
         bus._gatt_stop, path
-    )
-    await disable(unset_trigger(device))
-
-@disable.register
-async def _disable_env_sensing(device: Device[ServiceEnvSensing, T]):
-    srv = device.service
-    await disarm_async(
-        '{} disabled'.format(device),
-        'cannot disable {}'.format(device),
-        write_config, device.mac, srv.uuid_conf, srv.config_off
     )
 
 async def write_config(mac: str, uuid: str, data: bytes):

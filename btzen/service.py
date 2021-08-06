@@ -61,24 +61,6 @@ class ServiceCharacteristic(Service):
     uuid_data: str
     size: int
 
-@dtc.dataclass(frozen=True)
-class ServiceEnvSensing(ServiceCharacteristic):
-    """
-    Bluetooth service descriptor for Bluetooth Environmental Sensing
-    characteristic.
-
-    :var uuid_conf: UUID of characteristic to write and read device
-        configuration.
-    :var uuid_trigger: UUID of characteristic to write and read device
-        trigger data.
-    :var config_on: Default configuration of device to switch device on.
-    :var config_off: Default configuration of device to switch device off.
-    """
-    uuid_conf: str
-    uuid_trigger: str
-    config_on: bytes
-    config_off: bytes
-
 S = tp.TypeVar('S', bound=Service, covariant=True)
 
 # vim: sw=4:et:ai

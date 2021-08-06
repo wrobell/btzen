@@ -22,9 +22,13 @@ from functools import singledispatch
 
 from ..ndevice import T, DeviceBase, Device, DeviceTrigger, AddressType, \
     Trigger, TriggerCondition
-from ..service import S, Service, ServiceCharacteristic, ServiceEnvSensing
+from ..service import S, Service, ServiceCharacteristic
 
 import pytest
+
+@dtc.dataclass(frozen=True)
+class ServiceEnvSensing(ServiceCharacteristic):
+    pass
 
 @singledispatch
 def read(dev: DeviceBase) -> float:

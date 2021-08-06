@@ -37,6 +37,7 @@ CC2650STK
 """
 
 import asyncio
+import dataclasses as dtc
 import enum
 import logging
 import struct
@@ -44,11 +45,12 @@ import typing as tp
 from functools import partial
 
 from .ndevice import to_uuid as to_bt_uuid
-from .service import ServiceCharacteristic, ServiceEnvSensing
-from .ndevice import Device, DeviceTrigger, \
-    register_service, Make, ServiceType, Trigger, \
-    TriggerCondition, T
-from .fdevice import enable, write_config, _enable_env_sensing, _enable_tr
+from .service import ServiceCharacteristic
+from .ndevice import register_service, T, Device, DeviceTrigger, Make, \
+    ServiceType, Trigger, TriggerCondition
+from .fdevice import enable, disable, write_config, disarm_async, \
+    _enable_device_trigger
+from .session import get_session
 from .util import to_int
 
 logger = logging.getLogger(__name__)
@@ -60,7 +62,24 @@ MPU9250_GYRO = 65536 / 500
 MPU9250_ACCEL_2G = 32768 / 2
 MPU9250_ACCEL_UNPACK = struct.Struct('<3h').unpack
 
-class SensorTagService(ServiceEnvSensing):
+@dtc.dataclass(frozen=True)
+class SensorTagService(ServiceCharacteristic):
+    """
+    Bluetooth service descriptor for GATT characteristics of Texas
+    Instrument Sensor Tag Bluetooth device sensors.
+
+    :var uuid_conf: UUID of characteristic to write and read device
+        configuration.
+    :var uuid_trigger: UUID of characteristic to write and read device
+        trigger data.
+    :var config_on: Default configuration of device to switch device on.
+    :var config_off: Default configuration of device to switch device off.
+    :var interval: Time interval (period) of sensor.
+    """
+    uuid_conf: str
+    uuid_trigger: str
+    config_on: bytes
+    config_off: bytes
     interval: float=1
 
 class SensorTagButtonState(enum.IntFlag):
@@ -187,7 +206,13 @@ register_st(
 
 @enable.register  # type: ignore
 async def _enable_sensor_tag(device: Device[SensorTagService, T]):
-    await _enable_env_sensing(device)
+    bus = get_session().bus
+    srv = device.service
+
+    await bus.ensure_characteristic_paths(
+        device.mac, srv.uuid_data, srv.uuid_conf, srv.uuid_trigger
+    )
+    await write_config(device.mac, srv.uuid_conf, srv.config_on)
 
     value = int(device.service.interval * 100)
     assert value < 256  # TODO: raise value error
@@ -195,9 +220,18 @@ async def _enable_sensor_tag(device: Device[SensorTagService, T]):
     await write_config(device.mac, device.service.uuid_trigger, bytes([value]))
     logger.info('interval for {} is set'.format(device))
 
+@disable.register  # type: ignore
+async def _disable_sensor_tag(device: Device[SensorTagService, T]):
+    srv = device.service
+    await disarm_async(
+        '{} disabled'.format(device),
+        'cannot disable {}'.format(device),
+        write_config, device.mac, srv.uuid_conf, srv.config_off
+    )
+
 @enable.register  # type: ignore
 async def _enable_sensor_tag_tr(device: DeviceTrigger[SensorTagService, T]):
-    await _enable_tr(device)
+    await _enable_sensor_tag(device)
 
     assert device.trigger.operand is not None
     value = int(device.trigger.operand * 100)
@@ -205,5 +239,11 @@ async def _enable_sensor_tag_tr(device: DeviceTrigger[SensorTagService, T]):
 
     await write_config(device.mac, device.service.uuid_trigger, bytes([value]))
     logger.info('trigger for {} is set'.format(device))
+
+    await _enable_device_trigger(device)
+
+@disable.register  # type: ignore
+async def _disable_sensor_tag_tr(device: Device[SensorTagService, T]):
+    await _disable_sensor_tag(device)
 
 # vim: sw=4:et:ai

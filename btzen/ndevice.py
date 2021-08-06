@@ -294,6 +294,7 @@ def _create_device(
     if isinstance(trigger, NoTrigger):
         return dev
     else:
+        # TODO: fix placement of functions in modules
         from .fdevice import set_trigger
         return set_trigger(dev, trigger.condition, operand=trigger.operand)
 
