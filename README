@@ -9,17 +9,18 @@ The main features of BTZen are
 1. Connect and access multiple Bluetooth devices in parallel with Python
    asynchronous coroutines.
 2. GATT notification interface integrated into main API of the library.
-3. Automatic reconnections to devices with a connection manager.
+3. Automatic reconnections to devices.
 4. Access to serial devices implementing Stollmann (Telit) protocol.
-5. Support for devices partially following the Bluetooth specification
-   like SensorTag (CC2650STK) or Thingy:52.
+5. Support for devices, which do not follow the Bluetooth specification
+   fully like SensorTag (CC2650STK) or Thingy:52.
 6. Support for Bluez managed interfaces of devices, i.e. battery level.
+7. Allow to implement support for new devices easily.
 
 The library can be used with any Bluetooth Smart device. It was tested with
 
 1. SensorTag (CC2650STK) to read temperature, pressure, humidity, light,
    accelerometer data and state of the buttons.
-2. Thingy:52 to read temperature, pressure and humidity.
+2. Thingy:52 to read temperature, pressure, humidity and light data.
 3. Mi Smart Scale to read weight data.
 4. OSTC dive computer to read serial device data using Stollmann (Telit)
    protocol.
