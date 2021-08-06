@@ -18,7 +18,7 @@
 #
 
 """
-Bluetooth device descriptors.
+Bluetooth device descriptors and device object constructors.
 
 Diagram::
 
@@ -32,7 +32,7 @@ Diagram::
                      | Device |--------------------->| DeviceTrigger |
                      +--------+                      +---------------+
 
-The following functions create Bluetooth devices descriptors
+The following functions create Bluetooth device objects
 
 - `accelerometer`
 - `battery_level`
