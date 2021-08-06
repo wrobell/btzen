@@ -36,6 +36,17 @@ NOTE: The first version of SensorTag (CC2541DK) is not supported at the
 moment. If you still own the device and would like it to be supported,
 please `raise an issue <https://github.com/wrobell/btzen/issues>`_.
 
+API Changes
+===========
+Please note that since version 0.6.0 the API changed. The benefits are
+
+- support different makes of devices with single API
+- it is much easier to implement functionality for new devices
+- shutting down of BTZen connection sessions is more reliable
+
+If pre-0.6.0 version of BTZen is required, then use appropriate versioning
+in install requirements of your project.
+
 Documentation
 =============
 This project's documentation is lacking at the moment. Some useful tips
