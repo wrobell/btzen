@@ -31,10 +31,11 @@ from .ndevice import Make, DeviceBase, Device, DeviceTrigger, \
     pressure, temperature, humidity, light, light_rgb, create_device, \
     accelerometer, button, serial, weight, battery_level
 from .service import Service, ServiceCharacteristic, ServiceInterface
-from .fdevice import read, write, enable, disable, set_interval, \
+from .fdevice import read, read_all, write, enable, disable, set_interval, \
     set_trigger, set_address_type
-from .cm import connect, is_active
+from .cm import connect
 from .error import *
+from .session import is_active
 from .sensortag import SensorTagButtonState
 
 __version__ = pkg_resources.get_distribution('btzen').version
@@ -43,8 +44,8 @@ __all__ = [
     # bluetooth service descriptors
     'Service', 'ServiceCharacteristic', 'ServiceInterface',
 
-    'is_active', 'read', 'write', 'set_interval', 'set_trigger',
-    'set_address_type',
+    'is_active', 'read', 'read_all', 'write', 'set_interval',
+    'set_trigger', 'set_address_type',
 
     # bluetooth device classes and functions
     'Make', 'DeviceBase', 'Device', 'DeviceTrigger', 'TriggerCondition',

@@ -23,6 +23,7 @@ import asyncio
 import dataclasses as dtc
 import logging
 import typing as tp
+from collections.abc import AsyncIterator
 from functools import singledispatch
 
 from . import _btzen  # type: ignore
@@ -31,7 +32,7 @@ from .ndevice import T, DeviceBase, Device, DeviceTrigger, NoTrigger, \
     Trigger, TriggerCondition, AddressType
 from .service import S, Service, ServiceInterface, ServiceCharacteristic
 from .error import CallError
-from .session import get_session, connected
+from .session import get_session, connected, is_active
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,27 @@ async def read(device: DeviceBase[Service, T], *args: tp.Any) -> T:
     i.e. when the device is disconnected. The caller should handle the
     error, if it wants to continue reading data when the device is
     reconnected.
+
+    :param device: Bluetooth device to read data from.
     """
     pass
+
+async def read_all(device: DeviceBase[S, T]) -> AsyncIterator[T]:
+    """
+    Read all data from Bluetooth device.
+
+    It ignores cancellation errors.
+
+    :param device: Bluetooth device to read data from.
+    """
+    while is_active():
+        try:
+            value = await read(device)
+        except asyncio.CancelledError as ex:
+            # cancelled calls happen on device disconnection
+            logger.info('{}: {}'.format(device, ex))
+        else:
+            yield value
 
 @singledispatch
 async def write(device: DeviceBase[Service, T], data: bytes):

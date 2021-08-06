@@ -67,7 +67,7 @@ from .error import BTZenError
 from .config import DEFAULT_DBUS_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT
 from .ndevice import Device, AddressType
 from .fdevice import enable, disable
-from .session import BT_SESSION, Session, get_session
+from .session import BT_SESSION, Session, get_session, is_active
 from .util import concat
 
 DeviceDict = defaultdict[str, set[Device]]
@@ -302,8 +302,5 @@ async def disarm_async(msg: str, warn: str, coro, *args):
         logger.info(msg)
     except (Exception, asyncio.CancelledError) as ex:
         logger.warning(warn + ': ' + str(ex))
-
-def is_active() -> bool:
-    return get_session().is_active()
 
 # vim: sw=4:et:ai

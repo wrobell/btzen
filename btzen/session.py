@@ -151,4 +151,7 @@ async def connected(device: DeviceBase) -> tp.AsyncIterator[Session]:
 def get_session() -> Session:
     return BT_SESSION.get()
 
+def is_active() -> bool:
+    return get_session().is_active()
+
 # vim: sw=4:et:ai

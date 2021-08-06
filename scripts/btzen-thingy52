@@ -42,8 +42,7 @@ async def read_data(mac: str, interface: str, interval: float):
         await asyncio.gather(session, *tasks)
 
 async def read_sensor(name: str, sensor: btzen.DeviceBase):
-    while True:
-        value = await btzen.read(sensor)
+    async for value in btzen.read_all(sensor):
         if isinstance(value, (float, int)):
             print_data(name, '{:.1f}'.format(value))
         else:
