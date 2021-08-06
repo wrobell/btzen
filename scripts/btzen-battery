@@ -28,13 +28,8 @@ from datetime import datetime
 import btzen
 
 async def battery_level(battery: btzen.DeviceBase):
-    while True:
-        try:
-            value = await btzen.read(battery)
-        except asyncio.CancelledError:
-            print('{}: cancelled'.format(battery))
-        else:
-            print('{}: {}%'.format(datetime.now(), value))
+    async for value in btzen.read_all(battery):
+        print('{}: {}%'.format(datetime.now(), value))
 
 async def read_data(mac: str, interface: str, address_type: btzen.AddressType):
     dev = btzen.battery_level(mac)
