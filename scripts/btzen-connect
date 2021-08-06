@@ -40,6 +40,7 @@ import argparse
 import asyncio
 import logging
 import uvloop
+from functools import partial
 
 import btzen
 
@@ -65,7 +66,11 @@ logging.basicConfig(level=level)
 
 async def connect_devices(service_uuid: str, mac: list[str]) -> None:
     srv = btzen.Service(service_uuid)
-    devices = [btzen.create_device(srv, m) for m in mac]
+    set_trigger = partial(
+        btzen.set_trigger,
+        conndition=btzen.TriggerCondition.ON_CHANGE
+    )
+    devices = [set_trigger(btzen.create_device(srv, m)) for m in mac]
     async with btzen.connect(devices):
         while True:
             await asyncio.sleep(5)

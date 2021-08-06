@@ -1,13 +1,15 @@
 .PHONY=check test
 
+SCRIPTS=\
+	scripts/btzen-battery \
+	scripts/btzen-connect \
+	scripts/btzen-ostc \
+	scripts/btzen-sensor-tag \
+	scripts/btzen-thingy52 \
+	scripts/btzen-weight
+
 check:
-	mypy btzen
-	mypy scripts/btzen-connect
-	mypy scripts/btzen-battery
-	mypy scripts/btzen-sensor-tag
-	mypy scripts/btzen-thingy52
-	mypy scripts/btzen-weight
-	mypy scripts/btzen-ostc
+	mypy --scripts-are-modules btzen $(SCRIPTS)
 
 test:
 	pytest -vv --cov=btzen btzen

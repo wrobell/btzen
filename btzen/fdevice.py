@@ -81,7 +81,8 @@ def set_trigger(
         device.service,
         device.mac,
         device.address_type,
-        device.convert,
+        # TODO: mypy 0.920 shall fix problem below
+        device.convert,  # type: ignore
         Trigger(condition, operand),
     )
 

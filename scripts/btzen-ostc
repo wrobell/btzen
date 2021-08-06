@@ -82,7 +82,7 @@ async def read_data(dev: btzen.DeviceBase, count: int):
     try:
         await btzen.write(dev, b'\x6d')
         headers = await btzen.read(dev, 4098)
-        headers = headers[1:-1]
+        headers = headers[1:-1]  # type: ignore
 
         # get 20 latests dives
         items = itz.partition(16, headers)

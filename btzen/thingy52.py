@@ -162,7 +162,7 @@ async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]):
     await write_config(mac, srv.uuid_conf, data)
     await _enable_device_trigger(device)
 
-@set_trigger.register
+@set_trigger.register  # type: ignore
 def _set_trigger_thingy52(
         device: DeviceTrigger[Thingy52Service, T],
         condition: TriggerCondition,
