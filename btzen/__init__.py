@@ -27,11 +27,12 @@ from . import bluez
 
 from .btweight import WeightFlags, WeightData, MiScaleWeightData
 from .ndevice import Make, DeviceBase, Device, DeviceTrigger, \
-    TriggerCondition, \
+    TriggerCondition, AddressType, \
     pressure, temperature, humidity, light, light_rgb, create_device, \
     accelerometer, button, serial, weight, battery_level
 from .service import Service, ServiceCharacteristic, ServiceInterface
-from .fdevice import read, write, enable, disable, set_interval, set_trigger
+from .fdevice import read, write, enable, disable, set_interval, \
+    set_trigger, set_address_type
 from .cm import connect, is_active
 from .error import *
 from .sensortag import SensorTagButtonState
@@ -42,12 +43,13 @@ __all__ = [
     # bluetooth service descriptors
     'Service', 'ServiceCharacteristic', 'ServiceInterface',
 
-    'Make', 'is_active', 'read', 'write', 'set_interval', 'set_trigger',
+    'is_active', 'read', 'write', 'set_interval', 'set_trigger',
+    'set_address_type',
 
     # bluetooth device classes and functions
-    'DeviceBase', 'Device', 'DeviceTrigger', 'TriggerCondition',
-    'create_device', 'pressure', 'temperature', 'humidity', 'light',
-    'light_rgb', 'accelerometer', 'button', 'serial', 'weight',
+    'Make', 'DeviceBase', 'Device', 'DeviceTrigger', 'TriggerCondition',
+    'AddressType', 'create_device', 'pressure', 'temperature', 'humidity',
+    'light', 'light_rgb', 'accelerometer', 'button', 'serial', 'weight',
     'battery_level',
 
     # make specific objects

@@ -36,8 +36,9 @@ async def battery_level(battery: btzen.DeviceBase):
         else:
             print('{}: {}%'.format(datetime.now(), value))
 
-async def read_data(mac: str, interface: str):
+async def read_data(mac: str, interface: str, address_type: btzen.AddressType):
     dev = btzen.battery_level(mac)
+    dev = btzen.set_address_type(dev, address_type=address_type)
     async with btzen.connect([dev], interface=interface) as session:
         await asyncio.gather(session, battery_level(dev))
 
@@ -50,6 +51,11 @@ parser.add_argument(
     '-i', '--interface', default='hci0',
     help='Host controller interface (HCI)'
 )
+parser.add_argument(
+    '-a', '--address-type', choices=list(btzen.AddressType), default='public',
+    type=btzen.AddressType,
+    help='Device connection address type'
+)
 parser.add_argument('device', help='MAC address of device')
 args = parser.parse_args()
 
@@ -57,7 +63,6 @@ level = logging.DEBUG if args.verbose else logging.INFO
 logging.basicConfig(level=level)
 
 uvloop.install()
-asyncio.run(read_data(args.device, args.interface))
-
+asyncio.run(read_data(args.device, args.interface, args.address_type))
 
 # vim: sw=4:et:ai

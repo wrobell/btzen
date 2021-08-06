@@ -28,7 +28,7 @@ from functools import singledispatch
 from . import _btzen  # type: ignore
 from .config import DEFAULT_DBUS_TIMEOUT
 from .ndevice import T, DeviceBase, Device, DeviceTrigger, NoTrigger, \
-    Trigger, TriggerCondition
+    Trigger, TriggerCondition, AddressType
 from .service import S, Service, ServiceInterface, ServiceCharacteristic
 from .error import CallError
 from .session import get_session, connected
@@ -85,6 +85,12 @@ def set_trigger(
         device.convert,  # type: ignore
         Trigger(condition, operand),
     )
+
+def set_address_type(
+        device: DeviceBase[S, T],
+        address_type: AddressType,
+    ) -> DeviceBase[S, T]:
+    return dtc.replace(device, address_type=address_type)
 
 @singledispatch
 async def enable(device: DeviceBase[Service, T]):
