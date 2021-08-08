@@ -133,7 +133,6 @@ async def disable(device: DeviceBase[Service, T]):
     example, switch off a sensor on a Bluetooth device, there might be
     other resources to release like Bluez notification setup.
     """
-    pass
 
 @read.register
 async def _read_dev(device: Device[ServiceCharacteristic, T]) -> T:

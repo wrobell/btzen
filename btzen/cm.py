@@ -55,7 +55,7 @@ import asyncio
 import logging
 import typing as tp
 from collections import defaultdict
-from collections.abc import Coroutine, AsyncGenerator
+from collections.abc import Coroutine, AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from functools import partial
@@ -65,19 +65,23 @@ from . import _cm  # type: ignore
 from .bus import Bus
 from .error import BTZenError
 from .config import DEFAULT_DBUS_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT
-from .device import Device, AddressType
+from .device import DeviceBase, AddressType
 from .fdevice import enable, disable
 from .session import BT_SESSION, Session, get_session, is_active
 from .util import concat
 
-DeviceDict = defaultdict[str, set[Device]]
-Devices = tp.Iterable[Device]
+Devices = tp.Iterable[DeviceBase]
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def connect(devices: Devices, *, interface: str='hci0'):
+async def connect(
+        devices: Devices,
+        *,
+        interface: str='hci0'
+    ) -> AsyncIterator[Session]:
+
     bus = Bus.create_bus(interface)
     adapter_path = bus.adapter_path()
 
@@ -88,7 +92,7 @@ async def connect(devices: Devices, *, interface: str='hci0'):
     _dbus_timeout = DEFAULT_DBUS_TIMEOUT
     await _cm.bt_register_agent(bus.system_bus, _dbus_timeout)
 
-    by_mac: DeviceDict = defaultdict(set)
+    by_mac = defaultdict(set)
     for dev in devices:
         by_mac[dev.mac].add(dev)
 
