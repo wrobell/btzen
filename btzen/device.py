@@ -116,7 +116,7 @@ class DeviceBase(tp.Generic[S, T]):
     service: S
     mac: str
     address_type: AddressType
-    convert: Converter
+    convert: Converter[T]
 
     def __new__(cls, *args, **kw):
         tv = type(args[0])
