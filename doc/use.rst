@@ -4,40 +4,17 @@ Using the Library
 - create connection session using `btzen.connect`
 - read data
 
-Example usage for single read from a device::
-
-    import asyncio
-    import btzen
-
-    async def read_data():
-        device = btzen.temperature('00:...:00', make=btzen.Make.SENSOR_TAG)
-        # once reading from the sensor is finished, the session will be
-        # properly shutdown
-        with btzen.connect([device]):
-            # reading from the sensor will not start until BTZen
-            # connects to the device
-            temperature = await btzen.read(sensor)
-            print(temperature)
-
-    asyncio.run(read_data())
-
-Example usage for constant read from a device::
+Example usage for reading data from a device::
 
     import asyncio
     import btzen
 
     async def read_sensor(sensor):
-        while True:
-            try:
-                # reading from the sensor will not start until BTZen
-                # connects to the device
-                temperature = await btzen.read(sensor)
-            except CancelledError as ex:
-                # reading can be cancelled due to disconnected device,
-                # catch the exception to restart reading from the sensor
-                print('sensor read cancelled')
-            else:
-                print(temperature)
+        # reading from the sensor will not start until BTZen connects to
+        # the device
+        async for temperature in btzen.read_all(sensor):
+            temperature = await btzen.read(sensor)
+            print(temperature)
 
     async def read_data():
         sensor = btzen.temperature('00:...:00', make=btzen.Make.SENSOR_TAG)
