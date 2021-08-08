@@ -55,95 +55,18 @@ It is not possible to create non-triggered device from a triggered one.
 
 from __future__ import annotations
 
-import enum
+import dataclasses as dtc
 import logging
 import typing as tp
-import dataclasses as dtc
-from collections import defaultdict
 from functools import partial
 
-from .service import S, Service
+from .data import T, AddressType, Converter, Make, NoTrigger, Trigger, ServiceType
+from .service import S, Service, _SERVICE_REGISTRY
 
 logger = logging.getLogger(__name__)
 
-T = tp.TypeVar('T')
-Converter = tp.Callable[[bytes], T]
-AnyTrigger = tp.Union['Trigger', 'NoTrigger']
-
-# registry of known services
-_SERVICE_REGISTRY = defaultdict[
-    'Make',
-    dict['ServiceType', tuple['Service', Converter, AnyTrigger, 'AddressType']]
-](dict)
-
 # key is tuple (base class, parameter class)
 _PROXY_REGISTRY: dict[tuple[type, type], type] = {}
-
-# function to convert 16-bit UUID to full 128-bit Bluetooth normative UUID
-# string
-to_uuid: tp.Callable[[int], str] = '0000{:04x}-0000-1000-8000-00805f9b34fb'.format
-
-class Make(enum.Enum):
-    """
-    Bluetooth device make.
-    """
-    STANDARD = enum.auto()
-    SENSOR_TAG = enum.auto()
-    THINGY52 = enum.auto()
-    OSTC = enum.auto()
-    MI_SMART_SCALE = enum.auto()
-
-class ServiceType(enum.Enum):
-    """
-    Bluetooth service type.
-    """
-    ACCELEROMETER = enum.auto()
-    BUTTON = enum.auto()
-    BATTERY_LEVEL = enum.auto()
-    HUMIDITY = enum.auto()
-    LIGHT = enum.auto()
-    LIGHT_RGB = enum.auto()
-    PRESSURE = enum.auto()
-    SERIAL = enum.auto()
-    TEMPERATURE = enum.auto()
-    WEIGHT_MEASUREMENT = enum.auto()
-
-class AddressType(enum.Enum):
-    """
-    Bluetooth device address type.
-
-
-    .. seealso::
-
-        `ConnectDevice` method documentation at
-        https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/doc/adapter-api.txt.
-    """
-    PUBLIC = 'public'
-    RANDOM = 'random'
-
-class TriggerCondition(enum.IntEnum):
-    """
-    Condition value for Bluetooth Environmental Sensing device trigger
-    information.
-
-    Use `NoTrigger` for inactive trigger.
-
-    NOTE: Incomplete, see Bluetooth Environmental Sensing Service
-        specification, page 18.
-    """
-    FIXED_TIME = 0x01
-    ON_CHANGE = 0x04
-
-@dtc.dataclass(frozen=True)
-class Trigger:
-    """
-    Bluetooth Environmental Sensing device trigger information.
-    """
-    condition: TriggerCondition
-    operand: tp.Optional[tp.Any]=None
-
-@dtc.dataclass
-class NoTrigger: pass
 
 @dtc.dataclass(frozen=True)
 class DeviceBase(tp.Generic[S, T]):
@@ -252,22 +175,6 @@ class DeviceTrigger(DeviceBase[S, T]):
     :var trigger: Trigger information.
     """
     trigger: Trigger
-
-def register_service(
-        make: Make,
-        service_type: ServiceType,
-        service: Service,
-        *,
-        convert: Converter[T]=tp.cast(Converter, lambda v: v),
-        trigger: AnyTrigger=NoTrigger(),
-        address_type=AddressType.PUBLIC,
-    ):
-    """
-    Register service with data conversion function.
-    """
-    _SERVICE_REGISTRY[make][service_type] = (
-        service, convert, trigger, address_type
-    )
 
 def create_device(
         service: Service,

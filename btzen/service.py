@@ -21,6 +21,16 @@ from __future__ import annotations
 
 import dataclasses as dtc
 import typing as tp
+from collections import defaultdict
+
+from .data import T, AddressType, AnyTrigger, Converter, Make, NoTrigger, \
+    ServiceType
+
+# registry of known services
+_SERVICE_REGISTRY = defaultdict[
+    'Make',
+    dict['ServiceType', tuple['Service', Converter, AnyTrigger, 'AddressType']]
+](dict)
 
 @dtc.dataclass(frozen=True)
 class Service:
@@ -60,6 +70,22 @@ class ServiceCharacteristic(Service):
     """
     uuid_data: str
     size: int
+
+def register_service(
+        make: Make,
+        service_type: ServiceType,
+        service: Service,
+        *,
+        convert: Converter[T]=tp.cast(Converter, lambda v: v),
+        trigger: AnyTrigger=NoTrigger(),
+        address_type=AddressType.PUBLIC,
+    ):
+    """
+    Register service with data conversion function.
+    """
+    _SERVICE_REGISTRY[make][service_type] = (
+        service, convert, trigger, address_type
+    )
 
 S = tp.TypeVar('S', bound=Service, covariant=True)
 

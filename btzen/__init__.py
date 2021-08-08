@@ -26,10 +26,10 @@ from . import thingy52
 from . import bluez
 
 from .btweight import WeightFlags, WeightData, MiScaleWeightData
-from .device import Make, DeviceBase, Device, DeviceTrigger, \
-    TriggerCondition, AddressType, \
-    pressure, temperature, humidity, light, light_rgb, create_device, \
-    accelerometer, button, serial, weight, battery_level
+from .data import AddressType, Make, TriggerCondition, Trigger
+from .device import DeviceBase, Device, DeviceTrigger, create_device, \
+    accelerometer, battery_level, button, humidity, light, light_rgb, \
+    pressure, serial, temperature, weight
 from .service import Service, ServiceCharacteristic, ServiceInterface
 from .fdevice import read, read_all, write, enable, disable, set_interval, \
     set_trigger, set_address_type

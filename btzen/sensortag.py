@@ -44,13 +44,13 @@ import struct
 import typing as tp
 from functools import partial
 
-from .service import ServiceCharacteristic
-from .device import register_service, T, Device, DeviceTrigger, Make, \
-    ServiceType, Trigger, TriggerCondition, to_uuid as to_bt_uuid
+from .data import T, Make, ServiceType, Trigger, TriggerCondition
+from .device import Device, DeviceTrigger
 from .fdevice import enable, disable, write_config, disarm_async, \
     _enable_device_trigger
+from .service import ServiceCharacteristic, register_service
 from .session import get_session
-from .util import to_int
+from .util import to_int, to_uuid as to_bt_uuid
 
 logger = logging.getLogger(__name__)
 

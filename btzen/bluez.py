@@ -21,9 +21,9 @@
 Bluetooth services implemented by BlueZ protocol stack.
 """
 
-from .service import ServiceInterface
-from .device import register_service, to_uuid, Make, ServiceType, Trigger, \
-    TriggerCondition
+from .data import Make, ServiceType, Trigger, TriggerCondition
+from .service import ServiceInterface, register_service
+from .util import to_uuid
 
 register_service(
     Make.STANDARD,

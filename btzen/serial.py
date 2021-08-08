@@ -37,10 +37,12 @@ from functools import partial, cache
 from . import _btzen  # type: ignore
 from .bus import Bus
 from .config import DEFAULT_DBUS_TIMEOUT
-from .device import T, Device, Make, ServiceType, register_service, to_uuid
-from .service import Service
+from .data import T, Make, ServiceType
+from .device import Device
+from .service import Service, register_service
 from .fdevice import enable, disable, read, write, disarm
 from .session import get_session, connected
+from .util import to_uuid
 
 logger = logging.getLogger(__name__)
 

@@ -28,10 +28,9 @@ from functools import singledispatch
 
 from . import _btzen  # type: ignore
 from .config import DEFAULT_DBUS_TIMEOUT
-from .device import T, DeviceBase, Device, DeviceTrigger, NoTrigger, \
-    Trigger, TriggerCondition, AddressType
+from .data import T, AddressType, NoTrigger, Trigger, TriggerCondition
+from .device import DeviceBase, Device, DeviceTrigger
 from .service import S, Service, ServiceInterface, ServiceCharacteristic
-from .error import CallError
 from .session import get_session, connected, is_active
 
 logger = logging.getLogger(__name__)
@@ -65,7 +64,7 @@ async def read_all(device: DeviceBase[S, T]) -> AsyncIterator[T]:
             # cancelled calls happen on device disconnection
             logger.info('{}: {}'.format(device, ex))
         else:
-            yield value
+            yield value  # type: ignore
 
 @singledispatch
 async def write(device: DeviceBase[Service, T], data: bytes):

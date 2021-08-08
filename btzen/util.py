@@ -17,11 +17,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from functools import wraps, partial
-from inspect import iscoroutinefunction
+"""
+BTZen utility functions.
+"""
+
+import typing as tp
+from functools import partial
 from itertools import chain
 
 concat = chain.from_iterable
 to_int = partial(int.from_bytes, byteorder='little')
+
+# function to convert 16-bit UUID to full 128-bit Bluetooth normative UUID
+# string
+to_uuid: tp.Callable[[int], str] = '0000{:04x}-0000-1000-8000-00805f9b34fb'.format
 
 # vim: sw=4:et:ai

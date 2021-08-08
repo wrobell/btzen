@@ -20,8 +20,8 @@
 import dataclasses as dtc
 from functools import singledispatch
 
-from ..device import T, DeviceBase, Device, DeviceTrigger, AddressType, \
-    Trigger, TriggerCondition
+from ..data import T, AddressType, Trigger, TriggerCondition
+from ..device import DeviceBase, Device, DeviceTrigger
 from ..service import S, Service, ServiceCharacteristic
 
 import pytest

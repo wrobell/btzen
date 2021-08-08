@@ -26,9 +26,9 @@ import enum
 import struct
 import typing as tp
 
-from .device import register_service, to_uuid, Make, ServiceType, Trigger, \
-    TriggerCondition, T
-from .service import ServiceCharacteristic
+from .data import T, Make, ServiceType, Trigger, TriggerCondition
+from .service import register_service, ServiceCharacteristic
+from .util import to_uuid
 
 class WeightFlags(enum.IntFlag):
     IMPERIAL = 0x01

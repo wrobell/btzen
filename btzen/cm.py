@@ -131,9 +131,7 @@ async def manage_connection(bus: Bus, mac: str, devices: Devices) -> None:
     """
     Manage Bluetooth connection for the devices.
     """
-    # determine connection address type; favour random one; is there a
-    # better way? thingy52 requires random address type, but its battery
-    # service public only (FIXME: check that again)
+    # determine connection address type and favour random one
     address_types = set(dev.address_type for dev in devices)
     has_random = AddressType.RANDOM in address_types
     address_type = AddressType.RANDOM if has_random else AddressType.PUBLIC
@@ -273,7 +271,7 @@ async def restart_devices(bus: Bus, mac: str, devices: Devices) -> None:
 
 async def resolve_services(
         bus: Bus, mac: str, devices: Devices
-    ) -> AsyncGenerator[None, None]:
+    ) -> AsyncGenerator[bool, None]:
     """
     Asynchronous generator waiting for a Bluetooth device to be
     resolved.
