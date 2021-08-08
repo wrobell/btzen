@@ -81,7 +81,7 @@ class Thingy52Config:
     # color sensor LED calibration (RGB value)
     rgb: tuple[int, int, int] = (0, 255, 0)
 
-CONFIG_CACHE: defaultdict[str, Thingy52Config] = defaultdict(Thingy52Config)
+_CONFIG_CACHE: defaultdict[str, Thingy52Config] = defaultdict(Thingy52Config)
 
 @dtc.dataclass(frozen=True)
 class LightColor:
@@ -168,7 +168,7 @@ async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]):
     mac = device.mac
     srv = device.service
 
-    config = CONFIG_CACHE[mac]
+    config = _CONFIG_CACHE[mac]
     data = CONFIG_DATA_FMT.pack(
         to_ms(config.temperature),
         to_ms(config.pressure),
@@ -192,9 +192,9 @@ def _set_trigger_thingy52(
 
     mac = device.mac
     config_entry = device.service.config_entry
-    config = CONFIG_CACHE[device.mac]
+    config = _CONFIG_CACHE[device.mac]
     config = dtc.replace(config, **{config_entry: operand})
-    CONFIG_CACHE[mac] = config
+    _CONFIG_CACHE[mac] = config
 
     return device  # type: ignore
 
