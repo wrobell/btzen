@@ -46,7 +46,7 @@ from functools import partial
 
 from .data import T, Make, ServiceType, Trigger, TriggerCondition
 from .device import Device, DeviceTrigger
-from .fdevice import enable, disable, write_config, disarm_async, \
+from .fdevice import enable, disable, write_config, disarm, \
     _enable_device_trigger
 from .service import ServiceCharacteristic, register_service
 from .session import get_session
@@ -222,7 +222,7 @@ async def _enable_sensor_tag(device: Device[SensorTagService, T]):
 @disable.register  # type: ignore
 async def _disable_sensor_tag(device: Device[SensorTagService, T]):
     srv = device.service
-    await disarm_async(
+    await disarm(
         '{} disabled'.format(device),
         'cannot disable {}'.format(device),
         write_config, device.mac, srv.uuid_conf, srv.config_off

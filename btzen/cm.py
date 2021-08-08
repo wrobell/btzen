@@ -66,7 +66,7 @@ from .bus import Bus
 from .error import BTZenError
 from .config import DEFAULT_DBUS_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT
 from .device import DeviceBase, AddressType
-from .fdevice import enable, disable
+from .fdevice import enable, disable, disarm
 from .session import BT_SESSION, Session, get_session, is_active
 from .util import concat
 
@@ -111,14 +111,14 @@ async def connect(
     finally:
         session.stop()
 
-        disarm(
+        await disarm(
             'agent unregistered',
             'agent failed to unregister',
             _cm.bt_unregister_agent,
             bus.system_bus
         )
 
-        disarm(
+        await disarm(
             'connection manager unregistered',
             'connection manager failed to unregister',
             _cm.cm_close,
@@ -152,8 +152,7 @@ async def manage_connection(bus: Bus, mac: str, devices: Devices) -> None:
     finally:
         bus._dev_property_stop(mac, 'ServicesResolved')
 
-        # TODO: make async
-        disarm(
+        await disarm(
             'device {} disconnected'.format(mac),
             'device {} failed to disconnect'.format(mac),
             _cm.bt_disconnect,
@@ -165,7 +164,7 @@ async def manage_connection(bus: Bus, mac: str, devices: Devices) -> None:
 
 # TODO: make real async
 async def remove_connection(bus: Bus, mac: str):
-    disarm(
+    await disarm(
         'connection for device {} removed'.format(mac),
         'removal of connection failed for device {}'.format(mac),
         _cm.bt_remove,
@@ -284,25 +283,5 @@ async def resolve_services(
         resolved = await bus._dev_property_get(mac, 'ServicesResolved')
         logger.info('device {} services resolved: {}'.format(mac, resolved))
         yield resolved
-
-def disarm(msg: str, warn: str, f: tp.Callable, *args: tp.Any) -> None:
-    try:
-        f(*args)
-    except asyncio.CancelledError as ex:
-        if not is_active():
-            raise
-        else:
-            logger.warning(warn + ': ' + str(ex))
-    except Exception as ex:
-        logger.warning(warn + ': ' + str(ex))
-    else:
-        logger.info(msg)
-
-async def disarm_async(msg: str, warn: str, coro, *args):
-    try:
-        await coro(*args)
-        logger.info(msg)
-    except (Exception, asyncio.CancelledError) as ex:
-        logger.warning(warn + ': ' + str(ex))
 
 # vim: sw=4:et:ai

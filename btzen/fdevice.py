@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses as dtc
+import inspect
 import logging
 import typing as tp
 from collections.abc import AsyncIterator
@@ -216,18 +217,18 @@ async def write_config(mac: str, uuid: str, data: bytes):
         bus.system_bus, path, data, DEFAULT_DBUS_TIMEOUT
     )
 
-# TODO: there is disarm in btzen.cm
 async def disarm(msg: str, warn: str, f, *args):
     try:
-        f(*args)
+        if inspect.iscoroutinefunction(f):
+            await f(*args)
+        else:
+            f(*args)
         logger.info(msg)
-    except (Exception, asyncio.CancelledError) as ex:
-        logger.warning(warn + ': ' + str(ex))
-
-async def disarm_async(msg: str, warn: str, f, *args):
-    try:
-        await f(*args)
-        logger.info(msg)
+    except asyncio.CancelledError as ex:
+        if not is_active():
+            raise
+        else:
+            logger.warning(warn + ': ' + str(ex))
     except (Exception, asyncio.CancelledError) as ex:
         logger.warning(warn + ': ' + str(ex))
 
