@@ -20,7 +20,8 @@ The library can be used with any Bluetooth Smart device. It was tested with
 
 1. SensorTag (CC2650STK) to read temperature, pressure, humidity, light,
    accelerometer data and state of the buttons.
-2. Thingy:52 to read temperature, pressure, humidity and light data.
+2. Thingy:52 to read temperature, pressure, humidity, light data and state
+   of the button.
 3. Mi Smart Scale to read weight data.
 4. OSTC dive computer to read serial device data using Stollmann (Telit)
    protocol.

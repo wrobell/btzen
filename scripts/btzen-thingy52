@@ -59,6 +59,7 @@ SENSORS = [
     ('temperature', btzen.temperature),
     ('humidity', btzen.humidity),
     ('light', btzen.light_rgb),
+    ('button', btzen.button),
 ]
 
 parser = argparse.ArgumentParser()

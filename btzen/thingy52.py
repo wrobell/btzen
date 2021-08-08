@@ -144,6 +144,16 @@ register_th(
     convert=convert_light,
 )
 
+register_th(
+    ServiceType.BUTTON,
+    ServiceCharacteristic(
+        to_uuid(0x0300),
+        to_uuid(0x0302),
+        1,
+    ),
+    convert=lambda data: data[0],
+)
+
 @enable.register
 async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]):
     to_ms = lambda v: int(v * 1000)
