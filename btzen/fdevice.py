@@ -110,6 +110,12 @@ def set_address_type(
         device: DeviceBase[S, T],
         address_type: AddressType,
     ) -> DeviceBase[S, T]:
+    """
+    Set connection address type for a Bluetooth device.
+
+    :param device: Bluetooth device descriptor.
+    :param address_type: Bluetooth device connection address type.
+    """
     return dtc.replace(device, address_type=address_type)
 
 @singledispatch
