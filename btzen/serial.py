@@ -37,7 +37,7 @@ from functools import partial, cache
 from . import _btzen  # type: ignore
 from .bus import Bus
 from .config import DEFAULT_DBUS_TIMEOUT
-from .ndevice import T, Device, Make, ServiceType, register_service, to_uuid
+from .device import T, Device, Make, ServiceType, register_service, to_uuid
 from .service import Service
 from .fdevice import enable, disable, read, write, disarm
 from .session import get_session, connected

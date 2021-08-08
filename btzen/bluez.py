@@ -22,7 +22,7 @@ Bluetooth services implemented by BlueZ protocol stack.
 """
 
 from .service import ServiceInterface
-from .ndevice import register_service, to_uuid, Make, ServiceType, Trigger, \
+from .device import register_service, to_uuid, Make, ServiceType, Trigger, \
     TriggerCondition
 
 register_service(

@@ -28,7 +28,7 @@ from functools import singledispatch
 
 from . import _btzen  # type: ignore
 from .config import DEFAULT_DBUS_TIMEOUT
-from .ndevice import T, DeviceBase, Device, DeviceTrigger, NoTrigger, \
+from .device import T, DeviceBase, Device, DeviceTrigger, NoTrigger, \
     Trigger, TriggerCondition, AddressType
 from .service import S, Service, ServiceInterface, ServiceCharacteristic
 from .error import CallError

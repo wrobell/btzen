@@ -26,7 +26,7 @@ import enum
 import struct
 import typing as tp
 
-from .ndevice import register_service, to_uuid, Make, ServiceType, Trigger, \
+from .device import register_service, to_uuid, Make, ServiceType, Trigger, \
     TriggerCondition, T
 from .service import ServiceCharacteristic
 

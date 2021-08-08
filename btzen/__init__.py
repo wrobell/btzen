@@ -26,7 +26,7 @@ from . import thingy52
 from . import bluez
 
 from .btweight import WeightFlags, WeightData, MiScaleWeightData
-from .ndevice import Make, DeviceBase, Device, DeviceTrigger, \
+from .device import Make, DeviceBase, Device, DeviceTrigger, \
     TriggerCondition, AddressType, \
     pressure, temperature, humidity, light, light_rgb, create_device, \
     accelerometer, button, serial, weight, battery_level

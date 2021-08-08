@@ -34,7 +34,7 @@ import typing as tp
 from collections import defaultdict
 from functools import partial, cache
 
-from .ndevice import T, DeviceBase, DeviceTrigger, Make, ServiceType, \
+from .device import T, DeviceBase, DeviceTrigger, Make, ServiceType, \
     AddressType, Trigger, TriggerCondition, register_service
 from .fdevice import enable, _enable_device_trigger, write_config, set_trigger
 from .service import S, ServiceCharacteristic

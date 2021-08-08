@@ -26,7 +26,7 @@ from contextvars import ContextVar
 
 from .bus import Bus
 from .error import BTZenError, CallError
-from .ndevice import DeviceBase
+from .device import DeviceBase
 
 logger = logging.getLogger(__name__)
 

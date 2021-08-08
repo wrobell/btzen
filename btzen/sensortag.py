@@ -44,10 +44,9 @@ import struct
 import typing as tp
 from functools import partial
 
-from .ndevice import to_uuid as to_bt_uuid
 from .service import ServiceCharacteristic
-from .ndevice import register_service, T, Device, DeviceTrigger, Make, \
-    ServiceType, Trigger, TriggerCondition
+from .device import register_service, T, Device, DeviceTrigger, Make, \
+    ServiceType, Trigger, TriggerCondition, to_uuid as to_bt_uuid
 from .fdevice import enable, disable, write_config, disarm_async, \
     _enable_device_trigger
 from .session import get_session
