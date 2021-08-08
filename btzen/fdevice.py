@@ -17,6 +17,20 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+Operations for Bluetooth devices.
+
+Basic operations
+
+- `enable`
+- `disable`
+- `read`
+- `write`
+- `set_trigger`
+- `set_interval`
+- `set_address_type`
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -47,8 +61,11 @@ async def read(device: DeviceBase[Service, T], *args: tp.Any) -> T:
     reconnected.
 
     :param device: Bluetooth device to read data from.
+    :param args: Addition read arguments.
     """
-    pass
+    raise NotImplementedError(
+        'Read function for {} is not implemented'.format(device)
+    )
 
 async def read_all(device: DeviceBase[S, T]) -> AsyncIterator[T]:
     """
@@ -69,7 +86,15 @@ async def read_all(device: DeviceBase[S, T]) -> AsyncIterator[T]:
 
 @singledispatch
 async def write(device: DeviceBase[Service, T], data: bytes):
-    pass
+    """
+    Write data to Bluetooth device.
+
+    :param device: Bluetooth device to write data to.
+    :param data: Data to write to the Bluetooth device.
+    """
+    raise NotImplementedError(
+        'Write function for {} is not implemented'.format(device)
+    )
 
 def set_interval(
         device: DeviceBase[S, T],
