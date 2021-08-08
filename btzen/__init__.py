@@ -26,7 +26,7 @@ from . import thingy52
 from . import bluez
 
 from .btweight import WeightFlags, WeightData, MiScaleWeightData
-from .data import AddressType, Make, TriggerCondition, Trigger
+from .data import AddressType, Button, Make, TriggerCondition, Trigger
 from .device import DeviceBase, Device, DeviceTrigger, create_device, \
     accelerometer, battery_level, button, humidity, light, light_rgb, \
     pressure, serial, temperature, weight
@@ -37,12 +37,16 @@ from .cm import connect
 from .error import *
 from .session import is_active
 from .sensortag import SensorTagButtonState
+from .thingy52 import Thingy52ButtonState
 
 __version__ = pkg_resources.get_distribution('btzen').version
 
 __all__ = [
     # bluetooth service descriptors
     'Service', 'ServiceCharacteristic', 'ServiceInterface',
+
+    # basic data
+    'Button',
 
     'is_active', 'read', 'read_all', 'write', 'set_interval',
     'set_trigger', 'set_address_type',
@@ -54,7 +58,7 @@ __all__ = [
     'battery_level',
 
     # make specific objects
-    'SensorTagButtonState',
+    'SensorTagButtonState', 'Thingy52ButtonState',
 ]
 
 # vim: sw=4:et:ai

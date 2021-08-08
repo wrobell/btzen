@@ -21,6 +21,7 @@
 import argparse
 import asyncio
 import logging
+import typing as tp
 import uvloop
 from datetime import datetime
 
@@ -43,12 +44,14 @@ async def read_data(mac: str, interface: str, interval: float):
 
 async def read_sensor(name: str, sensor: btzen.DeviceBase):
     async for value in btzen.read_all(sensor):
-        if isinstance(value, (float, int)):
+        if isinstance(value, btzen.Button):
+            print_data(name, '{}'.format(str(value)))
+        elif isinstance(value, (float, int)):
             print_data(name, '{:.1f}'.format(value))
         else:
             print_data(name, '{}'.format(value))
 
-def print_data(name, value):
+def print_data(name: str, value: tp.Any):
     print('{} {}: {}'.format(datetime.now(), name, value))
 
 #

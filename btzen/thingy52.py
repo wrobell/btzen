@@ -34,7 +34,8 @@ import typing as tp
 from collections import defaultdict
 from functools import partial, cache
 
-from .data import T, AddressType, Make, ServiceType, Trigger, TriggerCondition
+from .data import T, AddressType, Button, Make, ServiceType, Trigger, \
+    TriggerCondition
 from .device import DeviceTrigger
 from .fdevice import enable, _enable_device_trigger, write_config, set_trigger
 from .service import S, register_service, ServiceCharacteristic
@@ -88,6 +89,13 @@ class LightColor:
     blue: float
     green: float
     clear: float
+
+class Thingy52ButtonState(Button):
+    """
+    Thingy:52 Bluetooth device button state.
+    """
+    OFF = 0x00
+    ON = 0x01
 
 def convert_light(data: bytes) -> LightColor:
     """
@@ -151,10 +159,10 @@ register_th(
         to_uuid(0x0302),
         1,
     ),
-    convert=lambda data: data[0],
+    convert=lambda data: Thingy52ButtonState(data[0]),
 )
 
-@enable.register
+@enable.register  # type: ignore
 async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]):
     to_ms = lambda v: int(v * 1000)
     mac = device.mac

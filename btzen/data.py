@@ -94,5 +94,10 @@ class NoTrigger:
     Singleton object indicating no trigger for a Bluetooth device.
     """
 
+class Button(enum.IntFlag):
+    """
+    Base enumeration class for state of buttons found on various Bluetooth
+    devices.
+    """
 
 # vim: sw=4:et:ai

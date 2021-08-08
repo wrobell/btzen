@@ -44,7 +44,7 @@ import struct
 import typing as tp
 from functools import partial
 
-from .data import T, Make, ServiceType, Trigger, TriggerCondition
+from .data import T, Button, Make, ServiceType, Trigger, TriggerCondition
 from .device import Device, DeviceTrigger
 from .fdevice import enable, disable, write_config, disarm, \
     _enable_device_trigger
@@ -81,7 +81,7 @@ class SensorTagService(ServiceCharacteristic):
     config_off: bytes
     interval: float=1
 
-class SensorTagButtonState(enum.IntFlag):
+class SensorTagButtonState(Button):
     """
     Sensor Tag Bluetooth device button state.
     """
