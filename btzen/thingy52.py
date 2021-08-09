@@ -36,9 +36,9 @@ from functools import partial, cache
 
 from .data import T, AddressType, Button, Make, ServiceType, Trigger, \
     TriggerCondition
-from .device import DeviceTrigger
-from .fdevice import enable, _enable_device_trigger, write_config, set_trigger
-from .service import S, register_service, ServiceCharacteristic
+from .device import DeviceTrigger, set_trigger
+from .devio import enable, _enable_device_trigger, write_config
+from .service import register_service, ServiceCharacteristic
 from .util import to_int
 
 logger = logging.getLogger(__name__)

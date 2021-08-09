@@ -46,7 +46,7 @@ from functools import partial
 
 from .data import T, Button, Make, ServiceType, Trigger, TriggerCondition
 from .device import Device, DeviceTrigger
-from .fdevice import enable, disable, write_config, disarm, \
+from .devio import enable, disable, write_config, disarm, \
     _enable_device_trigger
 from .service import ServiceCharacteristic, register_service
 from .session import get_session

@@ -39,8 +39,8 @@ from .bus import Bus
 from .config import DEFAULT_DBUS_TIMEOUT
 from .data import T, Make, ServiceType
 from .device import Device
+from .devio import enable, disable, read, write, disarm
 from .service import Service, register_service
-from .fdevice import enable, disable, read, write, disarm
 from .session import get_session, connected
 from .util import to_uuid
 

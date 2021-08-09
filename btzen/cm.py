@@ -66,7 +66,7 @@ from .bus import Bus
 from .error import BTZenError
 from .config import DEFAULT_DBUS_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT
 from .device import DeviceBase, AddressType
-from .fdevice import enable, disable, disarm
+from .devio import enable, disable, disarm
 from .session import BT_SESSION, Session, get_session, is_active
 from .util import concat
 

@@ -26,13 +26,14 @@ from . import thingy52
 from . import bluez
 
 from .btweight import WeightFlags, WeightData, MiScaleWeightData
-from .data import AddressType, Button, Make, TriggerCondition, Trigger
-from .device import DeviceBase, Device, DeviceTrigger, create_device, \
+from .data import AddressType, Button, Make, TriggerCondition, Trigger, \
+    ServiceType
+from .device import DeviceBase, Device, DeviceTrigger, set_interval, \
+    set_trigger, set_address_type, create_device, \
     accelerometer, battery_level, button, humidity, light, light_rgb, \
     pressure, serial, temperature, weight
+from .devio import read, read_all, write, enable, disable
 from .service import Service, ServiceCharacteristic, ServiceInterface
-from .fdevice import read, read_all, write, enable, disable, set_interval, \
-    set_trigger, set_address_type
 from .cm import connect
 from .error import *
 from .session import is_active
@@ -42,23 +43,29 @@ from .thingy52 import Thingy52ButtonState
 __version__ = pkg_resources.get_distribution('btzen').version
 
 __all__ = [
+    # connection session
+    'is_active', 'connect',
+
+    # bluetooth device descriptors and constructors
+    'DeviceBase', 'Device', 'DeviceTrigger', 'create_device',
+    'accelerometer', 'battery_level', 'button', 'humidity', 'light',
+    'light_rgb', 'pressure', 'serial', 'temperature', 'weight',
+
     # bluetooth service descriptors
     'Service', 'ServiceCharacteristic', 'ServiceInterface',
 
     # basic data
-    'Button',
+    'AddressType', 'Make', 'ServiceType', 'Button', 'WeightData',
+    'WeightFlags', 'Trigger', 'TriggerCondition',
 
-    'is_active', 'read', 'read_all', 'write', 'set_interval',
-    'set_trigger', 'set_address_type',
+    # bluetooth device i/o
+    'read', 'read_all', 'write',
 
-    # bluetooth device classes and functions
-    'Make', 'DeviceBase', 'Device', 'DeviceTrigger', 'TriggerCondition',
-    'AddressType', 'create_device', 'pressure', 'temperature', 'humidity',
-    'light', 'light_rgb', 'accelerometer', 'button', 'serial', 'weight',
-    'battery_level',
+    # bluetooth device configuration
+    'set_interval', 'set_trigger', 'set_address_type',
 
     # make specific objects
-    'SensorTagButtonState', 'Thingy52ButtonState',
+    'SensorTagButtonState', 'Thingy52ButtonState', 'MiScaleWeightData',
 ]
 
 # vim: sw=4:et:ai

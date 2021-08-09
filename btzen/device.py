@@ -58,9 +58,10 @@ from __future__ import annotations
 import dataclasses as dtc
 import logging
 import typing as tp
-from functools import partial
+from functools import partial, singledispatch
 
-from .data import T, AddressType, Converter, Make, NoTrigger, Trigger, ServiceType
+from .data import T, AddressType, Converter, Make, NoTrigger, Trigger, \
+    TriggerCondition, ServiceType
 from .service import S, Service, _SERVICE_REGISTRY
 
 logger = logging.getLogger(__name__)
@@ -188,6 +189,53 @@ def create_device(
     """
     return Device(service, mac, address_type=address_type, convert=convert)
 
+def set_interval(
+        device: DeviceBase[S, T],
+        interval: float,
+    ) -> DeviceTrigger[S, T]:
+    """
+    Set fixed time interval for Bluetooth Environmental Sensing device.
+
+    This is equivalent to::
+
+        set_trigger(TriggerCondition.FIXED_TIME, interval)
+
+    :param device: Bluetooth device descriptor.
+    :param interval: Interval in seconds.
+    """
+    return set_trigger(device, TriggerCondition.FIXED_TIME, operand=interval)
+
+@singledispatch
+def set_trigger(
+        device: DeviceBase[S, T],
+        condition: TriggerCondition,
+        *,
+        operand: tp.Optional[float]=None,
+        ) -> DeviceTrigger[S, T]:
+    """
+    Set trigger for Bluetooth Environmental Sensing device.
+    """
+    return DeviceTrigger(
+        device.service,
+        device.mac,
+        device.address_type,
+        # TODO: mypy 0.920 shall fix problem below
+        device.convert,  # type: ignore
+        Trigger(condition, operand),
+    )
+
+def set_address_type(
+        device: DeviceBase[S, T],
+        address_type: AddressType,
+    ) -> DeviceBase[S, T]:
+    """
+    Set connection address type for a Bluetooth device.
+
+    :param device: Bluetooth device descriptor.
+    :param address_type: Bluetooth device connection address type.
+    """
+    return dtc.replace(device, address_type=address_type)
+
 def _create_device(
         service_type: ServiceType,
         mac: str,
@@ -201,8 +249,6 @@ def _create_device(
     if isinstance(trigger, NoTrigger):
         return dev
     else:
-        # TODO: fix placement of functions in modules
-        from .fdevice import set_trigger
         return set_trigger(dev, trigger.condition, operand=trigger.operand)
 
 accelerometer = partial(_create_device, ServiceType.ACCELEROMETER)

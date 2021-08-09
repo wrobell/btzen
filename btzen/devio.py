@@ -26,9 +26,6 @@ Basic operations
 - `disable`
 - `read`
 - `write`
-- `set_trigger`
-- `set_interval`
-- `set_address_type`
 """
 
 from __future__ import annotations
@@ -43,9 +40,9 @@ from functools import singledispatch
 
 from . import _btzen  # type: ignore
 from .config import DEFAULT_DBUS_TIMEOUT
-from .data import T, AddressType, NoTrigger, Trigger, TriggerCondition
+from .data import T
 from .device import DeviceBase, Device, DeviceTrigger
-from .service import S, Service, ServiceInterface, ServiceCharacteristic
+from .service import Service, ServiceInterface, ServiceCharacteristic
 from .session import get_session, connected, is_active
 
 logger = logging.getLogger(__name__)
@@ -67,7 +64,7 @@ async def read(device: DeviceBase[Service, T], *args: tp.Any) -> T:
         'Read function for {} is not implemented'.format(device)
     )
 
-async def read_all(device: DeviceBase[S, T]) -> AsyncIterator[T]:
+async def read_all(device: DeviceBase[Service, T]) -> AsyncIterator[T]:
     """
     Read all data from Bluetooth device.
 
@@ -95,53 +92,6 @@ async def write(device: DeviceBase[Service, T], data: bytes):
     raise NotImplementedError(
         'Write function for {} is not implemented'.format(device)
     )
-
-def set_interval(
-        device: DeviceBase[S, T],
-        interval: float,
-    ) -> DeviceTrigger[S, T]:
-    """
-    Set fixed time interval for Bluetooth Environmental Sensing device.
-
-    This is equivalent to::
-
-        set_trigger(TriggerCondition.FIXED_TIME, interval)
-
-    :param device: Bluetooth device descriptor.
-    :param interval: Interval in seconds.
-    """
-    return set_trigger(device, TriggerCondition.FIXED_TIME, operand=interval)
-
-@singledispatch
-def set_trigger(
-        device: DeviceBase[S, T],
-        condition: TriggerCondition,
-        *,
-        operand: tp.Optional[float]=None,
-        ) -> DeviceTrigger[S, T]:
-    """
-    Set trigger for Bluetooth Environmental Sensing device.
-    """
-    return DeviceTrigger(
-        device.service,
-        device.mac,
-        device.address_type,
-        # TODO: mypy 0.920 shall fix problem below
-        device.convert,  # type: ignore
-        Trigger(condition, operand),
-    )
-
-def set_address_type(
-        device: DeviceBase[S, T],
-        address_type: AddressType,
-    ) -> DeviceBase[S, T]:
-    """
-    Set connection address type for a Bluetooth device.
-
-    :param device: Bluetooth device descriptor.
-    :param address_type: Bluetooth device connection address type.
-    """
-    return dtc.replace(device, address_type=address_type)
 
 @singledispatch
 async def enable(device: DeviceBase[Service, T]):
