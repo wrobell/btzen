@@ -26,7 +26,7 @@ and require some custom implementation.
 The sensors on device read data at certain time interval (period), usually
 one second. Functions `set_interval` or `set_trigger` change this interval.
 To change the time interval for a device with inactive trigger, use
-`btzen.set` function.
+`dataclasses.replace` function.
 
 The identificators for specific sensors can be found at
 

@@ -76,22 +76,34 @@ class DeviceBase(tp.Generic[S, T]):
 
     Implemenation notes
 
-        Add support for single-dispatch generic functions and generic
-        pseudo-type provided by Python `typing` module.
-
         BTZen handles complexity and diversity of non-compliant Bluetooth
-        devices by using parametrised types - generic pseudo-types in
-        Python. The behaviour for Bluetooth devices is implemented in
-        functions, which are overloaded by the combination of device class
-        and service class, i.e.:
+        devices by using product of device and service types (`+` denotes
+        that service class is upper bound for all other service classes)::
 
-            @enable.register
-            async def _enable_sensor_tag(device: Device[SensorTagService, T]):
+            (Device | DeviceTrigger, Service+)
+
+        In Python, construction of product types can be achieved with
+        `__new__` and `__class_getitem__` methods, for example::
+
+            assert isinstance(Device(Service(...), ...), Device[Service])
+            assert isinstance(Device(ServiceCharacteristic(...), ...), Device[ServiceCharacteristic])
+            assert isinstance(DeviceTrigger(ServiceCharacteristic(...), ...), DeviceTrigger[ServiceCharacteristic])
+
+        For BTZen purposes, instances of such types have to be dispatched
+        with Python single-dispatch generic functions. The functions
+        implement behaviour for the Bluetooth devices, i.e.::
+
+            @read.register
+            async def _read_sensor_tag(device: Device[SensorTagService, T]):
                 ...
 
-        The `__class_getitem__` method creates proxy classes for generic
-        psuedo-types, which allows to use them with single-dispatch generic
-        functions in Python. 
+        where `SensorTagService` is an example of service class, which
+        describes Texas Instrument Sensor Tag Bluetooth device sensors.
+
+        The `__class_getitem__` method creates proxy classes for the device
+        and service product types plus Python generic psuedo-types. This
+        allows to use them with single-dispatch generic functions in
+        Python.
 
         The `__new__` method creates instance using the proxy class.
 
@@ -106,7 +118,6 @@ class DeviceBase(tp.Generic[S, T]):
         functions in Python at the moment. See also
 
             https://bugs.python.org/issue34498
-
 
     :var service: Bluetooth service descriptor.
     :var mac: MAC address of Bluetooth device.
