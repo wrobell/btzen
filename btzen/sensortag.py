@@ -239,7 +239,7 @@ async def _enable_sensor_tag_tr(device: DeviceTrigger[SensorTagService, T]):
     await write_config(device.mac, device.service.uuid_trigger, bytes([value]))
     logger.info('trigger for {} is set'.format(device))
 
-    await _enable_device_trigger(device)
+    await _enable_dev_trigger(device)
 
 @disable.register  # type: ignore
 async def _disable_sensor_tag_tr(device: Device[SensorTagService, T]):
