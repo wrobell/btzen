@@ -152,7 +152,7 @@ async def _read_dev_tr(device: DeviceTrigger[ServiceCharacteristic, T]) -> T:
         return device.convert(data)
 
 @enable.register
-async def _enable(device: Device[ServiceCharacteristic, T]):
+async def _enable_dev(device: Device[ServiceCharacteristic, T]):
     bus = get_session().bus
     await bus.ensure_characteristic_paths(device.mac, device.service.uuid_data)
 
@@ -163,7 +163,7 @@ async def _enable_int(device: DeviceTrigger[ServiceInterface, T]):
     bus._dev_property_start(device.mac, srv.property, iface=srv.interface)
 
 @enable.register
-async def _enable_device_trigger(device: DeviceTrigger[ServiceCharacteristic, T]):
+async def _enable_dev_trigger(device: DeviceTrigger[ServiceCharacteristic, T]):
     bus = get_session().bus
     await bus.ensure_characteristic_paths(device.mac, device.service.uuid_data)
 

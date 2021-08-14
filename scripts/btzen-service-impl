@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+#
+# BTZen - library to asynchronously access Bluetooth devices.
+#
+# Copyright (C) 2015-2021 by Artur Wroblewski <wrobell@riseup.net>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+"""
+Show function implemented for each service type of a triggered and
+non-triggered Bluetooth device.
+"""
+
+import itertools
+import operator
+import typing as tp
+from pprint import pprint
+
+import btzen
+
+cls_name = operator.attrgetter('__name__')
+
+def find_func(classes, srv: type, is_triggered: bool) -> str:
+    if (srv, is_triggered) in classes:
+        f = classes[srv, is_triggered]
+        fc = f.__code__
+        return '{}:{}:{}'.format(f.__module__, fc.co_firstlineno, f.__name__)
+    elif len(m := srv.mro()) > 1 and issubclass(m[1], btzen.Service):
+        return find_func(classes, m[1], is_triggered)
+    else:
+        return ''
+
+def print_table(services, func: tp.Callable):
+    items = (
+        (*c.__product__, f) for c, f in func.registry.items()
+        if hasattr(c, '__product__')
+    )
+    classes = {
+        (s, issubclass(d, btzen.DeviceTrigger)): f for d, s, f in items
+    }
+
+    w = 48
+    rw = w - 1
+    fmt = '{:24s}{:48s}{:48s}'.format
+
+    print(fmt('=' * 23, '=' * rw, '=' * rw))
+    print(fmt(
+        'Service'.center(24),
+        'No Trigger'.center(w),
+        'Triggered'.center(w))
+    )
+    print(fmt('=' * 23, '=' * rw, '=' * rw))
+
+    for srv in services:
+        print(fmt(
+            srv.__name__,
+            find_func(classes, srv, False),
+            find_func(classes, srv, True))
+        )
+
+functions = [
+    btzen.set_trigger,
+    btzen.enable,
+    btzen.read,
+    btzen.disable,
+]
+
+items = (
+    c.__product__[1]
+    for func in functions
+    for c, f in func.registry.items()
+    if hasattr(c, '__product__')
+)
+services = sorted({s for s in items}, key=cls_name)
+
+for f in functions:
+    print('*** {}:{} ***'.format(f.__module__, f.__name__))
+    print_table(services, f)
+    print()
+
+# vim: sw=4:et:ai

@@ -119,6 +119,10 @@ class DeviceBase(tp.Generic[S, T]):
 
             https://bugs.python.org/issue34498
 
+        Single-dispatch generic functions, which implement behaviour for
+        the product types, can be listed with script
+        `scripts/btzen-service-impl`.
+
     :var service: Bluetooth service descriptor.
     :var mac: MAC address of Bluetooth device.
     :var address_type: Bluetooth device address type.
@@ -170,6 +174,7 @@ class DeviceBase(tp.Generic[S, T]):
             t = type('{}[{}]'.format(cls.__name__, cls_pt.__name__), bases, {})
             fields = cls.__dataclass_fields__  # type: ignore
             t = dtc.make_dataclass(t.__name__, fields, bases=bases, frozen=True)
+            t.__product__ = (cls, cls_pt)
             _PROXY_REGISTRY[key] = t
         return t
 
