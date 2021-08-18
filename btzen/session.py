@@ -139,7 +139,7 @@ async def connected(device: DeviceBase) -> tp.AsyncIterator[Session]:
     session = get_session()
 
     if not session.is_active():
-        raise CallError(
+        raise asyncio.CancelledError(
             'BTZen is not running for device with address {}'
             .format(device.mac)
         )
