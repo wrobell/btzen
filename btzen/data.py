@@ -33,11 +33,11 @@ class Make(enum.Enum):
     """
     Bluetooth device make.
     """
-    STANDARD = enum.auto()
-    SENSOR_TAG = enum.auto()
-    THINGY52 = enum.auto()
-    OSTC = enum.auto()
-    MI_SMART_SCALE = enum.auto()
+    STANDARD = 'standard'
+    SENSOR_TAG = 'sensor_tag'
+    THINGY52 = 'thingy52'
+    OSTC = 'ostc'
+    MI_SMART_SCALE = 'mi_smart_scale'
 
 class ServiceType(enum.Enum):
     """
