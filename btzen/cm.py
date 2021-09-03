@@ -221,10 +221,10 @@ async def enable_devices(mac: str, devices: Devices):
         await enable(dev)
 
     get_session().set_connected(mac)
-    logger.info('enabled devices: {}'.format(mac))
+    logger.info('enabled services: {}'.format(mac))
 
 async def disable_devices(mac: str, devices: Devices):
-    logger.info('disabling devices: {}'.format(mac))
+    logger.info('disabling services: {}'.format(mac))
 
     session = get_session()
 
@@ -238,7 +238,7 @@ async def disable_devices(mac: str, devices: Devices):
         # exceptions on failure
         await disable(dev)
 
-    logger.info('disabled devices: {}'.format(mac))
+    logger.info('disabled services: {}'.format(mac))
 
 async def restart_devices(bus: Bus, mac: str, devices: Devices) -> None:
     """
