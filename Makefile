@@ -2,6 +2,7 @@
 
 SCRIPTS=\
 	scripts/btzen-battery \
+	scripts/btzen-cancel \
 	scripts/btzen-connect \
 	scripts/btzen-ostc \
 	scripts/btzen-sensor-tag \

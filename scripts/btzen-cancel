@@ -84,52 +84,42 @@ import btzen.sensortag
 
 logger = logging.getLogger()
 
-async def read_sensor(args) -> None:
-    sensors = [
-        btzen.sensortag.Pressure(args.device),
-        btzen.sensortag.Temperature(args.device),
-        btzen.sensortag.Humidity(args.device),
-        btzen.sensortag.Light(args.device),
-    ]
-    for s in sensors:
-        s.set_interval(1)
+async def read_sensors(sensors: list[btzen.DeviceBase], timeout: float) -> None:
+    timeouts = 0
+    attempts = 0
+    while btzen.is_active():
+        attempts += 1
+        try:
+            tasks = [asyncio.create_task(btzen.read(s)) for s in sensors]
+            task = asyncio.gather(*tasks)
 
-    manager = btzen.ConnectionManager(interface=args.interface)
-    manager.add(*sensors)
+            # periodically show sensor values to ensure a tester that
+            # sensor data reads are against a connected device
+            if attempts == 1 or attempts % 10000 == 0:
+                result = await task
+            else:
+                result = await asyncio.wait_for(task, timeout=timeout)
+            print(result)
+        except asyncio.CancelledError as ex:
+            # timeout, no buffer space and connection errors are handled
+            # by BTZen and raised as cancellations; it is up to a caller
+            # to decide what to do
+            print('sensor read cancelled, sleep for 5s to let d-bus breath', ex)
+            await asyncio.sleep(5)
+        except asyncio.TimeoutError as ex:
+            # most of the time timeout from asyncio loop is expected,
+            # count the timeouts and report them to see the script
+            # progressing
+            timeouts += 1
+            if timeouts % 10000 == 0:
+                print('num timeouts', timeouts)
 
-    asyncio.create_task(manager.__await__())
-    try:
-        timeouts = 0
-        attempts = 0
-        while not all(s.is_closed for s in sensors):
-            attempts += 1
-            try:
-                tasks = [asyncio.create_task(s.read()) for s in sensors]
-                task = asyncio.gather(*tasks)
+async def start_test(iface: str, mac: str, timeout: float) -> None:
+    ctor = [btzen.pressure, btzen.temperature, btzen.humidity, btzen.light]
+    sensors = [c(mac, make=btzen.Make.SENSOR_TAG) for c in ctor]
 
-                # periodically show sensor values to ensure a tester that
-                # sensor data reads are against a connected device
-                if attempts == 1 or attempts % 10000 == 0:
-                    result = await task
-                else:
-                    result = await asyncio.wait_for(task, timeout=args.timeout)
-                print(result)
-            except asyncio.CancelledError as ex:
-                # timeout, no buffer space and connection errors are handled
-                # by BTZen and raised as cancellations; it is up to a caller
-                # to decide what to do
-                print('sensor read cancelled, sleep for 5s to let d-bus breath', ex)
-                await asyncio.sleep(5)
-            except asyncio.TimeoutError as ex:
-                # most of the time timeout from asyncio loop is expected,
-                # count the timeouts and report them to see the script
-                # progressing
-                timeouts += 1
-                if timeouts % 10000 == 0:
-                    print('num timeouts', timeouts)
-    finally:
-        # connection manager closes all sensors
-        manager.close()
+    async with btzen.connect(sensors, interface=iface) as session:
+        await asyncio.gather(session, read_sensors(sensors, timeout))
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -151,6 +141,6 @@ level = logging.DEBUG if args.verbose else logging.WARNING
 logging.basicConfig(level=level)
 
 uvloop.install()
-asyncio.run(read_sensor(args))
+asyncio.run(start_test(args.interface, args.device, args.timeout))
 
 # vim: sw=4:et:ai
