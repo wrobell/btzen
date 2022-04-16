@@ -65,9 +65,8 @@ for example::
 
 BTZen uses experimental API of Bluez adapter interface to connect to
 Bluetooth devices. The `bluetoothd` daemon has to be started with
-`-E` option. This can be permanently achieved by copying
-`/usr/lib/systemd/system/bluetooth.service` file into
-`/etc/systemd/system/` directory and by modifying the `ExecStart` line.
+experimental option on. This can be permanently achieved by setting
+`Experimental` to `true` in `/etc/bluez/main.conf` file.
 
 Change `AutoEnable` option to true in `/etc/bluetooth/main.conf` to
 automate powering up of Bluetooth controllers. Otherwise a controller might
@@ -123,7 +122,7 @@ Requirements
 BTZen library requires the following software components
 
 - Python 3.9
-- bluez 5.60
+- bluez 5.64
 - `sd-bus` (part of `systemd`)
 - Cython 0.29
 
