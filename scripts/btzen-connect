@@ -68,7 +68,7 @@ async def connect_devices(service_uuid: str, mac: list[str]) -> None:
     srv = btzen.Service(service_uuid)
     set_trigger = partial(
         btzen.set_trigger,
-        conndition=btzen.TriggerCondition.ON_CHANGE
+        condition=btzen.TriggerCondition.ON_CHANGE
     )
     devices = [set_trigger(btzen.create_device(srv, m)) for m in mac]
     async with btzen.connect(devices):
