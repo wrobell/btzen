@@ -50,7 +50,7 @@ depends on a device itself and its make. If possible, non-triggered device
 is created by default. Use `set_trigger` function to create tirggered
 device.
 
-It is not possible to create non-triggered device from a triggered one.
+It is not possible to create a non-triggered device from a triggered one.
 """
 
 from __future__ import annotations
@@ -187,7 +187,7 @@ class Device(DeviceBase[S, T]):
 @dtc.dataclass(frozen=True)
 class DeviceTrigger(DeviceBase[S, T]):
     """
-    Bluetooth device descriptor with tirgger.
+    Bluetooth device descriptor with trigger.
 
     :var trigger: Trigger information.
     """
