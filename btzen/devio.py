@@ -214,7 +214,7 @@ async def disarm(
             raise
         else:
             logger.warning(warn + ': ' + str(ex))
-    except (Exception, asyncio.CancelledError) as ex:
+    except Exception as ex:
         logger.warning(warn + ': ' + str(ex))
 
 # vim: sw=4:et:ai
