@@ -164,8 +164,9 @@ async def _enable_int(device: DeviceTrigger[ServiceInterface, T]) -> None:
 
 @enable.register
 async def _enable_dev_trigger(
-    device: DeviceTrigger[ServiceCharacteristic, T]
-) -> None:
+        device: DeviceTrigger[ServiceCharacteristic, T]
+    ) -> None:
+
     bus = get_session().bus
     await bus.ensure_characteristic_paths(device.mac, device.service.uuid_data)
 
@@ -201,8 +202,8 @@ async def write_config(mac: str, uuid: str, data: bytes) -> None:
     )
 
 async def disarm(
-    msg: str, warn: str, f: tp.Callable[..., tp.Any], *args: tp.Any
-) -> None:
+        msg: str, warn: str, f: tp.Callable[..., tp.Any], *args: tp.Any
+    ) -> None:
     try:
         if inspect.iscoroutinefunction(f):
             await f(*args)

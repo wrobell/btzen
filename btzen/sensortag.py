@@ -230,8 +230,9 @@ async def _disable_sensor_tag(device: Device[SensorTagService, T]) -> None:
 
 @enable.register  # type: ignore
 async def _enable_sensor_tag_tr(
-    device: DeviceTrigger[SensorTagService, T]
-) -> None:
+        device: DeviceTrigger[SensorTagService, T]
+    ) -> None:
+
     await _enable_sensor_tag(device)
 
     assert device.trigger.operand is not None

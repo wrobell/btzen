@@ -169,8 +169,8 @@ def _tx_credit_size(bus: Bus, mac: str) -> int:
     return bus._gatt_size(path)
 
 async def _add_rx_credits(
-    bus: Bus, device: Device[SerialService, T], n: int=0x20
-) -> None:
+        bus: Bus, device: Device[SerialService, T], n: int=0x20
+    ) -> None:
 
     state = device_state(device)
     await _write(bus, device.mac, UUID_RX_CREDIT, bytes([n]))
@@ -180,7 +180,7 @@ async def _add_rx_credits(
 @asynccontextmanager
 async def _rx_credits_mgr(
         bus: Bus, device: Device[SerialService, T], n: int
-) -> tp.AsyncIterator[None]:
+    ) -> tp.AsyncIterator[None]:
 
     state = device_state(device)
     if state['rx_credits'] < 1:
