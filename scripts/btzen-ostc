@@ -30,6 +30,7 @@ import argparse
 import asyncio
 import logging
 import struct
+import typing as tp
 from collections import namedtuple
 from cytoolz import itertoolz as itz  # type: ignore
 from cytoolz.functoolz import identity  # type: ignore
@@ -40,6 +41,8 @@ import btzen
 
 logger = logging.getLogger('btzen-ostc')
 
+Device = btzen.Device[btzen.SerialService, bytes]
+
 DiveHeader = namedtuple('DiveHeader', ['size', 'datetime', 'depth', 'duration', 'dive_number', 'version'])
 to_int = partial(int.from_bytes, byteorder='little', signed=False)
 to_timestamp = lambda value: datetime(value[0] + 2000, *value[1:])
@@ -47,25 +50,24 @@ to_depth = lambda v: v * 9.80665 / 1000
 to_duration = lambda v: (to_int(v[:2]) * 60 + int(v[2])) / 60
 header_parsers = (to_int, to_timestamp, to_depth, to_duration) + (identity,) * 2
 
-def parse_header(item):
-    item = struct.unpack('<3s5sH3sHB', item)
-    values = zip(header_parsers, item)
-    values = (p(v) for p, v in values)
+def parse_header(item: bytes) -> DiveHeader:
+    data = struct.unpack('<3s5sH3sHB', item)
+    values = (p(v) for p, v in zip(header_parsers, data))
     return DiveHeader._make(values)
 
-async def start(dev: btzen.DeviceBase) -> None:
+async def start(dev: Device) -> None:
     await btzen.write(dev, b'\xbb')
     value = await btzen.read(dev, 2)
-    assert value == b'\xbb\x4d', 'got: {}'.format(value)
+    assert value == b'\xbb\x4d', 'got: {!r}'.format(value)
     logger.info('started')
 
-async def stop(dev: btzen.DeviceBase) -> None:
+async def stop(dev: Device) -> None:
     await btzen.write(dev, b'\xff')
     # NOTE: do not wait for the response as device is disconnected now
     # value = await btzen.read(dev, 2)
     # assert value == b'\xffM', 'got: {}'.format(value)
 
-async def display(dev: btzen.DeviceBase, msg: str) -> None:
+async def display(dev: Device, msg: str) -> None:
     msg_data = '{:16.16}'.format(msg).encode()
 
     await btzen.write(dev, b'\x6e')
@@ -75,14 +77,14 @@ async def display(dev: btzen.DeviceBase, msg: str) -> None:
     value = await btzen.read(dev, 1)
     assert value == b'\x4d'
 
-async def read_data(dev: btzen.DeviceBase, count: int):
+async def read_data(dev: Device, count: int) -> None:
     await start(dev)
     await display(dev, 'BTZen Connected')
 
     try:
         await btzen.write(dev, b'\x6d')
         headers = await btzen.read(dev, 4098)
-        headers = headers[1:-1]  # type: ignore
+        headers = headers[1:-1]
 
         # get 20 latests dives
         items = itz.partition(16, headers)
@@ -100,19 +102,20 @@ async def read_data(dev: btzen.DeviceBase, count: int):
     finally:
         await stop(dev)
 
-async def run_single(mac: str, count: int):
+async def run_single(mac: str, count: int) -> None:
     """
     Download dives from a dive computer and exit.
     """
     dev = btzen.serial(mac, make=btzen.Make.OSTC)
+    dev = tp.cast(Device, btzen.serial(mac, make=btzen.Make.OSTC))
     async with btzen.connect([dev]) as session:
         await read_data(dev, count)
 
-async def run_loop(mac: str, count: int):
+async def run_loop(mac: str, count: int) -> None:
     """
     Download dives from a dive computer in a loop.
     """
-    dev = btzen.serial(mac, make=btzen.Make.OSTC)
+    dev = tp.cast(Device, btzen.serial(mac, make=btzen.Make.OSTC))
     async with btzen.connect([dev]) as session:
         while True:
             await read_data(dev, count)

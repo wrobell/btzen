@@ -65,19 +65,21 @@ from . import _cm  # type: ignore
 from .bus import Bus
 from .error import BTZenError
 from .config import DEFAULT_DBUS_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT
-from .device import DeviceBase, AddressType
+from .data import T, AddressType
+from .device import DeviceBase
 from .devio import enable, disable, disarm
 from .session import BT_SESSION, Session, get_session, is_active
+from .service import S
 from .util import concat
 
-Devices = tp.Iterable[DeviceBase]
+Devices = tp.Iterable[DeviceBase[S, T]]
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def connect(
-        devices: Devices,
+        devices: Devices,  # type: ignore
         *,
         interface: str='hci0'
     ) -> AsyncIterator[Session]:
@@ -127,7 +129,7 @@ async def connect(
             cm_handle
         )
 
-async def manage_connection(bus: Bus, mac: str, devices: Devices) -> None:
+async def manage_connection(bus: Bus, mac: str, devices: Devices) -> None:  # type: ignore
     """
     Manage Bluetooth connection for the devices.
     """
@@ -163,7 +165,7 @@ async def manage_connection(bus: Bus, mac: str, devices: Devices) -> None:
         await remove_connection(bus, mac)
 
 # TODO: make real async
-async def remove_connection(bus: Bus, mac: str):
+async def remove_connection(bus: Bus, mac: str) -> None:
     await disarm(
         'connection for device {} removed'.format(mac),
         'removal of connection failed for device {}'.format(mac),
@@ -214,7 +216,7 @@ async def create_connection(
         _cm.bt_device_set_trusted(bus.system_bus, dev_path)
     return created
 
-async def enable_devices(mac: str, devices: Devices):
+async def enable_devices(mac: str, devices: Devices) -> None:  # type: ignore
     logger.info('enabling devices: {}'.format(mac))
 
     for dev in devices:
@@ -223,7 +225,7 @@ async def enable_devices(mac: str, devices: Devices):
     get_session().set_connected(mac)
     logger.info('enabled services: {}'.format(mac))
 
-async def disable_devices(mac: str, devices: Devices):
+async def disable_devices(mac: str, devices: Devices) -> None:  # type: ignore
     logger.info('disabling services: {}'.format(mac))
 
     session = get_session()
@@ -240,7 +242,7 @@ async def disable_devices(mac: str, devices: Devices):
 
     logger.info('disabled services: {}'.format(mac))
 
-async def restart_devices(bus: Bus, mac: str, devices: Devices) -> None:
+async def restart_devices(bus: Bus, mac: str, devices: Devices) -> None:  # type: ignore
     """
     Enable or disable Bluetooth device when property 'ServicesResolved`
     changes.
@@ -269,7 +271,7 @@ async def restart_devices(bus: Bus, mac: str, devices: Devices) -> None:
                 await disable_devices(mac, devices)
 
 async def resolve_services(
-        bus: Bus, mac: str, devices: Devices
+        bus: Bus, mac: str, devices: Devices  # type: ignore
     ) -> AsyncGenerator[bool, None]:
     """
     Asynchronous generator waiting for a Bluetooth device to be

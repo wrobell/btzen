@@ -46,22 +46,30 @@ async def read_sensors(mac: str, interface: str) -> None:
         tasks.append(read_battery('battery', battery))
         await asyncio.gather(session, *tasks)
 
-async def read_sensor(name: str, sensor: btzen.DeviceBase) -> None:
+async def read_sensor(
+    name: str, sensor: btzen.DeviceBase[btzen.Service, tp.Any]
+) -> None:
     loop = asyncio.get_event_loop()
     async for value in btzen.read_all(sensor):
         print_data(name, '{:.1f}'.format(value))
         await asyncio.sleep(-loop.time() % 1)
 
-async def read_accelerometer(name: str, sensor: btzen.DeviceBase) -> None:
+async def read_accelerometer(
+    name: str, sensor: btzen.DeviceBase[btzen.Service, tp.Any]
+) -> None:
     async for values in btzen.read_all(sensor):
         values = ', '.join('{:.4f}'.format(v) for v in values)
         print_data(name, values)
 
-async def read_button(name: str, button: btzen.DeviceBase) -> None:
+async def read_button(
+    name: str, button: btzen.DeviceBase[btzen.Service, tp.Any]
+) -> None:
     async for value in btzen.read_all(button):
         print_data('button', str(value))
 
-async def read_battery(name: str, battery: btzen.DeviceBase) -> None:
+async def read_battery(
+    name: str, battery: btzen.DeviceBase[btzen.Service, tp.Any]
+) -> None:
     async for value in btzen.read_all(battery):
         print_data('battery level', value)
 

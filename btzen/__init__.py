@@ -33,6 +33,7 @@ from .device import DeviceBase, Device, DeviceTrigger, set_interval, \
     accelerometer, battery_level, button, humidity, light, light_rgb, \
     pressure, serial, temperature, weight
 from .devio import read, read_all, write, enable, disable
+from .serial import SerialService
 from .service import Service, ServiceCharacteristic, ServiceInterface
 from .cm import connect
 from .error import *
@@ -52,7 +53,7 @@ __all__ = [
     'light_rgb', 'pressure', 'serial', 'temperature', 'weight',
 
     # bluetooth service descriptors
-    'Service', 'ServiceCharacteristic', 'ServiceInterface',
+    'Service', 'ServiceCharacteristic', 'ServiceInterface', 'SerialService',
 
     # basic data
     'AddressType', 'Make', 'ServiceType', 'Button', 'WeightData',

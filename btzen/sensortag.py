@@ -204,7 +204,7 @@ register_st(
 )
 
 @enable.register  # type: ignore
-async def _enable_sensor_tag(device: Device[SensorTagService, T]):
+async def _enable_sensor_tag(device: Device[SensorTagService, T]) -> None:
     bus = get_session().bus
     srv = device.service
 
@@ -220,7 +220,7 @@ async def _enable_sensor_tag(device: Device[SensorTagService, T]):
     logger.info('interval for {} is set'.format(device))
 
 @disable.register  # type: ignore
-async def _disable_sensor_tag(device: Device[SensorTagService, T]):
+async def _disable_sensor_tag(device: Device[SensorTagService, T]) -> None:
     srv = device.service
     await disarm(
         '{} disabled'.format(device),
@@ -229,7 +229,9 @@ async def _disable_sensor_tag(device: Device[SensorTagService, T]):
     )
 
 @enable.register  # type: ignore
-async def _enable_sensor_tag_tr(device: DeviceTrigger[SensorTagService, T]):
+async def _enable_sensor_tag_tr(
+    device: DeviceTrigger[SensorTagService, T]
+) -> None:
     await _enable_sensor_tag(device)
 
     assert device.trigger.operand is not None
@@ -242,7 +244,7 @@ async def _enable_sensor_tag_tr(device: DeviceTrigger[SensorTagService, T]):
     await _enable_dev_trigger(device)
 
 @disable.register  # type: ignore
-async def _disable_sensor_tag_tr(device: Device[SensorTagService, T]):
+async def _disable_sensor_tag_tr(device: Device[SensorTagService, T]) -> None:
     await _disable_sensor_tag(device)
 
 # vim: sw=4:et:ai

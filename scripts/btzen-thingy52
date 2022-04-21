@@ -27,7 +27,7 @@ from datetime import datetime
 
 import btzen
 
-async def read_data(mac: str, interface: str, interval: float):
+async def read_data(mac: str, interface: str, interval: float) -> None:
     # initialize all Thingy52 sensors
     devices = [ctor(mac, make=btzen.Make.THINGY52) for _, ctor in SENSORS]
     devices = [btzen.set_interval(d, interval) for d in devices]
@@ -42,7 +42,7 @@ async def read_data(mac: str, interface: str, interval: float):
 
         await asyncio.gather(session, *tasks)
 
-async def read_sensor(name: str, sensor: btzen.DeviceBase):
+async def read_sensor(name: str, sensor: btzen.DeviceBase[btzen.Service, tp.Any]) -> None:
     async for value in btzen.read_all(sensor):
         if isinstance(value, btzen.Button):
             print_data(name, '{}'.format(str(value)))
@@ -51,7 +51,7 @@ async def read_sensor(name: str, sensor: btzen.DeviceBase):
         else:
             print_data(name, '{}'.format(value))
 
-def print_data(name: str, value: tp.Any):
+def print_data(name: str, value: tp.Any) -> None:
     print('{} {}: {}'.format(datetime.now(), name, value))
 
 #

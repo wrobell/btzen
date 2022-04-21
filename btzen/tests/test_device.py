@@ -18,6 +18,7 @@
 #
 
 import dataclasses as dtc
+import typing as tp
 from functools import singledispatch
 
 from ..data import T, AddressType, Trigger, TriggerCondition
@@ -26,30 +27,32 @@ from ..service import S, Service, ServiceCharacteristic
 
 import pytest
 
+Tf = tp.TypeVar('Tf', bound=float)
+
 @dtc.dataclass(frozen=True)
 class ServiceEnvSensing(ServiceCharacteristic):
     pass
 
 @singledispatch
-def read(dev: DeviceBase) -> float:
-    return 1.0
+def read(dev: DeviceBase[Service, Tf]) -> Tf:
+    return 1.0  # type: ignore
 
 @read.register
-def _read_service(dev: Device[Service, T]) -> T:
+def _read_service(dev: Device[Service, Tf]) -> Tf:
     return dev.convert(b'11')
 
 @read.register
-def _read_service_chr(dev: Device[ServiceCharacteristic, T]) -> T:
+def _read_service_chr(dev: Device[ServiceCharacteristic, Tf]) -> Tf:
     return dev.convert(b'22')
 
 @read.register
-def _read_service_chr_tr(dev: DeviceTrigger[ServiceCharacteristic, T]) -> T:
+def _read_service_chr_tr(dev: DeviceTrigger[ServiceCharacteristic, Tf]) -> Tf:
     return dev.convert(b'33')
 
 def to_int(v: bytes) -> int:
     return int(v.decode())
 
-instance_data = [
+INSTANCE_DATA = [
     [
         Device(Service('aaa'), '1', AddressType.PUBLIC, to_int),
         Device[Service, T],
@@ -76,7 +79,7 @@ instance_data = [
     ],
 ]
 
-subclass_data = [
+SUBCLASS_DATA = [
     [
         Device[Service, T],
         Device[ServiceCharacteristic, T],
@@ -91,7 +94,7 @@ subclass_data = [
     ],
 ]
 
-non_subclass_data = [
+NON_SUBCLASS_DATA = [
     [
         Device[ServiceCharacteristic, T],
         DeviceTrigger[ServiceCharacteristic, T],
@@ -102,8 +105,8 @@ non_subclass_data = [
     ],
 ]
 
-@pytest.mark.parametrize('obj, cls, func, func_result', instance_data)
-def test_instance(obj, cls, func, func_result):
+@pytest.mark.parametrize('obj, cls, func, func_result', INSTANCE_DATA)
+def test_instance(obj, cls, func, func_result) -> None:  # type: ignore
     """
     Test instance of parametrised class.
     """
@@ -111,24 +114,24 @@ def test_instance(obj, cls, func, func_result):
     assert type(obj) == cls
     assert dtc.is_dataclass(obj)
 
-@pytest.mark.parametrize('parent, cls', subclass_data)
-def test_subclass(parent, cls):
+@pytest.mark.parametrize('parent, cls', SUBCLASS_DATA)
+def test_subclass(parent: type, cls: type) -> None:
     """
     Test inheritance of parametrised subclasses.
     """
     assert parent in cls.mro()
     assert issubclass(cls, parent)
 
-@pytest.mark.parametrize('parent, cls', non_subclass_data)
-def test_not_subclass(parent, cls):
+@pytest.mark.parametrize('parent, cls', NON_SUBCLASS_DATA)
+def test_not_subclass(parent: type, cls: type) -> None:
     """
     Test lack of inheritance of parametrised subclasses.
     """
     assert parent not in cls.mro()
     assert not issubclass(cls, parent)
 
-@pytest.mark.parametrize('obj, cls, func, func_result', instance_data)
-def test_dispatch(obj, cls, func, func_result):
+@pytest.mark.parametrize('obj, cls, func, func_result', INSTANCE_DATA)
+def test_dispatch(obj, cls, func, func_result) -> None:  # type: ignore
     """
     Test generic functions dispatch against instances of parametrised
     classes.
@@ -136,14 +139,14 @@ def test_dispatch(obj, cls, func, func_result):
     assert read.dispatch(type(obj)) == func
     assert read(obj) == func_result
 
-def test_cls_create():
+def test_cls_create() -> None:
     """
     Test creating parametrised class.
     """
     t = Device[Service, T]
     assert isinstance(t, type)
 
-def test_cls_create_self():
+def test_cls_create_self() -> None:
     """
     Test creating parametrised class when itself has to be returned.
     """
@@ -151,12 +154,12 @@ def test_cls_create_self():
     assert t == Device
 
 @pytest.mark.parametrize('cls_param', [(Service,), (Service, int)])
-def test_cls_param_invalid(cls_param):
+def test_cls_param_invalid(cls_param: type) -> None:
     """
     Test if error is raised on an invalid parameters passed to a class.
     """
     with pytest.raises(TypeError) as ctx:
-        Device[cls_param]
+        Device[cls_param]   # type: ignore
 
     expected = 'Class subscript requires dataclass and type variable. Got {}' \
         .format(cls_param)

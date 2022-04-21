@@ -29,7 +29,7 @@ from .data import T, AddressType, AnyTrigger, Converter, Make, NoTrigger, \
 # registry of known services
 _SERVICE_REGISTRY = defaultdict[
     'Make',
-    dict['ServiceType', tuple['Service', Converter, AnyTrigger, 'AddressType']]
+    dict['ServiceType', tuple['Service', Converter[T], AnyTrigger, 'AddressType']]
 ](dict)
 
 @dtc.dataclass(frozen=True)
@@ -76,10 +76,10 @@ def register_service(
         service_type: ServiceType,
         service: Service,
         *,
-        convert: Converter[T]=tp.cast(Converter, lambda v: v),
+        convert: Converter[T]=tp.cast(Converter[tp.Any], lambda v: v),
         trigger: AnyTrigger=NoTrigger(),
-        address_type=AddressType.PUBLIC,
-    ):
+        address_type: AddressType=AddressType.PUBLIC,
+    ) -> None:
     """
     Register service with data conversion function.
     """

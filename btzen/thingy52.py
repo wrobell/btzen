@@ -163,8 +163,8 @@ register_th(
 )
 
 @enable.register  # type: ignore
-async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]):
-    to_ms = lambda v: int(v * 1000)
+async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]) -> None:
+    to_ms: tp.Callable[[float], int] = lambda v: int(v * 1000)
     mac = device.mac
     srv = device.service
 
@@ -181,7 +181,7 @@ async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]):
     await _enable_dev_trigger(device)
 
 @set_trigger.register  # type: ignore
-def _set_trigger_thingy52(
+def _set_trigger_thingy52(  # type: ignore
         device: DeviceTrigger[Thingy52Service, T],
         condition: TriggerCondition,
         *,
@@ -196,7 +196,7 @@ def _set_trigger_thingy52(
     config = dtc.replace(config, **{config_entry: operand})
     _CONFIG_CACHE[mac] = config
 
-    return device  # type: ignore
+    return device
 
 # class DeviceThingy52Configuration(DeviceCharacteristic):
 #     """

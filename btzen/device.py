@@ -134,16 +134,16 @@ class DeviceBase(tp.Generic[S, T]):
     address_type: AddressType
     convert: Converter[T]
 
-    def __new__(cls, *args, **kw):
+    def __new__(cls, *args, **kw):  # type: ignore
         tv = type(args[0])
-        return cls[tv, T](*args, **kw)
+        return cls[tv, T](*args, **kw)  # type: ignore
 
     def __class_getitem__(cls, cls_param: tuple[type[S], tp.TypeVar]) -> type[Device[S, T]]:
         ok = (
             isinstance(cls_param, tuple)
             and len(cls_param) == 2
             and (dtc.is_dataclass(cls_param[0]) or cls_param[0] == S) # type: ignore
-            and isinstance(cls_param[1], tp.TypeVar)  # type: ignore
+            and isinstance(cls_param[1], tp.TypeVar)
         )
 
         if not ok:
@@ -172,7 +172,7 @@ class DeviceBase(tp.Generic[S, T]):
             # create new dataclass based on main class `cls` and the
             # parameter class `cls_pt`
             t = type('{}[{}]'.format(cls.__name__, cls_pt.__name__), bases, {})
-            fields = cls.__dataclass_fields__  # type: ignore
+            fields = cls.__dataclass_fields__ 
             t = dtc.make_dataclass(t.__name__, fields, bases=bases, frozen=True)
             t.__product__ = (cls, cls_pt)  # type: ignore
             _PROXY_REGISTRY[key] = t
@@ -198,7 +198,7 @@ def create_device(
         mac: str,
         *,
         address_type: AddressType=AddressType.PUBLIC,
-        convert: Converter[T]=tp.cast(Converter, lambda v: v),
+        convert: Converter[T]=tp.cast(Converter[tp.Any], lambda v: v),
     ) -> Device[Service, T]:
     """
     Create Bluetooth device for a Bluetooth service.
@@ -235,7 +235,6 @@ def set_trigger(
         device.service,
         device.mac,
         device.address_type,
-        # TODO: mypy 0.920 shall fix problem below
         device.convert,  # type: ignore
         Trigger(condition, operand),
     )

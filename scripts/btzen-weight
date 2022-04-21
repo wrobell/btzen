@@ -26,10 +26,13 @@ characteristic.
 import argparse
 import asyncio
 import logging
+import typing as tp
 
 import btzen
 
-async def read_weight(scale: btzen.DeviceBase):
+Device = btzen.DeviceTrigger[btzen.ServiceCharacteristic, btzen.WeightData]
+
+async def read_weight(scale: Device) -> None:
     while btzen.is_active():
         try:
             value = await btzen.read(scale)
@@ -38,8 +41,8 @@ async def read_weight(scale: btzen.DeviceBase):
         else:
             print('weight: {}'.format(value))
 
-async def read_data(mac: str):
-    scale = btzen.weight(mac, make=btzen.Make.MI_SMART_SCALE)
+async def read_data(mac: str) -> None:
+    scale: Device = tp.cast(Device, btzen.weight(mac, make=btzen.Make.MI_SMART_SCALE))
     async with btzen.connect([scale]) as session:
         await asyncio.gather(session, read_weight(scale))
 

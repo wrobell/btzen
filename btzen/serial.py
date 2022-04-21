@@ -37,7 +37,7 @@ from functools import partial, cache
 from . import _btzen  # type: ignore
 from .bus import Bus
 from .config import DEFAULT_DBUS_TIMEOUT
-from .data import T, Make, ServiceType
+from .data import Make, ServiceType
 from .device import Device
 from .devio import enable, disable, read, write, disarm
 from .service import Service, register_service
@@ -45,6 +45,8 @@ from .session import get_session, connected
 from .util import to_uuid
 
 logger = logging.getLogger(__name__)
+
+T = tp.TypeVar('T', bound=bytes)
 
 UUID_RX_UART = '00000001-0000-1000-8000-008025000000'
 UUID_TX_UART = '00000002-0000-1000-8000-008025000000'
@@ -74,11 +76,11 @@ def device_state(device: Device[SerialService, T]) -> State:
     """
     return State(buffer=bytearray(), rx_credits=0)
 
-@read.register
-async def _read_serial(device: Device[SerialService, T], n: int) -> T:
+@read.register  # type: ignore
+async def _read_serial(device: Device[SerialService, T], n: int) -> bytes:
     async with connected(device) as session:
-        task = session.create_future(device, _read_data(session.bus, device, n))
-        return (await task)
+        task = session.create_future(device, _read_data(session.bus, device, n))   # type: ignore
+        return (await task)  # type: ignore
 
 async def _read_data(bus: Bus, device: Device[SerialService, T], n: int) -> bytes:
     state = device_state(device)
@@ -107,8 +109,8 @@ async def _read_data(bus: Bus, device: Device[SerialService, T], n: int) -> byte
     state['buffer'] = data[n:]
     return data[:n]
 
-@write.register
-async def _write_serial(device: Device[SerialService, T], data: bytes):
+@write.register  # type: ignore
+async def _write_serial(device: Device[SerialService, T], data: bytes) -> None:
     assert len(data) <= 20
     async with connected(device) as session:
         state = device_state(device)
@@ -122,8 +124,8 @@ async def _write_serial(device: Device[SerialService, T], data: bytes):
 
         await _write(session.bus, device.mac, UUID_RX_UART, data)
 
-@enable.register
-async def _enable_serial(device: Device[SerialService, T]):
+@enable.register  # type: ignore
+async def _enable_serial(device: Device[SerialService, T]) -> None:
     bus = get_session().bus
     get_path = partial(bus.characteristic_path, device.mac)
 
@@ -141,8 +143,8 @@ async def _enable_serial(device: Device[SerialService, T]):
     logger.debug('requesting tx credits on enable')
     await _tx_credit(bus, device.mac)
 
-@disable.register
-async def _disable_serial(device: Device[SerialService, T]):
+@disable.register  # type: ignore
+async def _disable_serial(device: Device[SerialService, T]) -> None:
     bus = get_session().bus
     await disarm(
         'disabled tx credit for {}'.format(device.mac),
@@ -157,7 +159,7 @@ async def _disable_serial(device: Device[SerialService, T]):
         bus.characteristic_path(device.mac, UUID_TX_UART),
     )
 
-async def _tx_credit(bus: Bus, mac: str):
+async def _tx_credit(bus: Bus, mac: str) -> None:
     path = bus.characteristic_path(mac, UUID_TX_CREDIT)
     n = await bus._gatt_get(path)
     logger.debug('got tx credits: {}'.format(n))
@@ -166,7 +168,10 @@ def _tx_credit_size(bus: Bus, mac: str) -> int:
     path = bus.characteristic_path(mac, UUID_TX_CREDIT)
     return bus._gatt_size(path)
 
-async def _add_rx_credits(bus: Bus, device: Device[SerialService, T], n=0x20):
+async def _add_rx_credits(
+    bus: Bus, device: Device[SerialService, T], n: int=0x20
+) -> None:
+
     state = device_state(device)
     await _write(bus, device.mac, UUID_RX_CREDIT, bytes([n]))
     state['rx_credits'] += n
@@ -175,7 +180,7 @@ async def _add_rx_credits(bus: Bus, device: Device[SerialService, T], n=0x20):
 @asynccontextmanager
 async def _rx_credits_mgr(
         bus: Bus, device: Device[SerialService, T], n: int
-    ) -> tp.AsyncIterator:
+) -> tp.AsyncIterator[None]:
 
     state = device_state(device)
     if state['rx_credits'] < 1:
@@ -186,7 +191,7 @@ async def _rx_credits_mgr(
     finally:
         state['rx_credits'] -= 1
 
-async def _write(bus: Bus, mac: str, uuid: str, data: bytes):
+async def _write(bus: Bus, mac: str, uuid: str, data: bytes) -> None:
     path = bus.characteristic_path(mac, uuid)
     task = _btzen.bt_write(bus.system_bus, path, data, DEFAULT_DBUS_TIMEOUT)
     await task

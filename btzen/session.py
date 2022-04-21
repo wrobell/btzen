@@ -26,7 +26,9 @@ from contextvars import ContextVar
 
 from .bus import Bus
 from .error import BTZenError, CallError
+from .data import T
 from .device import DeviceBase
+from .service import S
 
 logger = logging.getLogger(__name__)
 
@@ -42,16 +44,18 @@ class Session:
         self.bus = bus
         self._is_active = False
 
-        self._device_task: dict[DeviceBase, asyncio.Future] = {}
-        self._connection_task: dict[str, asyncio.Task] = {}
+        self._device_task: dict[DeviceBase[tp.Any, tp.Any], asyncio.Future[tp.Any]] = {}
+        self._connection_task: dict[str, asyncio.Task[tp.Any]] = {}
         self._connection_status: dict[str, asyncio.Event] = {}
 
         self._event = asyncio.Event()
 
-    def start(self):
+    def start(self) -> None:
         self._is_active = True
 
-    def create_future(self, device: DeviceBase, f: Coroutine) -> asyncio.Future:
+    def create_future(
+        self, device: DeviceBase[S, T], f: Coroutine[None, None, T]
+    ) -> asyncio.Future[T]:
         """
         Create future managed by BTZen connection session.
 
@@ -63,7 +67,9 @@ class Session:
         self._device_task[device] = task
         return task
 
-    def add_connection_task(self, mac: str, f: Coroutine) -> asyncio.Task:
+    def add_connection_task(
+        self, mac: str, f: Coroutine[None, None, T]
+    ) -> asyncio.Task[T]:
         assert not self._is_active
 
         self._connection_status[mac] = asyncio.Event()
@@ -74,14 +80,14 @@ class Session:
         self._connection_task[mac] = task
         return task
 
-    def set_connected(self, mac: str):
+    def set_connected(self, mac: str) -> None:
         assert self._is_active
         self._connection_status[mac].set()
 
-    def set_disconnected(self, mac: str):
+    def set_disconnected(self, mac: str) -> None:
         self._connection_status[mac].clear()
 
-    async def wait_connected(self, device: DeviceBase) -> None:
+    async def wait_connected(self, device: DeviceBase[S, T]) -> None:
         assert self._is_active
 
         event = self._connection_status.get(device.mac)
@@ -92,18 +98,18 @@ class Session:
             )
         # create future, so it can be cancelled when error happens in
         # connection management tasks
-        task = self.create_future(device, event.wait())
+        task = self.create_future(device, event.wait())  # type: ignore
         await task
 
     def is_active(self) -> bool:
         return self._is_active
 
-    def cancel_device_tasks(self, mac: str, msg: str):
+    def cancel_device_tasks(self, mac: str, msg: str) -> None:
         tasks = (t for d, t in self._device_task.items() if d.mac == mac)
         for t in tasks:
             t.cancel(msg=msg)
 
-    def stop(self):
+    def stop(self) -> None:
         self._is_active = False
 
         msg = 'BTZen session stopped'
@@ -114,7 +120,7 @@ class Session:
 
         logger.info('session is done')
 
-    def _stop(self, task: asyncio.Task):
+    def _stop(self, task: asyncio.Task[T]) -> None:
         """
         Stop BTZen session if task is in error.
         """
@@ -126,7 +132,7 @@ class Session:
                 logger.critical('Error in connection task', exc_info=True) 
                 self._event.set()
 
-    def __await__(self):
+    def __await__(self) -> tp.Generator[None, None, None]:
         # just wait forever and stop session on exit
         try:
             yield from self._event.wait().__await__()
@@ -135,7 +141,7 @@ class Session:
         logger.info('session await exit')
 
 @asynccontextmanager
-async def connected(device: DeviceBase) -> tp.AsyncIterator[Session]:
+async def connected(device: DeviceBase[S, T]) -> tp.AsyncIterator[Session]:
     session = get_session()
 
     if not session.is_active():

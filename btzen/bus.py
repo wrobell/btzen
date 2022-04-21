@@ -41,7 +41,7 @@ def _mac_to_path(mac: str) -> str:
 class Bus:
     BUS = contextvars.ContextVar[tp.Optional['Bus']]('BUS', default=None)
 
-    def __init__(self, system_bus, interface: str):
+    def __init__(self, system_bus: _sd_bus.Bus, interface: str) -> None:
         self.system_bus = system_bus
         self.interface = interface
 
@@ -104,7 +104,7 @@ class Bus:
             self._characteristic_cache[key] = path
         return path
 
-    async def ensure_characteristic_paths(self, mac: str, *uuid: str):
+    async def ensure_characteristic_paths(self, mac: str, *uuid: str) -> None:
         """
         Ensure Bluetooth GATT characteristic path exists for each UUID.
         """
@@ -112,7 +112,7 @@ class Bus:
         for u in uuid:
             await self.ensure_characteristic_path(mac, u)
 
-    async def ensure_characteristic_path(self, mac: str, uuid: str):
+    async def ensure_characteristic_path(self, mac: str, uuid: str) -> None:
         key = mac, uuid
         prefix = self.dev_path(mac)
         for i in range(DEFAULT_CHARACTERISTIC_PATH_RETRY):
@@ -130,7 +130,7 @@ class Bus:
             'Cannot determine characteristic path for {}/{}'.format(mac, uuid)
         )
 
-    def _gatt_start(self, path):
+    def _gatt_start(self, path: str) -> None:
         # TODO: creates notification session; if another session started,
         # then we get notifications twice; this needs to be fixed
         self._notifications.start(path, INTERFACE_GATT_CHR, 'Value')
@@ -141,17 +141,17 @@ class Bus:
             self._notifications.stop(path, INTERFACE_GATT_CHR)
             raise
 
-    def adapter_path(self):
+    def adapter_path(self) -> str:
         return '/org/bluez/{}'.format(self.interface)
 
     def dev_path(self, mac: str) -> str:
         return '/org/bluez/{}/dev_{}'.format(self.interface, _mac_to_path(mac))
 
-    async def _gatt_get(self, path):
+    async def _gatt_get(self, path: str) -> tp.Any:
         task = self._notifications.get(path, INTERFACE_GATT_CHR, 'Value')
         return (await task)
 
-    def _gatt_stop(self, path):
+    def _gatt_stop(self, path: str) -> None:
         try:
             _btzen.bt_notify_stop(self.system_bus, path)
         except Exception as ex:
@@ -159,45 +159,51 @@ class Bus:
         finally:
             self._notifications.stop(path, INTERFACE_GATT_CHR)
 
-    def _gatt_size(self, path) -> int:
+    def _gatt_size(self, path: str) -> int:
         return self._notifications.size(path, INTERFACE_GATT_CHR, 'Value')
 
-    def _dev_property_start(self, mac, name, iface=INTERFACE_DEVICE):
+    def _dev_property_start(
+        self, mac: str, name: str, iface: str=INTERFACE_DEVICE
+    ) -> None:
         path = self.dev_path(mac)
         self._notifications.start(path, iface, name)
 
     async def _dev_property_get(
             self,
-            mac,
-            name,
-            iface=INTERFACE_DEVICE,
-        ):
+            mac: str,
+            name: str,
+            iface: str=INTERFACE_DEVICE,
+    ) -> tp.Any:
         path = self.dev_path(mac)
         value = await self._notifications.get(path, iface, name)
         return value
 
-    def _dev_property_stop(self, mac, name, iface=INTERFACE_DEVICE):
+    def _dev_property_stop(
+        self, mac: str, name: str, iface: str=INTERFACE_DEVICE
+    ) -> None:
         path = self.dev_path(mac)
         self._notifications.stop(path, iface)
 
-    async def _property(self, mac, iface, name, type='s'):
+    async def _property(
+        self, mac: str, iface: str, name: str, type: str='s'
+    ) -> tp.Any:
         bus = self.system_bus
         path = self.dev_path(mac)
         value = await _btzen.bt_property(bus, path, iface, name, type)
         return value
 
-    async def _get_name(self, mac):
+    async def _get_name(self, mac: str) -> str:
         path = self.dev_path(mac)
         bus = self.system_bus
         value = await _btzen.bt_property(bus, path, INTERFACE_DEVICE, 'Name', 's')
-        return value
+        return value  # type: ignore
 
 class Notifications:
-    def __init__(self, bus):
-        self._data = {}
+    def __init__(self, bus: Bus):
+        self._data: dict[tuple[str, str], _btzen.PropertyNotification] = {}
         self._bus = bus
 
-    def start(self, path, iface, name):
+    def start(self, path: str, iface: str, name: str) -> None:
         key = path, iface
         bus = self._bus.system_bus
 
@@ -208,16 +214,16 @@ class Notifications:
         assert key in self._data
         data.register(name)
 
-    def size(self, path, iface, name):
+    def size(self, path: str, iface: str, name: str) -> int:
         key = path, iface
-        return self._data[key].size(name)
+        return self._data[key].size(name)  # type: ignore
 
-    async def get(self, path, iface, name):
+    async def get(self, path: str, iface: str, name: str) -> tp.Any:
         key = path, iface
         data = self._data[key]
         return (await data.get(name))
 
-    def stop(self, path, iface):
+    def stop(self, path: str, iface: str) -> None:
         # TODO: add name and call PropertyNotification.stop when no
         # properties monitored
         key = path, iface

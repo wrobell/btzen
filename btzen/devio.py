@@ -79,10 +79,10 @@ async def read_all(device: DeviceBase[Service, T]) -> AsyncIterator[T]:
             # cancelled calls happen on device disconnection
             logger.info('{}: {}'.format(device, ex))
         else:
-            yield value  # type: ignore
+            yield value
 
 @singledispatch
-async def write(device: DeviceBase[Service, T], data: bytes):
+async def write(device: DeviceBase[Service, T], data: bytes) -> None:
     """
     Write data to Bluetooth device.
 
@@ -94,7 +94,7 @@ async def write(device: DeviceBase[Service, T], data: bytes):
     )
 
 @singledispatch
-async def enable(device: DeviceBase[Service, T]):
+async def enable(device: DeviceBase[Service, T]) -> None:
     """
     Enable and configure Bluetooth device.
 
@@ -103,7 +103,7 @@ async def enable(device: DeviceBase[Service, T]):
     """
 
 @singledispatch
-async def disable(device: DeviceBase[Service, T]):
+async def disable(device: DeviceBase[Service, T]) -> None:
     """
     Disable Bluetooth device.
 
@@ -152,18 +152,20 @@ async def _read_dev_tr(device: DeviceTrigger[ServiceCharacteristic, T]) -> T:
         return device.convert(data)
 
 @enable.register
-async def _enable_dev(device: Device[ServiceCharacteristic, T]):
+async def _enable_dev(device: Device[ServiceCharacteristic, T]) -> None:
     bus = get_session().bus
     await bus.ensure_characteristic_paths(device.mac, device.service.uuid_data)
 
 @enable.register
-async def _enable_int(device: DeviceTrigger[ServiceInterface, T]):
+async def _enable_int(device: DeviceTrigger[ServiceInterface, T]) -> None:
     bus = get_session().bus
     srv = device.service
     bus._dev_property_start(device.mac, srv.property, iface=srv.interface)
 
 @enable.register
-async def _enable_dev_trigger(device: DeviceTrigger[ServiceCharacteristic, T]):
+async def _enable_dev_trigger(
+    device: DeviceTrigger[ServiceCharacteristic, T]
+) -> None:
     bus = get_session().bus
     await bus.ensure_characteristic_paths(device.mac, device.service.uuid_data)
 
@@ -173,13 +175,13 @@ async def _enable_dev_trigger(device: DeviceTrigger[ServiceCharacteristic, T]):
     logger.info('notifications enabled for {}'.format(path))
 
 @disable.register
-async def _disable_int(device: DeviceTrigger[ServiceInterface, T]):
+async def _disable_int(device: DeviceTrigger[ServiceInterface, T]) -> None:
     bus = get_session().bus
     srv = device.service
     bus._dev_property_stop(device.mac, srv.property, iface=srv.interface)
 
 @disable.register
-async def _disable_device_trigger(device: DeviceTrigger[ServiceCharacteristic, T]):
+async def _disable_device_trigger(device: DeviceTrigger[ServiceCharacteristic, T]) -> None:
     bus = get_session().bus
     srv = device.service
     path = bus.characteristic_path(device.mac, srv.uuid_data)
@@ -191,14 +193,16 @@ async def _disable_device_trigger(device: DeviceTrigger[ServiceCharacteristic, T
         bus._gatt_stop, path
     )
 
-async def write_config(mac: str, uuid: str, data: bytes):
+async def write_config(mac: str, uuid: str, data: bytes) -> None:
     bus = get_session().bus
     path = bus.characteristic_path(mac, uuid)
     await _btzen.bt_write(
         bus.system_bus, path, data, DEFAULT_DBUS_TIMEOUT
     )
 
-async def disarm(msg: str, warn: str, f, *args):
+async def disarm(
+    msg: str, warn: str, f: tp.Callable[..., tp.Any], *args: tp.Any
+) -> None:
     try:
         if inspect.iscoroutinefunction(f):
             await f(*args)

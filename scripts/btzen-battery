@@ -27,11 +27,14 @@ from datetime import datetime
 
 import btzen
 
-async def battery_level(battery: btzen.DeviceBase):
+async def battery_level(battery: btzen.DeviceBase[btzen.Service, int]) -> None:
     async for value in btzen.read_all(battery):
         print('{}: {}%'.format(datetime.now(), value))
 
-async def read_data(mac: str, interface: str, address_type: btzen.AddressType):
+async def read_data(
+    mac: str, interface: str, address_type: btzen.AddressType
+) -> None:
+
     dev = btzen.battery_level(mac)
     dev = btzen.set_address_type(dev, address_type=address_type)
     async with btzen.connect([dev], interface=interface) as session:

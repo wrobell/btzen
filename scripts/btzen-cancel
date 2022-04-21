@@ -76,6 +76,7 @@ The test is successful when it still outputs sensor values.
 import argparse
 import asyncio
 import logging
+import typing as tp
 import uvloop
 from datetime import datetime
 
@@ -84,7 +85,10 @@ import btzen.sensortag
 
 logger = logging.getLogger()
 
-async def read_sensors(sensors: list[btzen.DeviceBase], timeout: float) -> None:
+async def read_sensors(
+    sensors: list[btzen.DeviceBase[btzen.Service, tp.Any]], timeout: float
+) -> None:
+
     timeouts = 0
     attempts = 0
     while btzen.is_active():

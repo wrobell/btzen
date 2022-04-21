@@ -10,7 +10,7 @@ SCRIPTS=\
 	scripts/btzen-weight
 
 check:
-	mypy --scripts-are-modules btzen $(SCRIPTS)
+	mypy --strict --scripts-are-modules btzen $(SCRIPTS)
 
 test:
 	pytest -vv --cov=btzen btzen
