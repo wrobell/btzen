@@ -153,7 +153,14 @@ def test_cls_create_self() -> None:
     t = Device[S, T]
     assert t == Device
 
-@pytest.mark.parametrize('cls_param', [(Service,), (Service, int)])
+def test_cls_create_concrete() -> None:
+    """
+    Test creating a concrete version of device type.
+    """
+    t = Device[S, int]
+    assert isinstance(t, type)
+
+@pytest.mark.parametrize('cls_param', [(Service,), (Service, 'a value')])
 def test_cls_param_invalid(cls_param: type) -> None:
     """
     Test if error is raised on an invalid parameters passed to a class.

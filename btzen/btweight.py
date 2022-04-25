@@ -26,30 +26,10 @@ import enum
 import struct
 import typing as tp
 
-from .data import T, Make, ServiceType, Trigger, TriggerCondition
+from .data import T, Make, ServiceType, Trigger, TriggerCondition, \
+    WeightData, WeightFlags
 from .service import register_service, ServiceCharacteristic
 from .util import to_uuid
-
-class WeightFlags(enum.IntFlag):
-    IMPERIAL = 0x01
-    TIMESTAMP = 0x02
-    USER_ID = 0x04
-    BMI = 0x08
-    RESERVED_1 = 0x10
-    RESERVED_2 = 0x20
-    RESERVED_3 = 0x40
-    RESERVED_4 = 0x80
-
-@dtc.dataclass(frozen=True)
-class WeightData:
-    """
-    Weight measurement data.
-
-    var flags: Weight scale flags value.
-    var weight: Weight measurement value.
-    """
-    flags: WeightFlags
-    weight: float
 
 @dtc.dataclass(frozen=True)
 class MiScaleWeightData(WeightData):

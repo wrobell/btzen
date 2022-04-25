@@ -41,7 +41,7 @@ import btzen
 
 logger = logging.getLogger('btzen-ostc')
 
-Device = btzen.Device[btzen.SerialService, bytes]
+Device = btzen.Device[btzen.Service, bytes]
 
 DiveHeader = namedtuple('DiveHeader', ['size', 'datetime', 'depth', 'duration', 'dive_number', 'version'])
 to_int = partial(int.from_bytes, byteorder='little', signed=False)
@@ -107,7 +107,6 @@ async def run_single(mac: str, count: int) -> None:
     Download dives from a dive computer and exit.
     """
     dev = btzen.serial(mac, make=btzen.Make.OSTC)
-    dev = tp.cast(Device, btzen.serial(mac, make=btzen.Make.OSTC))
     async with btzen.connect([dev]) as session:
         await read_data(dev, count)
 
@@ -115,7 +114,7 @@ async def run_loop(mac: str, count: int) -> None:
     """
     Download dives from a dive computer in a loop.
     """
-    dev = tp.cast(Device, btzen.serial(mac, make=btzen.Make.OSTC))
+    dev = btzen.serial(mac, make=btzen.Make.OSTC)
     async with btzen.connect([dev]) as session:
         while True:
             await read_data(dev, count)

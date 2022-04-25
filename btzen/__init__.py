@@ -25,13 +25,13 @@ from . import sensortag
 from . import thingy52
 from . import bluez
 
-from .btweight import WeightFlags, WeightData, MiScaleWeightData
-from .data import AddressType, Button, Make, TriggerCondition, Trigger, \
-    ServiceType
+from .btweight import MiScaleWeightData
+from .data import AddressType, Button, Make, LightColor, TriggerCondition, \
+    Trigger, ServiceType, WeightFlags, WeightData
 from .device import DeviceBase, Device, DeviceTrigger, set_interval, \
     set_trigger, set_address_type, create_device, \
-    accelerometer, battery_level, button, humidity, light, light_rgb, \
-    pressure, serial, temperature, weight
+    accelerometer, battery_level, button, humidity, light, \
+    light_rgb, pressure, serial, temperature, weight
 from .devio import read, read_all, write, enable, disable
 from .serial import SerialService
 from .service import Service, ServiceCharacteristic, ServiceInterface
@@ -56,7 +56,7 @@ __all__ = [
     'Service', 'ServiceCharacteristic', 'ServiceInterface', 'SerialService',
 
     # basic data
-    'AddressType', 'Make', 'ServiceType', 'Button', 'WeightData',
+    'AddressType', 'Make', 'ServiceType', 'Button', 'LightColor', 'WeightData',
     'WeightFlags', 'Trigger', 'TriggerCondition',
 
     # bluetooth device i/o

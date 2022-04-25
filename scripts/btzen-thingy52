@@ -27,9 +27,20 @@ from datetime import datetime
 
 import btzen
 
+#
+# sensor definitions
+#
+SENSORS = [
+    ('pressure', btzen.pressure),
+    ('temperature', btzen.temperature),
+    ('humidity', btzen.humidity),
+    ('light', btzen.light_rgb),
+    ('button', btzen.button),
+]
+
 async def read_data(mac: str, interface: str, interval: float) -> None:
     # initialize all Thingy52 sensors
-    devices = [ctor(mac, make=btzen.Make.THINGY52) for _, ctor in SENSORS]
+    devices = [ctor(mac, make=btzen.Make.THINGY52) for _, ctor in SENSORS] # type: ignore
     devices = [btzen.set_interval(d, interval) for d in devices]
 
     battery = btzen.battery_level(mac)
@@ -42,7 +53,7 @@ async def read_data(mac: str, interface: str, interval: float) -> None:
 
         await asyncio.gather(session, *tasks)
 
-async def read_sensor(name: str, sensor: btzen.DeviceBase[btzen.Service, tp.Any]) -> None:
+async def read_sensor(name: str, sensor: btzen.DeviceTrigger[btzen.Service, tp.Any]) -> None:
     async for value in btzen.read_all(sensor):
         if isinstance(value, btzen.Button):
             print_data(name, '{}'.format(str(value)))
@@ -53,17 +64,6 @@ async def read_sensor(name: str, sensor: btzen.DeviceBase[btzen.Service, tp.Any]
 
 def print_data(name: str, value: tp.Any) -> None:
     print('{} {}: {}'.format(datetime.now(), name, value))
-
-#
-# sensor definitions
-#
-SENSORS = [
-    ('pressure', btzen.pressure),
-    ('temperature', btzen.temperature),
-    ('humidity', btzen.humidity),
-    ('light', btzen.light_rgb),
-    ('button', btzen.button),
-]
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

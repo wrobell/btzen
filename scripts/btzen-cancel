@@ -79,6 +79,7 @@ import logging
 import typing as tp
 import uvloop
 from datetime import datetime
+from collections.abc import Sequence
 
 import btzen
 import btzen.sensortag
@@ -86,8 +87,8 @@ import btzen.sensortag
 logger = logging.getLogger()
 
 async def read_sensors(
-    sensors: list[btzen.DeviceBase[btzen.Service, tp.Any]], timeout: float
-) -> None:
+        sensors: Sequence[btzen.Device[btzen.Service, float]], timeout: float
+    ) -> None:
 
     timeouts = 0
     attempts = 0
@@ -120,7 +121,9 @@ async def read_sensors(
 
 async def start_test(iface: str, mac: str, timeout: float) -> None:
     ctor = [btzen.pressure, btzen.temperature, btzen.humidity, btzen.light]
-    sensors = [c(mac, make=btzen.Make.SENSOR_TAG) for c in ctor]
+    sensors: Sequence[btzen.Device[btzen.Service, float]] = [
+        c(mac, make=btzen.Make.SENSOR_TAG) for c in ctor
+    ]
 
     async with btzen.connect(sensors, interface=iface) as session:
         await asyncio.gather(session, read_sensors(sensors, timeout))

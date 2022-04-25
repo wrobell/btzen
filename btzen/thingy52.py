@@ -34,8 +34,8 @@ import typing as tp
 from collections import defaultdict
 from functools import partial, cache
 
-from .data import T, AddressType, Button, Make, ServiceType, Trigger, \
-    TriggerCondition
+from .data import T, AddressType, Button, LightColor, Make, ServiceType, \
+    Trigger, TriggerCondition
 from .device import DeviceTrigger, set_trigger
 from .devio import enable, _enable_dev_trigger, write_config
 from .service import register_service, ServiceCharacteristic
@@ -82,13 +82,6 @@ class Thingy52Config:
     rgb: tuple[int, int, int] = (0, 255, 0)
 
 _CONFIG_CACHE: defaultdict[str, Thingy52Config] = defaultdict(Thingy52Config)
-
-@dtc.dataclass(frozen=True)
-class LightColor:
-    red: float
-    blue: float
-    green: float
-    clear: float
 
 class Thingy52ButtonState(Button):
     """

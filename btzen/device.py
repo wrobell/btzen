@@ -18,9 +18,9 @@
 #
 
 """
-Bluetooth device descriptors and device object constructors.
+Bluetooth device descriptors, device object constructors and
+modification functions.
 
-Diagram::
 
                                    +--------------+
                                    | <<abstract>> |
@@ -61,14 +61,60 @@ import typing as tp
 from functools import partial, singledispatch
 
 from .data import T, AddressType, Converter, Make, NoTrigger, Trigger, \
-    TriggerCondition, ServiceType
+    TriggerCondition, ServiceType, LightColor, Button, WeightData
 from .service import S, Service, _SERVICE_REGISTRY
 
 logger = logging.getLogger(__name__)
 
+D = tp.TypeVar('D')
+
+MakeNonTrigger = tp.Literal[Make.STANDARD, Make.SENSOR_TAG, Make.OSTC]
+
 # key is tuple (base class, parameter class)
 _PROXY_REGISTRY: dict[tuple[type, type], type] = {}
 
+#
+# define protocols for the constructors of devices objects
+#
+class Ctor(tp.Protocol[T]):
+    """
+    Constructor protocol for a device.
+
+    By default it creates non-triggered device object. Exceptions are
+    defined for devices, which work only with a trigger set.
+
+    For example, by default a pressure device works without a trigger. But
+    certain makes of pressure devices, i.e. Thingy:52, works only with
+    a trigger set.
+    """
+    @tp.overload
+    def __call__(
+        self, mac: str, *, make: MakeNonTrigger=Make.STANDARD
+    ) -> Device[Service, T]: ...
+
+    @tp.overload
+    def __call__(
+        self, mac: str, *, make: tp.Literal[Make.THINGY52]
+    ) -> DeviceTrigger[Service, T]: ...
+
+    def __call__(
+        self,
+        mac: str,
+        *,
+        make: tp.Literal[Make.THINGY52] | MakeNonTrigger=Make.STANDARD
+    ) -> Device[Service, T] | DeviceTrigger[Service, T]: ...
+
+class CtorTrigger(tp.Protocol[T]):
+    """
+    Constructor for devices, which work only with triggers set.
+
+    For example, any accelerometer device works with trigger set only.
+    """
+    def __call__(self, mac: str, make: Make=Make.STANDARD) -> DeviceTrigger[Service, T]: ...
+
+#
+# device objects
+#
 @dtc.dataclass(frozen=True)
 class DeviceBase(tp.Generic[S, T]):
     """
@@ -143,7 +189,7 @@ class DeviceBase(tp.Generic[S, T]):
             isinstance(cls_param, tuple)
             and len(cls_param) == 2
             and (dtc.is_dataclass(cls_param[0]) or cls_param[0] == S) # type: ignore
-            and isinstance(cls_param[1], tp.TypeVar)
+            and isinstance(cls_param[1], (tp.TypeVar, type))
         )
 
         if not ok:
@@ -239,10 +285,7 @@ def set_trigger(
         Trigger(condition, operand),
     )
 
-def set_address_type(
-        device: DeviceBase[S, T],
-        address_type: AddressType,
-    ) -> DeviceBase[S, T]:
+def set_address_type(device: D, address_type: AddressType) -> D:
     """
     Set connection address type for a Bluetooth device.
 
@@ -266,25 +309,28 @@ def _create_device(
     else:
         return set_trigger(dev, trigger.condition, operand=trigger.operand)
 
-accelerometer = partial(_create_device, ServiceType.ACCELEROMETER)
+accelerometer = tp.cast(
+    CtorTrigger[tuple[float, float, float]],
+    partial(_create_device, ServiceType.ACCELEROMETER),
+)
 
-battery_level = partial(_create_device, ServiceType.BATTERY_LEVEL)
+battery_level = tp.cast(CtorTrigger[int], partial(_create_device, ServiceType.BATTERY_LEVEL))
 battery_level.__doc__ = """
 The current charge level of a Bluetooth device battery.
 
 :param mac: MAC address of Bluetooth device.
 :param make: Bluetooth device make.
 
-.. seealso: `Make`
+.. seealso:: `Make`
 """
 
-button = partial(_create_device, ServiceType.BUTTON)
-humidity = partial(_create_device, ServiceType.HUMIDITY)
-light = partial(_create_device, ServiceType.LIGHT)
-light_rgb = partial(_create_device, ServiceType.LIGHT_RGB)
-pressure = partial(_create_device, ServiceType.PRESSURE)
-serial = partial(_create_device, ServiceType.SERIAL)
-temperature = partial(_create_device, ServiceType.TEMPERATURE)
-weight = partial(_create_device, ServiceType.WEIGHT_MEASUREMENT)
+button = tp.cast(CtorTrigger[Button], partial(_create_device, ServiceType.BUTTON))
+humidity = tp.cast(Ctor[float], partial(_create_device, ServiceType.HUMIDITY))
+light = tp.cast(Ctor[float], partial(_create_device, ServiceType.LIGHT))
+light_rgb = tp.cast(Ctor[LightColor], partial(_create_device, ServiceType.LIGHT_RGB))
+pressure = tp.cast(Ctor[float], partial(_create_device, ServiceType.PRESSURE))
+serial = tp.cast(Ctor[bytes], partial(_create_device, ServiceType.SERIAL))
+temperature = tp.cast(Ctor[float], partial(_create_device, ServiceType.TEMPERATURE))
+weight = tp.cast(CtorTrigger[WeightData], partial(_create_device, ServiceType.WEIGHT_MEASUREMENT))
 
 # vim: sw=4:et:ai

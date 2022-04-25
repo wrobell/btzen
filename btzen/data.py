@@ -100,4 +100,35 @@ class Button(enum.IntFlag):
     devices.
     """
 
+@dtc.dataclass(frozen=True)
+class LightColor:
+    """
+    Light value with RGB colour information.
+    """
+    red: float
+    blue: float
+    green: float
+    clear: float
+
+class WeightFlags(enum.IntFlag):
+    IMPERIAL = 0x01
+    TIMESTAMP = 0x02
+    USER_ID = 0x04
+    BMI = 0x08
+    RESERVED_1 = 0x10
+    RESERVED_2 = 0x20
+    RESERVED_3 = 0x40
+    RESERVED_4 = 0x80
+
+@dtc.dataclass(frozen=True)
+class WeightData:
+    """
+    Weight measurement data.
+
+    var flags: Weight scale flags value.
+    var weight: Weight measurement value.
+    """
+    flags: WeightFlags
+    weight: float
+
 # vim: sw=4:et:ai
