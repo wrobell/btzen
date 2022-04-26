@@ -24,6 +24,6 @@ DEFAULT_DBUS_TIMEOUT = 5 * USEC
 # used by btzen to allow connection object creation
 DEFAULT_CONNECTION_TIMEOUT = 30 * USEC
 
-DEFAULT_CHARACTERISTIC_PATH_RETRY = 3
+DEFAULT_CHARACTERISTIC_PATH_RETRY = 5
 
 # vim: sw=4:et:ai
