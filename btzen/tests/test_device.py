@@ -139,13 +139,6 @@ def test_dispatch(obj, cls, func, func_result) -> None:  # type: ignore
     assert read.dispatch(type(obj)) == func
     assert read(obj) == func_result
 
-def test_cls_create() -> None:
-    """
-    Test creating parametrised class.
-    """
-    t = Device[Service, T]
-    assert isinstance(t, type)
-
 def test_cls_create_self() -> None:
     """
     Test creating parametrised class when itself has to be returned.
@@ -153,11 +146,12 @@ def test_cls_create_self() -> None:
     t = Device[S, T]
     assert t == Device
 
-def test_cls_create_concrete() -> None:
+@pytest.mark.parametrize('cls', (T, int, tp.Any))
+def test_cls_create(cls: tp.Any) -> None:
     """
-    Test creating a concrete version of device type.
+    Test creating parametrised class.
     """
-    t = Device[S, int]
+    t = Device[Service, T]
     assert isinstance(t, type)
 
 @pytest.mark.parametrize('cls_param', [(Service,), (Service, 'a value')])

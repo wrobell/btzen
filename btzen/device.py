@@ -189,7 +189,10 @@ class DeviceBase(tp.Generic[S, T]):
             isinstance(cls_param, tuple)
             and len(cls_param) == 2
             and (dtc.is_dataclass(cls_param[0]) or cls_param[0] == S) # type: ignore
-            and isinstance(cls_param[1], (tp.TypeVar, type))
+            and (
+                isinstance(cls_param[1], (tp.TypeVar, type))
+                or cls_param[1] is tp.Any
+            )
         )
 
         if not ok:

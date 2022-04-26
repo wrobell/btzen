@@ -227,8 +227,9 @@ class Notifications:
         # TODO: add name and call PropertyNotification.stop when no
         # properties monitored
         key = path, iface
-        self._data[key].stop()
-        del self._data[key]
+        if key in self._data:
+            self._data[key].stop()
+            del self._data[key]
 
         assert key not in self._data
 
