@@ -51,15 +51,6 @@ class DescTrigger:
     ctor: btzen.device.CtorTrigger[tp.Any]
     reader: tp.Callable[[str, btzen.DeviceTrigger[btzen.Service, tp.Any]], tp.Coroutine[tp.Any, tp.Any, None]]
 
-SENSORS: list[tp.Union[Desc, DescTrigger]] = [
-    Desc('pressure', btzen.pressure, read_sensor),
-    Desc('temperature', btzen.temperature, read_sensor),
-    Desc('humidity', btzen.humidity, read_sensor),
-    Desc('light', btzen.light, read_sensor),
-    DescTrigger('button', btzen.button, read_button),
-    DescTrigger('accelerometer', btzen.accelerometer, read_accelerometer),
-]
-
 async def read_sensors(mac: str, interface: str) -> None:
     battery = btzen.battery_level(mac)
     devices = [s.ctor(mac, make=btzen.Make.SENSOR_TAG) for s in SENSORS]
@@ -112,6 +103,15 @@ parser.add_argument(
 )
 parser.add_argument('mac', help='MAC address of device')
 args = parser.parse_args()
+
+SENSORS: list[tp.Union[Desc, DescTrigger]] = [
+    Desc('pressure', btzen.pressure, read_sensor),
+    Desc('temperature', btzen.temperature, read_sensor),
+    Desc('humidity', btzen.humidity, read_sensor),
+    Desc('light', btzen.light, read_sensor),
+    DescTrigger('button', btzen.button, read_button),
+    DescTrigger('accelerometer', btzen.accelerometer, read_accelerometer),
+]
 
 level = logging.DEBUG if args.verbose else logging.INFO
 logging.basicConfig(level=level)
