@@ -284,7 +284,7 @@ def set_trigger(
         device.service,
         device.mac,
         device.address_type,
-        device.convert,  # type: ignore
+        device.convert,
         Trigger(condition, operand),
     )
 
