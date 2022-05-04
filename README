@@ -46,7 +46,7 @@ Please note that since version 0.6.0 the API changed. The benefits are
 - shutting down of BTZen connection sessions is more reliable
 
 If pre-0.6.0 version of BTZen is required, then use appropriate versioning
-in install requirements of your project.
+in installation requirements of your project.
 
 Documentation
 =============
@@ -107,9 +107,9 @@ Performance
 The library enables programmers to communicate with mutliple devices in
 parallel without using threads. This avoids context switching of threads
 and minimizes memory requirements, which makes BTZen more efficient than
-other, similar libraries. To keep the library as fast as possible, the
-Cython is used to access Bluez D-Bus API. BTZen can be used with `uvloop`
-for even more increased performance of an application.
+other, similar libraries. To keep the library as fast as possible, Cython
+is used to access Bluez D-Bus API. BTZen can be used with `uvloop` for even
+more increased performance of an application.
 
 Support for GATT notification interface allows efficient use of Bluetooth
 devices. For example, data from sensors like accelerometers can be read
