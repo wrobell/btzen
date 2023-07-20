@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pkg_resources
+from importlib.metadata import version
 
 # register devices
 from . import serial as mod_serial
@@ -41,7 +41,7 @@ from .session import is_active
 from .sensortag import SensorTagButtonState
 from .thingy52 import Thingy52ButtonState
 
-__version__ = pkg_resources.get_distribution('btzen').version
+__version__ = version('btzen')
 
 __all__ = [
     # connection session

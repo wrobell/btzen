@@ -9,7 +9,7 @@ SCRIPTS=\
 	scripts/btzen-thingy52 \
 	scripts/btzen-weight
 
-check:
+check-type:
 	mypy --strict --scripts-are-modules btzen $(SCRIPTS)
 
 test:

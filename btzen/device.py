@@ -295,7 +295,7 @@ def set_address_type(device: D, address_type: AddressType) -> D:
     :param device: Bluetooth device descriptor.
     :param address_type: Bluetooth device connection address type.
     """
-    return dtc.replace(device, address_type=address_type)
+    return dtc.replace(device, address_type=address_type)  # type: ignore
 
 def _create_device(
         service_type: ServiceType,

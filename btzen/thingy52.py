@@ -118,7 +118,7 @@ register_th(
         to_uuid(0x0206),
         'temperature',
     ),
-    convert=lambda data: data[0] + data[1] / 100
+    convert=lambda data: int.from_bytes(data[0:1], signed=True) + data[1] / 100
 )
 
 register_th(
@@ -174,7 +174,7 @@ async def _enable_thingy52(device: DeviceTrigger[Thingy52Service, T]) -> None:
     await _enable_dev_trigger(device)
 
 @set_trigger.register  # type: ignore
-def _set_trigger_thingy52(  # type: ignore
+def _set_trigger_thingy52(
         device: DeviceTrigger[Thingy52Service, T],
         condition: TriggerCondition,
         *,

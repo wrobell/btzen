@@ -85,7 +85,12 @@ def check_msg_error(r):
             'D-Bus message parsing error: {}'.format(strerror(-r))
         )
 
-def task_handle_message(BusMessage bus_msg, task, cls_err, value_type: str):
+def task_handle_message(
+        BusMessage bus_msg,
+        task,
+        cls_err,
+        value_type: str | None
+) -> int:
     """
     Handle asynchronous task result or error.
 

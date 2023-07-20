@@ -55,13 +55,13 @@ def to_int(v: bytes) -> int:
 INSTANCE_DATA = [
     [
         Device(Service('aaa'), '1', AddressType.PUBLIC, to_int),
-        Device[Service, T],
+        Device[Service, int],
         _read_service,
         11,
     ],
     [
         Device(ServiceCharacteristic('aaa', 'bbb', 4), '1', AddressType.PUBLIC, str),
-        Device[ServiceCharacteristic, T],
+        Device[ServiceCharacteristic, int],
         _read_service_chr,
         "b'22'",
     ],
@@ -73,7 +73,7 @@ INSTANCE_DATA = [
             str,
             Trigger(TriggerCondition.FIXED_TIME, 1),
         ),
-        DeviceTrigger[ServiceCharacteristic, T],
+        DeviceTrigger[ServiceCharacteristic, int],
         _read_service_chr_tr,
         "b'33'",
     ],
@@ -81,27 +81,27 @@ INSTANCE_DATA = [
 
 SUBCLASS_DATA = [
     [
-        Device[Service, T],
-        Device[ServiceCharacteristic, T],
+        Device[Service, int],
+        Device[ServiceCharacteristic, int],
     ],
     [
-        Device[Service, T],
-        Device[ServiceEnvSensing, T],
+        Device[Service, int],
+        Device[ServiceEnvSensing, int],
     ],
     [
-        Device[ServiceCharacteristic, T],
-        Device[ServiceEnvSensing, T],
+        Device[ServiceCharacteristic, int],
+        Device[ServiceEnvSensing, int],
     ],
 ]
 
 NON_SUBCLASS_DATA = [
     [
-        Device[ServiceCharacteristic, T],
-        DeviceTrigger[ServiceCharacteristic, T],
+        Device[ServiceCharacteristic, int],
+        DeviceTrigger[ServiceCharacteristic, int],
     ],
     [
-        Device[Service, T],
-        DeviceTrigger[ServiceCharacteristic, T],
+        Device[Service, int],
+        DeviceTrigger[ServiceCharacteristic, int],
     ],
 ]
 

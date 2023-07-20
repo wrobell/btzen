@@ -26,11 +26,13 @@ from collections import defaultdict
 from .data import T, AddressType, AnyTrigger, Converter, Make, NoTrigger, \
     ServiceType
 
+ServiceRegistryDict: tp.TypeAlias = dict[
+    'ServiceType',
+    tuple['Service', Converter[T], AnyTrigger, 'AddressType']
+]
+
 # registry of known services
-_SERVICE_REGISTRY = defaultdict[
-    'Make',
-    dict['ServiceType', tuple['Service', Converter[T], AnyTrigger, 'AddressType']]
-](dict)
+_SERVICE_REGISTRY = defaultdict['Make', ServiceRegistryDict[tp.Any]](ServiceRegistryDict[tp.Any])
 
 @dtc.dataclass(frozen=True)
 class Service:

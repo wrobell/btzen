@@ -66,7 +66,11 @@ cdef class ConnectionManagerHandle:
         sd_bus_slot_unref(self.slot)
         free(self.vtable)
 
-cdef int cm_release(sd_bus_message *msg, void *user_data, sd_bus_error *error) with gil:
+cdef int cm_release(
+        sd_bus_message *msg,
+        void *user_data,
+        sd_bus_error *error
+) noexcept with gil:
     return sd_bus_reply_method_return(msg, NULL)
 
 cdef int cm_property(
@@ -77,7 +81,7 @@ cdef int cm_property(
         sd_bus_message *reply,
         void *user_data,
         sd_bus_error *error
-    ) with gil:
+) noexcept with gil:
 
     cdef set services = <object>user_data
     cdef int r
@@ -178,7 +182,11 @@ def cm_close(Bus bus, str path, handle):
         sd_bus_error_free(&error);
         sd_bus_message_unref(msg);
 
-cdef int task_cb(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+cdef int task_cb(
+        sd_bus_message *msg,
+        void *user_data,
+        sd_bus_error *ret_error
+) noexcept with gil:
     cdef object task = <object>user_data
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
     bus_msg.c_obj = msg

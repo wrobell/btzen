@@ -97,7 +97,11 @@ cdef str fmt_rule(str iface, str path):
     rule = rule.strip().replace('\n', '')
     return rule
 
-cdef int task_cb_read(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+cdef int task_cb_read(
+        sd_bus_message *msg,
+        void *user_data,
+        sd_bus_error *ret_error
+) noexcept with gil:
     cdef object task = <object>user_data
     cdef const sd_bus_error *error = sd_bus_message_get_error(msg)
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
@@ -158,7 +162,11 @@ async def bt_read(Bus bus, str path, uint64_t timeout):
         # timeout and buffer space errors need to be handled properly
         sd_bus_slot_unref(slot)
 
-cdef int task_cb_write(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+cdef int task_cb_write(
+        sd_bus_message *msg,
+        void *user_data,
+        sd_bus_error *ret_error
+) noexcept with gil:
     """
     Data write callback used by `bt_write` function.
     """
@@ -258,7 +266,12 @@ def bt_write_sync(Bus bus, str path, bytes data):
     r = sd_bus_call(bus.bus, msg, 0, &error, &ret_msg)
     _sd_bus.check_call('write data to {}'.format(path), r)
 
-cdef int task_cb_property_monitor(sd_bus_message *msg, void *user_data, sd_bus_error *ret_error) with gil:
+cdef int task_cb_property_monitor(
+        sd_bus_message *msg,
+        void *user_data,
+        sd_bus_error *ret_error
+) noexcept with gil:
+
     cdef object cb = <object>user_data
     cdef const char *path
     cdef BusMessage bus_msg = BusMessage.__new__(BusMessage)
