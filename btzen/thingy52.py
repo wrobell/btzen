@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2023 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -186,7 +186,7 @@ def _set_trigger_thingy52(
     mac = device.mac
     config_entry = device.service.config_entry
     config = _CONFIG_CACHE[device.mac]
-    config = dtc.replace(config, **{config_entry: operand})
+    config = dtc.replace(config, **{config_entry: operand})  # type: ignore
     _CONFIG_CACHE[mac] = config
 
     return device

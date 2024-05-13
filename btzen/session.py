@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2023 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -98,7 +98,7 @@ class Session:
             )
         # create future, so it can be cancelled when error happens in
         # connection management tasks
-        task = self.create_future(device, event.wait())  # type: ignore
+        task = self.create_future(device, event.wait())  # type: ignore[misc]
         await task
 
     def is_active(self) -> bool:
