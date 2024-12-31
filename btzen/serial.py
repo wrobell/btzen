@@ -99,8 +99,8 @@ async def _read_data(bus: Bus, device: Device[SerialService, T], n: int) -> byte
 
             if __debug__:
                 logger.debug(
-                    'bytes read {}, last {}, tx credits size {}'
-                    .format(len(data), hexlify(data[-5:]).decode(), _tx_credit_size(bus, device.mac))
+                    'bytes expected {}, bytes read {}, last {}, tx credits size {}'
+                    .format(n, len(data), hexlify(data[-5:]).decode(), _tx_credit_size(bus, device.mac))
                 )
 
     assert len(data) >= n
