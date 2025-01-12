@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2025 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -79,7 +79,7 @@ def device_state(device: Device[SerialService, T]) -> State:
 @read.register  # type: ignore
 async def _read_serial(device: Device[SerialService, T], n: int) -> bytes:
     async with connected(device) as session:
-        task = session.create_future(device, _read_data(session.bus, device, n))   # type: ignore
+        task = session.create_task(device, _read_data(session.bus, device, n))   # type: ignore
         return (await task)  # type: ignore
 
 async def _read_data(bus: Bus, device: Device[SerialService, T], n: int) -> bytes:

@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2025 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@ from .error import *
 
 logger = logging.getLogger(__name__)
 
-CANCEL_ERROR = {
+CONNECTION_ERROR = {
     ENOBUFS: 'No buffer space, call cancelled ({})'.format,
     ETIMEDOUT: 'Timeout, call cancelled ({})'.format,
     EIO: 'Input/output error, call cancelled ({})'.format,
@@ -62,9 +62,9 @@ def check_call(msg_err, code):
     Raise call error if a D-Bus call has failed.
     """
     error_code = -code
-    if error_code in CANCEL_ERROR:
-        fmt = CANCEL_ERROR[error_code]
-        raise asyncio.CancelledError(fmt(error_code))
+    if error_code in CONNECTION_ERROR:
+        fmt = CONNECTION_ERROR[error_code]
+        raise ConnectionError(fmt(error_code))
     elif error_code > 0:
         msg_err = 'Call failed - {}: {} ({})'.format(
             msg_err, strerror(error_code), error_code
@@ -107,9 +107,9 @@ def task_handle_message(
     elif error:
         error_code = sd_bus_error_get_errno(error)
 
-        if error_code in CANCEL_ERROR:
-            fmt = CANCEL_ERROR[error_code]
-            task.cancel(msg=fmt(error_code))
+        if error_code in CONNECTION_ERROR:
+            fmt = CONNECTION_ERROR[error_code]
+            task.set_exception(ConnectionError(fmt(error_code)))
         else:
             task.set_exception(cls_err(strerror(error_code)))
     elif value_type is None:

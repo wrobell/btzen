@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2025 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,8 +26,8 @@ import enum
 import typing as tp
 
 T = tp.TypeVar('T')
-Converter = tp.Callable[[bytes], T]
-AnyTrigger = tp.Union['Trigger', 'NoTrigger']
+Converter: tp.TypeAlias = tp.Callable[[bytes], T]
+AnyTrigger: tp.TypeAlias = tp.Union['Trigger', 'NoTrigger']
 
 class Make(enum.Enum):
     """

@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2025 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,11 +25,6 @@ class BTZenError(Exception):
 class CallError(BTZenError):
     """
     Error when starting an asynchronous call is not possible.
-    """
-
-class ConnectionError(BTZenError):
-    """
-    Connection error.
     """
 
 class ConfigurationError(BTZenError):

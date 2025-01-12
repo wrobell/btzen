@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2025 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -198,7 +198,7 @@ async def create_connection(
             bus.system_bus, bus.adapter_path(), mac, address_type.value,
             DEFAULT_CONNECTION_TIMEOUT
         )
-    except (BTZenError, asyncio.CancelledError) as ex:
+    except (BTZenError, ConnectionError) as ex:
         is_active = get_session().is_active()
         if is_active and str(ex) == 'Already Exists':
             created = True
@@ -233,7 +233,7 @@ async def disable_devices(mac: str, devices: Devices) -> None:  # type: ignore
     # clear connection flag as soon as possible, to prevent reading from
     # disabled device
     session.set_disconnected(mac)
-    session.cancel_device_tasks(mac, 'Disable device')
+    session.disconnect_devices(mac)
 
     for dev in devices:
         # no exception checks as the disable functions should not raise
@@ -255,7 +255,7 @@ async def restart_devices(bus: Bus, mac: str, devices: Devices) -> None:  # type
             if resolved:
                 await enable_devices(mac, devices)
                 enabled = True
-        except asyncio.CancelledError as ex:
+        except ConnectionError as ex:
             logger.info(
                 'enabling devices for %s failed, seems to be not connected',
                 mac

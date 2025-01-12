@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2025 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ from functools import partial
 from . import _btzen  # type: ignore
 from . import _sd_bus  # type: ignore
 from .config import DEFAULT_CHARACTERISTIC_PATH_RETRY
-from .error import BTZenError, ConnectionError
+from .error import BTZenError
 
 logger = logging.getLogger(__name__)
 

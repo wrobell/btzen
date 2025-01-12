@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2025 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,6 +16,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+# https://github.com/python/mypy/issues/18216
+# https://github.com/python/mypy/issues/17623
+# mypy: disable-error-code="misc"
 
 """
 Operations for Bluetooth devices.
@@ -52,10 +56,9 @@ async def read(device: DeviceBase[Service, T], *args: tp.Any) -> T:
     """
     Read data from Bluetooth device.
 
-    The coroutine can raise cancellation error (`asyncio.CancelledError`),
-    i.e. when the device is disconnected. The caller should handle the
-    error, if it wants to continue reading data when the device is
-    reconnected.
+    The coroutine can raise connection error i.e. when the device is
+    disconnected. The caller should handle the error, if it wants to
+    continue reading data when the device is reconnected.
 
     :param device: Bluetooth device to read data from.
     :param args: Addition read arguments.
@@ -68,15 +71,14 @@ async def read_all(device: DeviceBase[Service, T]) -> AsyncIterator[T]:
     """
     Read all data from Bluetooth device.
 
-    It ignores cancellation errors.
+    The coroutine ignores connection errors.
 
     :param device: Bluetooth device to read data from.
     """
     while is_active():
         try:
             value = await read(device)
-        except asyncio.CancelledError as ex:
-            # cancelled calls happen on device disconnection
+        except ConnectionError as ex:
             logger.info('{}: {}'.format(device, ex))
         else:
             yield value
@@ -122,7 +124,7 @@ async def _read_dev(device: Device[ServiceCharacteristic, T]) -> T:
         path = bus.characteristic_path(device.mac, device.service.uuid_data)
         assert path is not None
 
-        task = session.create_future(
+        task = session.create_task(
             device,
             _btzen.bt_read(bus.system_bus, path, DEFAULT_DBUS_TIMEOUT)
         )
@@ -135,7 +137,7 @@ async def _read_dev_int(device: DeviceTrigger[ServiceInterface, T]) -> T:
         bus = session.bus
         srv = device.service
 
-        task = session.create_future(
+        task = session.create_task(
             device,
             bus._dev_property_get(device.mac, srv.property, srv.interface)
         )
@@ -147,7 +149,7 @@ async def _read_dev_tr(device: DeviceTrigger[ServiceCharacteristic, T]) -> T:
     async with connected(device) as session:
         bus = session.bus
         path = bus.characteristic_path(device.mac, device.service.uuid_data)
-        task = session.create_future(device, bus._gatt_get(path))
+        task = session.create_task(device, bus._gatt_get(path))
         data = await task
         return device.convert(data)
 
@@ -210,7 +212,7 @@ async def disarm(
         else:
             f(*args)
         logger.info(msg)
-    except asyncio.CancelledError as ex:
+    except ConnectionError as ex:
         if not is_active():
             raise
         else:

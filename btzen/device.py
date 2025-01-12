@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2025 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,6 +16,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+# https://github.com/python/mypy/issues/18216
+# https://github.com/python/mypy/issues/17623
+# mypy: disable-error-code="misc"
 
 """
 Bluetooth device descriptors, device object constructors and
@@ -65,8 +69,6 @@ from .data import T, AddressType, Converter, Make, NoTrigger, Trigger, \
 from .service import S, Service, _SERVICE_REGISTRY
 
 logger = logging.getLogger(__name__)
-
-D = tp.TypeVar('D')
 
 MakeNonTrigger = tp.Literal[Make.STANDARD, Make.SENSOR_TAG, Make.OSTC]
 
@@ -188,9 +190,9 @@ class DeviceBase(tp.Generic[S, T]):
         ok = (
             isinstance(cls_param, tuple)
             and len(cls_param) == 2
-            and (dtc.is_dataclass(cls_param[0]) or cls_param[0] == S) # type: ignore
+            and (dtc.is_dataclass(cls_param[0]) or cls_param[0] == S)
             and (
-                isinstance(cls_param[1], (tp.TypeVar, type))
+                isinstance(cls_param[1], (tp.TypeVar, tp.GenericAlias, type))  # type: ignore[attr-defined]
                 or cls_param[1] is tp.Any
             )
         )
@@ -288,7 +290,7 @@ def set_trigger(
         Trigger(condition, operand),
     )
 
-def set_address_type(device: D, address_type: AddressType) -> D:
+def set_address_type[D](device: D, address_type: AddressType) -> D:
     """
     Set connection address type for a Bluetooth device.
 

@@ -2,7 +2,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2025 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@
 #
 
 """
+NOTE: The D-Bus problem seems to be gone.
+
 BTZen script to test cancellation of sensor data read requests.
 
 The script uses SensorTag Bluetooth device.
@@ -49,15 +51,15 @@ Run the script::
 The output of the script should be::
 
     [100917, 24.75, 58.53271484375, 592.96]
-    sensor read cancelled, sleep for 5s to let d-bus breath
+    sensor read failed, sleep for 5s to let d-bus breath
     ...
     [100909, 23.90625, 53.253173828125, 569.12]
     num timeouts 10000
-    sensor read cancelled, sleep for 5s to let d-bus breath
+    sensor read failed, sleep for 5s to let d-bus breath
     ...
     [100914, 23.5625, 53.326416015625, 555.04]
     num timeouts 20000
-    sensor read cancelled, sleep for 5s to let d-bus breath
+    sensor read failed, sleep for 5s to let d-bus breath
     ...
 
 As root run::
@@ -86,32 +88,34 @@ import btzen.sensortag
 
 logger = logging.getLogger()
 
-async def read_sensors(
-        sensors: Sequence[btzen.Device[btzen.Service, float]], timeout: float
-    ) -> None:
+async def read_data(sensors: Sequence[btzen.Device[btzen.Service, float]]) -> list[float]:
+    async with asyncio.TaskGroup() as tg:
+        tasks = [tg.create_task(btzen.read(s)) for s in sensors]
 
+    return [t.result() for t in tasks]
+
+async def read_sensors(
+        sensors: Sequence[btzen.Device[btzen.Service, float]],
+        timeout: float
+) -> None:
     timeouts = 0
     attempts = 0
     while btzen.is_active():
         attempts += 1
         try:
-            tasks = [asyncio.create_task(btzen.read(s)) for s in sensors]
-            task = asyncio.gather(*tasks)
-
-            # periodically show sensor values to ensure a tester that
-            # sensor data reads are against a connected device
+            task = read_data(sensors)
             if attempts == 1 or attempts % 10000 == 0:
                 result = await task
             else:
                 result = await asyncio.wait_for(task, timeout=timeout)
             print(result)
-        except asyncio.CancelledError as ex:
-            # timeout, no buffer space and connection errors are handled
-            # by BTZen and raised as cancellations; it is up to a caller
-            # to decide what to do
-            print('sensor read cancelled, sleep for 5s to let d-bus breath', ex)
+        except* ConnectionError as ex:
+            # timeout, no buffer space and connection errors are handled by
+            # BTZen and raised as connection error; it is up to a caller to
+            # decide what to do
+            print('sensor read failed, sleep for 5s to let d-bus breath', ex)
             await asyncio.sleep(5)
-        except asyncio.TimeoutError as ex:
+        except* asyncio.TimeoutError as ex:
             # most of the time timeout from asyncio loop is expected,
             # count the timeouts and report them to see the script
             # progressing

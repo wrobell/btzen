@@ -1,7 +1,7 @@
 #
 # BTZen - library to asynchronously access Bluetooth devices.
 #
-# Copyright (C) 2015 - 2024 by Artur Wroblewski <wrobell@riseup.net>
+# Copyright (C) 2015 - 2025 by Artur Wroblewski <wrobell@riseup.net>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 import asyncio
 import logging
 import typing as tp
+from collections import defaultdict
 from collections.abc import Coroutine
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -28,11 +29,12 @@ from .bus import Bus
 from .error import BTZenError, CallError
 from .data import T
 from .device import DeviceBase
-from .service import S
+from .service import S, Service
 
 logger = logging.getLogger(__name__)
 
 BT_SESSION = ContextVar['Session']('BT_SESSION')
+CONNECTION_ERROR = 'Connection error'
 
 class Session:
     """
@@ -44,7 +46,8 @@ class Session:
         self.bus = bus
         self._is_active = False
 
-        self._device_task: dict[DeviceBase[tp.Any, tp.Any], asyncio.Future[tp.Any]] = {}
+        self._device_task = \
+            defaultdict[DeviceBase[Service, tp.Any], set[asyncio.Task[tp.Any]]](set)
         self._connection_task: dict[str, asyncio.Task[tp.Any]] = {}
         self._connection_status: dict[str, asyncio.Event] = {}
 
@@ -53,18 +56,21 @@ class Session:
     def start(self) -> None:
         self._is_active = True
 
-    def create_future(
+    def create_task(
         self, device: DeviceBase[S, T], f: Coroutine[None, None, T]
-    ) -> asyncio.Future[T]:
+    ) -> asyncio.Task[T]:
         """
-        Create future managed by BTZen connection session.
+        Create task managed by BTZen connection session.
 
         If session stops, then all pending tasks are cancelled.
         """
         assert self._is_active
 
-        task = asyncio.ensure_future(f)
-        self._device_task[device] = task
+        dev_tasks = self._device_task[device]
+
+        task = asyncio.create_task(_run_device_task(f))
+        dev_tasks.add(task)
+        task.add_done_callback(dev_tasks.discard)
         return task
 
     def add_connection_task(
@@ -96,24 +102,24 @@ class Session:
                 'Device with address {} not managed by BTZen connection manager'
                 .format(device.mac)
             )
-        # create future, so it can be cancelled when error happens in
-        # connection management tasks
-        task = self.create_future(device, event.wait())  # type: ignore[misc]
+        # create task, which can be cancelled with connection error
+        task = self.create_task(device, event.wait())
         await task
 
     def is_active(self) -> bool:
         return self._is_active
 
-    def cancel_device_tasks(self, mac: str, msg: str) -> None:
-        tasks = (t for d, t in self._device_task.items() if d.mac == mac)
+    def disconnect_devices(self, mac: str) -> None:
+        tasks = (t for d, st in self._device_task.items() for t in st if d.mac == mac)
         for t in tasks:
-            t.cancel(msg=msg)
+            t.cancel(msg=CONNECTION_ERROR)
 
     def stop(self) -> None:
         self._is_active = False
 
         msg = 'BTZen session stopped'
-        for t in self._device_task.values():
+        tasks = (t for st in self._device_task.values() for t in st)
+        for t in tasks:
             t.cancel(msg=msg)
         for t in self._connection_task.values():
             t.cancel(msg=msg)
@@ -124,7 +130,9 @@ class Session:
         """
         Stop BTZen session if task is in error.
         """
-        if task.done() and not task.cancelled() and task.exception():
+        if task.done() and not task.cancelled() and task.exception() \
+                and not isinstance(task.exception(), ConnectionError):
+
             get_session().stop()
             try:
                 task.result()
@@ -159,5 +167,18 @@ def get_session() -> Session:
 
 def is_active() -> bool:
     return get_session().is_active()
+
+async def _run_device_task(f: Coroutine[None, None, T]) -> T:
+    """
+    Run device task and convert task cancellations with connection error
+    message into connection errors.
+    """
+    try:
+        return await f
+    except asyncio.CancelledError as ex:
+        if ex.args and ex.args[0] == CONNECTION_ERROR:
+            raise ConnectionError('Device disconnected')
+        else:
+            raise
 
 # vim: sw=4:et:ai
